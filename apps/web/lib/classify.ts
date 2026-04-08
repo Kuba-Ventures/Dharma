@@ -57,6 +57,45 @@ export function detectTimezoneFromText(text: string): string {
   return "America/New_York"; // default — owner is Eastern
 }
 
+export async function classifyEmailLabels(
+  subject: string,
+  from: string,
+  body: string,
+  labels: Array<{ name: string; description: string }>
+): Promise<string[]> {
+  if (!labels.length) return [];
+
+  const labelList = labels
+    .map((l) => `- ${l.name}: ${l.description}`)
+    .join("\n");
+
+  const text = await callClaude(
+    `You are an email classifier for a business professional. Label emails from real people about real business situations. Be confident when the match is clear.
+
+SKIP labeling entirely (return []) for:
+- GitHub, Vercel, Jira, Linear, Slack, or any developer tool notifications
+- Google Calendar invites, acceptances, or meeting updates
+- Gemini, AI digest, or automated summary emails
+- Newsletters, marketing, or bulk mail
+- Any no-reply or automated sender
+
+For real human emails, apply labels that clearly fit. It's fine to apply 1-2 labels when confident.
+
+Labels:\n${labelList}\n\nEmail:\nFrom: ${from}\nSubject: ${subject}\nBody:\n${body.slice(0, 600)}\n\nReturn a JSON array of matching label names ([] if automated or no clear match): ["Label1"]\nJSON only, no explanation.`,
+    200
+  );
+
+  const arrMatch = text.match(/\[[\s\S]*?\]/);
+  if (!arrMatch) return [];
+  try {
+    const arr = JSON.parse(arrMatch[0]) as string[];
+    const validNames = new Set(labels.map((l) => l.name));
+    return arr.filter((n) => validNames.has(n));
+  } catch {
+    return [];
+  }
+}
+
 export async function classifyEmail(
   subject: string,
   body: string

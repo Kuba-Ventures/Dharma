@@ -8,6 +8,32 @@ function makeOAuth2Client() {
   );
 }
 
+// Creates an auth client with expiry so the library auto-refreshes stale tokens,
+// and persists new tokens back to the database.
+export async function makeAuthForUser(userId: string) {
+  const cred = await prisma.googleCredential.findUnique({ where: { userId } });
+  if (!cred) throw new Error(`No Google credential for user ${userId}`);
+
+  const auth = makeOAuth2Client();
+  auth.setCredentials({
+    access_token: cred.accessToken,
+    refresh_token: cred.refreshToken,
+    expiry_date: cred.expiresAt.getTime(),
+  });
+
+  auth.on("tokens", async (tokens) => {
+    await prisma.googleCredential.update({
+      where: { userId },
+      data: {
+        accessToken: tokens.access_token ?? cred.accessToken,
+        expiresAt: new Date(tokens.expiry_date ?? Date.now() + 3_600_000),
+      },
+    });
+  });
+
+  return { auth, cred };
+}
+
 // Seeds gmailHistoryId from the current Gmail profile so the poller knows
 // where to start. If Pub/Sub is configured, also registers a push watch.
 export async function setupGmailWatch(
@@ -129,6 +155,129 @@ function extractBody(payload: any): string {
     }
   }
   return "";
+}
+
+// Gmail label background colors (must be from Gmail's supported palette)
+export const GMAIL_COLORS: Record<string, { backgroundColor: string; textColor: string }> = {
+  blue:   { backgroundColor: "#4986e7", textColor: "#ffffff" },
+  purple: { backgroundColor: "#a479e2", textColor: "#ffffff" },
+  green:  { backgroundColor: "#16a766", textColor: "#ffffff" },
+  teal:   { backgroundColor: "#2da2bb", textColor: "#ffffff" },
+  yellow: { backgroundColor: "#f2c960", textColor: "#1d1d1d" },
+  orange: { backgroundColor: "#ff7537", textColor: "#ffffff" },
+  red:    { backgroundColor: "#cc3a21", textColor: "#ffffff" },
+  gray:   { backgroundColor: "#999999", textColor: "#ffffff" },
+};
+
+export async function listGmailLabels(
+  userId: string
+): Promise<Array<{ id: string; name: string }>> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.labels.list({ userId: "me" });
+    return (res.data.labels ?? [])
+      .filter((l) => l.id && l.name)
+      .map((l) => ({ id: l.id!, name: l.name! }));
+  } catch (err) {
+    console.error("[gmail] listGmailLabels failed:", err);
+    return [];
+  }
+}
+
+export async function createGmailLabel(
+  userId: string,
+  name: string,
+  colorKey: string
+): Promise<string | null> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    const color = GMAIL_COLORS[colorKey] ?? GMAIL_COLORS.gray;
+    const res = await gmail.users.labels.create({
+      userId: "me",
+      requestBody: { name, labelListVisibility: "labelShow", messageListVisibility: "show", color },
+    });
+    return res.data.id ?? null;
+  } catch (err) {
+    console.error("[gmail] createGmailLabel failed:", err);
+    return null;
+  }
+}
+
+export async function deleteGmailLabel(
+  userId: string,
+  gmailLabelId: string
+): Promise<void> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.labels.delete({ userId: "me", id: gmailLabelId });
+  } catch (err) {
+    console.warn("[gmail] deleteGmailLabel failed:", err);
+  }
+}
+
+export interface InboxMessage {
+  id: string;
+  subject: string;
+  from: string;
+  snippet: string;
+}
+
+export async function listRecentInboxMessages(
+  userId: string,
+  maxResults = 30
+): Promise<InboxMessage[]> {
+  const { auth } = await makeAuthForUser(userId);
+  const gmail = google.gmail({ version: "v1", auth });
+
+  const listRes = await gmail.users.messages.list({
+    userId: "me",
+    labelIds: ["INBOX"],
+    maxResults,
+  });
+
+  const ids = (listRes.data.messages ?? []).map((m) => m.id!).filter(Boolean);
+
+  const results = await Promise.allSettled(
+    ids.map(async (id) => {
+      const res = await gmail.users.messages.get({
+        userId: "me",
+        id,
+        format: "metadata",
+        metadataHeaders: ["Subject", "From"],
+      });
+      const headers = res.data.payload?.headers ?? [];
+      const get = (name: string) =>
+        headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
+      return {
+        id,
+        subject: get("Subject"),
+        from: get("From"),
+        snippet: res.data.snippet ?? "",
+      };
+    })
+  );
+
+  return results
+    .filter((r): r is PromiseFulfilledResult<InboxMessage> => r.status === "fulfilled")
+    .map((r) => r.value);
+}
+
+export async function applyGmailLabels(
+  userId: string,
+  messageId: string,
+  gmailLabelIds: string[]
+): Promise<void> {
+  if (!gmailLabelIds.length) return;
+  const { auth } = await makeAuthForUser(userId);
+  const gmail = google.gmail({ version: "v1", auth });
+  await gmail.users.messages.modify({
+    userId: "me",
+    id: messageId,
+    requestBody: { addLabelIds: gmailLabelIds },
+  });
 }
 
 export async function createDraft(

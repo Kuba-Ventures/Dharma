@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { getNewMessageIds, getMessage, createDraft } from "../../../../lib/gmail";
-import { classifyEmail } from "../../../../lib/classify";
+import { getNewMessageIds, getMessage, createDraft, applyGmailLabels } from "../../../../lib/gmail";
+import { classifyEmail, classifyEmailLabels } from "../../../../lib/classify";
 import { getAvailableSlots } from "@dharma/calendar-core";
 import { RealGoogleProvider } from "@dharma/providers-google";
 import { generateReply, generateAIReply } from "@dharma/reply-generation";
@@ -87,6 +87,35 @@ export async function POST(req: NextRequest) {
 
       if (!msg) continue; // sent by the user themselves
 
+      // Apply matching Gmail labels (rules first, then AI for labels without rules)
+      try {
+        const labels = await prisma.label.findMany({
+          where: { userId: googleCred.userId, enabled: true, gmailLabelId: { not: null } },
+          include: { rules: true },
+        });
+
+        const ruleMatches = labels.filter(
+          (l) => l.rules.length > 0 && l.rules.some((rule) => matchesRule(rule, msg))
+        );
+        const labelsWithoutRules = labels.filter((l) => l.rules.length === 0);
+        let aiMatches: typeof labels = [];
+        if (labelsWithoutRules.length > 0 && process.env.ANTHROPIC_API_KEY) {
+          const aiNames = await classifyEmailLabels(
+            msg.subject, msg.from, msg.body,
+            labelsWithoutRules.map((l) => ({ name: l.name, description: l.description }))
+          );
+          aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
+        }
+
+        const gmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
+        if (gmailIds.length > 0) {
+          await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+          console.log(`[gmail/webhook] Labeled message ${messageId}:`, gmailIds);
+        }
+      } catch (err) {
+        console.error("[gmail/webhook] Label application failed:", err);
+      }
+
       const { isSchedulingRequest, durationMinutes } = await classifyEmail(
         msg.subject,
         msg.body
@@ -152,4 +181,26 @@ export async function POST(req: NextRequest) {
   }
 
   return new NextResponse("OK", { status: 200 });
+}
+
+function matchesRule(
+  rule: { field: string; operator: string; value: string },
+  msg: { subject: string; from: string; body: string }
+): boolean {
+  const haystack = (() => {
+    switch (rule.field) {
+      case "subject": return msg.subject.toLowerCase();
+      case "from":    return msg.from.toLowerCase();
+      case "body":    return msg.body.toLowerCase();
+      default:        return "";
+    }
+  })();
+  const needle = rule.value.toLowerCase();
+  switch (rule.operator) {
+    case "contains":     return haystack.includes(needle);
+    case "not_contains": return !haystack.includes(needle);
+    case "starts_with":  return haystack.startsWith(needle);
+    case "is":           return haystack === needle;
+    default:             return false;
+  }
 }
