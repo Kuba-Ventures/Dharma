@@ -13,7 +13,7 @@ const TONE_INSTRUCTIONS: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
-  const { threadId, tone } = await req.json() as { threadId: string; tone?: string };
+  const { threadId, tone } = await req.json() as { threadId: string; tone?: string; returnText?: boolean };
 
   let userId: string | undefined;
   const session = await auth();
@@ -106,15 +106,6 @@ Reply draft:`;
   const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
   const replyBody = claudeData.content[0]?.text?.trim() ?? "";
 
-  await createDraft(googleCred.accessToken, googleCred.refreshToken, {
-    from: googleCred.email,
-    to: from,
-    subject,
-    body: replyBody,
-    threadId,
-    inReplyTo: messageIdHeader,
-    references,
-  });
-
-  return NextResponse.json({ ok: true });
+  // Return the text directly so the extension can inject it into the compose box
+  return NextResponse.json({ ok: true, text: replyBody });
 }
