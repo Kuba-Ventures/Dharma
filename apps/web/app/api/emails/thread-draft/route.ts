@@ -34,7 +34,15 @@ export async function POST(req: Request) {
   const gmail = google.gmail({ version: "v1", auth: oauthClient });
 
   // Get the thread and use the most recent message
-  const thread = await gmail.users.threads.get({ userId: "me", id: threadId, format: "full" });
+  let thread;
+  try {
+    thread = await gmail.users.threads.get({ userId: "me", id: threadId, format: "full" });
+  } catch (err: any) {
+    const status = err?.status ?? err?.code ?? 500;
+    const message = err?.errors?.[0]?.message ?? err?.message ?? "Gmail API error";
+    console.error("[thread-draft] gmail.threads.get failed:", status, message, "threadId:", threadId);
+    return NextResponse.json({ error: `Gmail error: ${message}`, threadId }, { status: 502 });
+  }
   const messages = thread.data.messages ?? [];
   if (!messages.length) return NextResponse.json({ error: "Thread empty" }, { status: 404 });
 
