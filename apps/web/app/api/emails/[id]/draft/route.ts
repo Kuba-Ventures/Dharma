@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
+import { verifyExtensionToken } from "../../../../../lib/extension-token";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser, createDraft } from "../../../../../lib/gmail";
 import { google } from "googleapis";
@@ -16,13 +17,21 @@ const TONE_INSTRUCTIONS: Record<string, string> = {
 };
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id: messageId } = await params;
   const { tone } = await req.json() as { tone?: string };
 
-  const userId = session.user.id;
+  // Accept either a NextAuth session or a Bearer extension token
+  let userId: string | undefined;
+  const session = await auth();
+  if (session?.user?.id) {
+    userId = session.user.id;
+  } else {
+    const authHeader = req.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      userId = verifyExtensionToken(authHeader.slice(7)) ?? undefined;
+    }
+  }
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const googleCred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!googleCred) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
 
