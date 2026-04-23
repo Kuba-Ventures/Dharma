@@ -12,8 +12,19 @@ const TONE_INSTRUCTIONS: Record<string, string> = {
   "Casual / Friendly": "Write in a warm, conversational tone. It's okay to be a little informal — use contractions, keep it light and approachable.",
 };
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}
+
 export async function POST(req: Request) {
-  const { threadId, tone } = await req.json() as { threadId: string; tone?: string; returnText?: boolean };
+  try {
+  const { threadId, tone } = await req.json() as { threadId: string; tone?: string };
 
   let userId: string | undefined;
   const session = await auth();
@@ -25,7 +36,7 @@ export async function POST(req: Request) {
       userId = verifyExtensionToken(authHeader.slice(7)) ?? undefined;
     }
   }
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
 
   const googleCred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!googleCred) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
@@ -102,10 +113,13 @@ Reply draft:`;
     }),
   });
 
-  if (!claudeRes.ok) return NextResponse.json({ error: "Claude failed" }, { status: 500 });
+  if (!claudeRes.ok) return NextResponse.json({ error: "Claude failed" }, { status: 500, headers: CORS });
   const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
   const replyBody = claudeData.content[0]?.text?.trim() ?? "";
 
-  // Return the text directly so the extension can inject it into the compose box
-  return NextResponse.json({ ok: true, text: replyBody });
+  return NextResponse.json({ ok: true, text: replyBody }, { headers: CORS });
+  } catch (err: any) {
+    console.error("[thread-draft] unhandled error:", err?.message ?? err);
+    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500, headers: CORS });
+  }
 }
