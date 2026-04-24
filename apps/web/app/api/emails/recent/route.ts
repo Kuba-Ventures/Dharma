@@ -20,7 +20,7 @@ export async function GET() {
   const listRes = await gmail.users.messages.list({
     userId: "me",
     labelIds: ["INBOX"],
-    maxResults: 30,
+    maxResults: 10,
   });
 
   const ids = (listRes.data.messages ?? []).map((m) => m.id!).filter(Boolean);
