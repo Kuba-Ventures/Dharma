@@ -96,7 +96,7 @@ export default function DashboardFeatures({ schedulingEnabled, onSchedulingChang
       <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-white">Calendar & Scheduling</p>
+            <p className="text-sm font-medium text-white">Scheduling</p>
             <p className="text-xs text-white/30 mt-0.5">Automate scheduling and calendar events</p>
           </div>
           <Toggle enabled={schedulingEnabled} onChange={onSchedulingChange} />

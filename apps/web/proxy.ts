@@ -10,7 +10,8 @@ export default auth((req) => {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
     pathname.startsWith("/api/emails/thread-draft") ||
-    pathname.startsWith("/api/user/me");
+    pathname.startsWith("/api/user/me") ||
+    pathname.startsWith("/api/user/preferences");
 
   if (!isLoggedIn && !isPublic) {
     const loginUrl = new URL("/login", req.url);
