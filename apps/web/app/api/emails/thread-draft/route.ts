@@ -34,6 +34,16 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       userId = verifyExtensionToken(authHeader.slice(7)) ?? undefined;
+    } else if (authHeader?.startsWith("GoogleBearer ")) {
+      const googleToken = authHeader.slice("GoogleBearer ".length);
+      const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${googleToken}` },
+      });
+      if (userinfoRes.ok) {
+        const { email } = await userinfoRes.json() as { email: string };
+        const cred = await prisma.googleCredential.findUnique({ where: { email } });
+        if (cred) userId = cred.userId;
+      }
     }
   }
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
