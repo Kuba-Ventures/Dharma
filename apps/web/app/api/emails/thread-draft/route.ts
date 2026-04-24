@@ -10,6 +10,7 @@ const TONE_INSTRUCTIONS: Record<string, string> = {
   Concise: "Write a brief, direct reply. No filler words, no pleasantries beyond a quick greeting. Get to the point in 2-4 sentences.",
   "Formal / Legal": "Write in formal, precise language appropriate for legal or official correspondence. Use complete sentences, avoid contractions, and maintain a professional distance.",
   "Casual / Friendly": "Write in a warm, conversational tone. It's okay to be a little informal — use contractions, keep it light and approachable.",
+  Scheduling: "Write a brief reply focused on scheduling. Propose specific times or ask for the recipient's availability. Be direct and action-oriented — no filler.",
 };
 
 const CORS = {
