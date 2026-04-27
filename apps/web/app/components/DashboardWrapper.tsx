@@ -284,10 +284,10 @@ export default function DashboardWrapper({
           {labelsEnabled && <LabelsPanel />}
         </div>
 
-        {/* ── Calendar & Scheduling card ── */}
+        {/* ── Scheduling card ── */}
         <FeatureCard>
           <FeatureRow
-            title="Calendar & Scheduling"
+            title="Scheduling"
             description="Detect scheduling requests and send calendar invites automatically"
             enabled={schedulingEnabled}
             onToggle={handleSchedulingToggle}
