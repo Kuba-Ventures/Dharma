@@ -118,6 +118,7 @@ Rules:
 - No sign-off name at the end — the sender's signature handles that.
 - No subject line.
 - Keep it concise.
+- Never use em-dashes (—). Use a comma or period instead.
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Their notes/draft:
@@ -254,7 +255,7 @@ Reply draft:`;
 
   if (!claudeRes.ok) return NextResponse.json({ error: "Claude failed" }, { status: 500, headers: CORS });
   const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
-  const replyBody = claudeData.content[0]?.text?.trim() ?? "";
+  const replyBody = (claudeData.content[0]?.text?.trim() ?? "").replace(/—/g, ",");
 
   return NextResponse.json({ ok: true, text: replyBody }, { headers: CORS });
   } catch (err: any) {
