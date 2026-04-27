@@ -9,13 +9,7 @@ import InboxPanel from "./InboxPanel";
 
 type Tone = "My Tone" | "Concise" | "Formal / Legal" | "Casual / Friendly";
 
-const TONES: { id: Tone; description: string; example: string }[] = [
-  {
-    id: "My Tone",
-    description: "Trained on your inbox — mirrors how you write naturally",
-    example:
-      "Hey Sarah,\n\nJust circling back on this one — let me know if there's anything you need from my end before Thursday.\n\nThanks,\nFinley",
-  },
+const PRESET_TONES: { id: Tone; description: string; example: string }[] = [
   {
     id: "Concise",
     description: "Brief and direct, no filler",
@@ -36,16 +30,27 @@ const TONES: { id: Tone; description: string; example: string }[] = [
   },
 ];
 
+const ALL_TONES: Tone[] = ["My Tone", "Concise", "Formal / Legal", "Casual / Friendly"];
+
+interface UpcomingEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+}
+
+interface SchedulePatterns {
+  preferredWindow: string;
+  preferredDays: string;
+  typicalDuration: string;
+  meetingsPerWeek: string;
+  insight: string;
+}
 
 interface Props {
   schedulingEnabled: boolean;
   tone: string;
-  googleEmail?: string;
-  microsoft: boolean;
-  microsoftEmail?: string;
-  microsoftConfigured: boolean;
-  apple: boolean;
-  appleEmail?: string;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -53,12 +58,6 @@ interface Props {
 export default function DashboardWrapper({
   schedulingEnabled: initialSchedulingEnabled,
   tone: initialTone,
-  googleEmail,
-  microsoft,
-  microsoftEmail,
-  microsoftConfigured,
-  apple,
-  appleEmail,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -69,27 +68,103 @@ export default function DashboardWrapper({
   const [labelsEnabled, setLabelsEnabled] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
 
-  // Calendar state
-  const [toast, setToast] = useState<string | null>(null);
-  const [showAppleForm, setShowAppleForm] = useState(false);
-  const [appleId, setAppleId] = useState("");
-  const [appPassword, setAppPassword] = useState("");
-  const [appleError, setAppleError] = useState<string | null>(null);
-  const [calLoading, setCalLoading] = useState<string | null>(null);
+  // My Tone sync state
+  const [toneProfile, setToneProfile] = useState("");
+  const [toneExample, setToneExample] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
 
-  // Microsoft OAuth return
   useEffect(() => {
-    const connected = params.get("connected");
-    if (connected === "microsoft") {
-      setToast("Outlook Calendar connected");
-      router.replace("/dashboard");
+    fetch("/api/preferences/tone")
+      .then((r) => r.json())
+      .then((data: { toneProfile: string | null; toneExample: string | null }) => {
+        if (data.toneProfile) setToneProfile(data.toneProfile);
+        if (data.toneExample) setToneExample(data.toneExample);
+      })
+      .catch(() => null);
+  }, []);
+
+  async function handleSyncEmail() {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/preferences/tone/sync", { method: "POST" });
+      if (!res.ok) {
+        const { error } = await res.json() as { error: string };
+        throw new Error(error ?? "Sync failed");
+      }
+      const data = await res.json() as { summary: string; example: string };
+      setToneProfile(data.summary);
+      setToneExample(data.example);
+      setSelectedTone("My Tone");
+      await fetch("/api/preferences/tone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tone: "My Tone" }),
+      });
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncing(false);
     }
-    const errorParam = params.get("error");
-    if (errorParam?.startsWith("microsoft")) {
-      setToast("Could not connect Outlook — please try again");
-      router.replace("/dashboard");
+  }
+
+  async function handleSaveProfile() {
+    setProfileSaving(true);
+    await fetch("/api/preferences/tone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toneProfile, toneExample }),
+    });
+    setProfileSaving(false);
+  }
+
+  const [calSyncing, setCalSyncing] = useState(false);
+  const [calSyncStatus, setCalSyncStatus] = useState<string | null>(null);
+  const [scheduleData, setScheduleData] = useState<{ upcoming: UpcomingEvent[]; patterns: SchedulePatterns } | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [schedulingPrefs, setSchedulingPrefs] = useState("");
+  const [prefsSaving, setPrefsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!schedulingEnabled) return;
+    setScheduleLoading(true);
+    fetch("/api/calendar/google/schedule")
+      .then((r) => r.json())
+      .then((data: { upcoming: UpcomingEvent[]; patterns: SchedulePatterns; savedPreferences: string | null }) => {
+        setScheduleData(data);
+        setSchedulingPrefs(data.savedPreferences ?? data.patterns?.preferredWindow ?? "");
+      })
+      .catch(() => null)
+      .finally(() => setScheduleLoading(false));
+  }, [schedulingEnabled]);
+
+  async function handleSaveSchedulingPrefs() {
+    setPrefsSaving(true);
+    await fetch("/api/preferences/scheduling", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schedulingPreferences: schedulingPrefs }),
+    });
+    setPrefsSaving(false);
+  }
+
+  async function handleCalSync() {
+    setCalSyncing(true);
+    setCalSyncStatus(null);
+    try {
+      const res = await fetch("/api/calendar/google/sync", { method: "POST" });
+      if (!res.ok) throw new Error();
+      setCalSyncStatus("Calendar synced successfully");
+    } catch {
+      setCalSyncStatus("Sync failed — please try again");
+    } finally {
+      setCalSyncing(false);
     }
-  }, [params, router]);
+  }
+
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -117,110 +192,6 @@ export default function DashboardWrapper({
     });
   }
 
-  async function disconnect(provider: "google" | "microsoft" | "apple") {
-    setCalLoading(provider);
-    await fetch(`/api/calendar/${provider}/disconnect`, { method: "POST" });
-    setCalLoading(null);
-    router.refresh();
-  }
-
-  async function connectApple(e: React.FormEvent) {
-    e.preventDefault();
-    setAppleError(null);
-    setCalLoading("apple");
-    const res = await fetch("/api/calendar/apple/connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ appleId, appPassword }),
-    });
-    setCalLoading(null);
-    if (res.ok) {
-      setShowAppleForm(false);
-      setAppleId("");
-      setAppPassword("");
-      setToast("Apple Calendar connected");
-      router.refresh();
-    } else {
-      const data = await res.json() as { error?: string };
-      setAppleError(data.error ?? "Connection failed");
-    }
-  }
-
-  const calendarProviders = (
-    <div className={`transition-opacity ${schedulingEnabled ? "opacity-100" : "opacity-35 pointer-events-none"}`}>
-      {/* Google — always connected via sign-in */}
-      <div className="px-5 py-3.5 flex items-center justify-between gap-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <GoogleIcon />
-          <div>
-            <p className="text-sm text-white/80">Google Calendar</p>
-            {googleEmail && <p className="text-xs text-white/30 mt-0.5">{googleEmail}</p>}
-          </div>
-        </div>
-        <span className="text-xs text-[#c8f5a0]/60 bg-[#c8f5a0]/10 px-2 py-0.5 rounded-full">Connected</span>
-      </div>
-
-      {/* Microsoft */}
-      <div className="px-5 py-3.5 flex items-center justify-between gap-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <MicrosoftIcon />
-          <div>
-            <p className="text-sm text-white/80">Outlook / Microsoft 365</p>
-            {microsoft && microsoftEmail && <p className="text-xs text-white/30 mt-0.5">{microsoftEmail}</p>}
-          </div>
-        </div>
-        {microsoft ? (
-          <button onClick={() => disconnect("microsoft")} disabled={calLoading === "microsoft"} className="text-xs text-white/30 hover:text-white/60 transition-colors disabled:opacity-40">
-            {calLoading === "microsoft" ? "…" : "Disconnect"}
-          </button>
-        ) : microsoftConfigured ? (
-          <a href="/api/calendar/microsoft/connect" className="text-xs bg-white/[0.08] hover:bg-white/[0.12] text-white/60 px-3 py-1.5 rounded-lg transition-colors">Connect →</a>
-        ) : (
-          <span className="text-xs text-white/20 italic">Coming soon</span>
-        )}
-      </div>
-
-      {/* Apple */}
-      <div className="px-5 py-3.5 space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <AppleIcon />
-            <div>
-              <p className="text-sm text-white/80">Apple iCloud Calendar</p>
-              {apple && appleEmail && <p className="text-xs text-white/30 mt-0.5">{appleEmail}</p>}
-            </div>
-          </div>
-          {apple ? (
-            <button onClick={() => disconnect("apple")} disabled={calLoading === "apple"} className="text-xs text-white/30 hover:text-white/60 transition-colors disabled:opacity-40">
-              {calLoading === "apple" ? "…" : "Disconnect"}
-            </button>
-          ) : (
-            <button onClick={() => setShowAppleForm((v) => !v)} className="text-xs bg-white/[0.08] hover:bg-white/[0.12] text-white/60 px-3 py-1.5 rounded-lg transition-colors">
-              {showAppleForm ? "Cancel" : "Connect →"}
-            </button>
-          )}
-        </div>
-        {showAppleForm && !apple && (
-          <form onSubmit={connectApple} className="space-y-3 pt-1 border-t border-white/[0.06]">
-            <p className="text-xs text-white/30 leading-relaxed">
-              Enter your Apple ID and an{" "}
-              <a href="https://support.apple.com/102654" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white/50">app-specific password</a>
-              . Stored encrypted.
-            </p>
-            <input type="email" placeholder="Apple ID (e.g. you@icloud.com)" value={appleId} onChange={(e) => setAppleId(e.target.value)} required
-              className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20" />
-            <input type="password" placeholder="App-specific password (xxxx-xxxx-xxxx-xxxx)" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} required
-              className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/20" />
-            {appleError && <p className="text-xs text-red-400">{appleError}</p>}
-            <button type="submit" disabled={calLoading === "apple"}
-              className="w-full bg-white text-[#1a1a1a] font-medium text-sm py-2.5 rounded-xl hover:bg-white/90 transition-colors disabled:opacity-50">
-              {calLoading === "apple" ? "Connecting…" : "Connect Apple Calendar"}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
 
   return (
     <div>
@@ -248,13 +219,58 @@ export default function DashboardWrapper({
           {toneEnabled && (
             <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 space-y-3 h-full">
               <div className="flex flex-wrap gap-2">
-                {TONES.map(({ id }) => (
+                {ALL_TONES.map((id) => (
                   <Tag key={id} label={id} active={selectedTone === id}
                     onClick={() => handleToneSelect(selectedTone === id ? null : id)} />
                 ))}
               </div>
-              {selectedTone && (() => {
-                const tone = TONES.find((t) => t.id === selectedTone)!;
+
+              {selectedTone === "My Tone" && (
+                <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-white/40">
+                      {toneProfile ? "Analysed from your sent emails" : "Sync your sent emails to detect your writing style"}
+                    </p>
+                    <button
+                      onClick={handleSyncEmail}
+                      disabled={syncing}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/[0.07] border border-white/[0.12] text-white/60 hover:text-white/90 hover:bg-white/[0.11] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {syncing ? <><SpinnerIcon />Syncing…</> : <><SyncIcon />Sync Email</>}
+                    </button>
+                  </div>
+                  {syncError && <p className="text-xs text-red-400/80">{syncError}</p>}
+                  {toneProfile && (
+                    <>
+                      <div className="space-y-1.5 border-t border-white/[0.06] pt-3">
+                        <p className="text-[10px] text-white/20 uppercase tracking-widest">Your style</p>
+                        <textarea
+                          value={toneProfile}
+                          onChange={(e) => setToneProfile(e.target.value)}
+                          rows={3}
+                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white/80 resize-none focus:outline-none focus:border-white/20 leading-relaxed"
+                        />
+                      </div>
+                      {toneExample && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] text-white/20 uppercase tracking-widest">Example email</p>
+                          <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2.5">{toneExample}</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={profileSaving}
+                        className="text-xs px-3 py-1.5 rounded-full bg-[#c8f5a0]/10 border border-[#c8f5a0]/30 text-[#c8f5a0]/80 hover:bg-[#c8f5a0]/15 hover:text-[#c8f5a0] transition-colors disabled:opacity-40"
+                      >
+                        {profileSaving ? "Saving…" : "Save"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {selectedTone && selectedTone !== "My Tone" && (() => {
+                const tone = PRESET_TONES.find((t) => t.id === selectedTone)!;
                 return (
                   <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] p-4 space-y-3">
                     <p className="text-xs text-white/40">{tone.description}</p>
@@ -294,9 +310,90 @@ export default function DashboardWrapper({
           />
         </FeatureCard>
 
-        {/* Calendar providers panel — always visible */}
-        <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl overflow-hidden">
-          {calendarProviders}
+        {/* Scheduling detail panel */}
+        <div>
+          {schedulingEnabled && (
+            <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 space-y-4 h-full">
+              {/* Sync row */}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-white/40">
+                  {calSyncStatus ?? "Sync your calendar to keep availability up to date"}
+                </p>
+                <button
+                  onClick={handleCalSync}
+                  disabled={calSyncing}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-white/[0.07] border border-white/[0.12] text-white/60 hover:text-white/90 hover:bg-white/[0.11] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {calSyncing ? <><SpinnerIcon />Syncing…</> : <><SyncIcon />Sync Calendar</>}
+                </button>
+              </div>
+
+              {/* My Schedule */}
+              <div className="border-t border-white/[0.06] pt-3">
+                <p className="text-[10px] text-white/20 uppercase tracking-widest mb-3">My Schedule</p>
+                {scheduleLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-white/30 py-4 justify-center">
+                    <SpinnerIcon />Loading schedule…
+                  </div>
+                ) : scheduleData ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Upcoming meetings */}
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">Upcoming</p>
+                      {scheduleData.upcoming.length === 0 ? (
+                        <p className="text-xs text-white/30">No upcoming events</p>
+                      ) : (
+                        scheduleData.upcoming.map((ev) => {
+                          const start = new Date(ev.start);
+                          const dateStr = ev.isAllDay
+                            ? start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+                            : start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                          const timeStr = ev.isAllDay
+                            ? "All day"
+                            : start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                          return (
+                            <div key={ev.id} className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2">
+                              <p className="text-xs text-white/75 truncate">{ev.title}</p>
+                              <p className="text-[10px] text-white/30 mt-0.5">{dateStr} · {timeStr}</p>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Scheduling patterns */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">Your patterns</p>
+
+                      {/* Editable preferred time */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-white/20 uppercase tracking-widest">Preferred time</p>
+                        <textarea
+                          value={schedulingPrefs}
+                          onChange={(e) => setSchedulingPrefs(e.target.value)}
+                          rows={3}
+                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white/80 resize-none focus:outline-none focus:border-white/20 leading-relaxed"
+                        />
+                        <button
+                          onClick={handleSaveSchedulingPrefs}
+                          disabled={prefsSaving}
+                          className="text-xs px-3 py-1.5 rounded-full bg-[#c8f5a0]/10 border border-[#c8f5a0]/30 text-[#c8f5a0]/80 hover:bg-[#c8f5a0]/15 hover:text-[#c8f5a0] transition-colors disabled:opacity-40"
+                        >
+                          {prefsSaving ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+
+                      <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2.5 space-y-2">
+                        <PatternRow label="Preferred days" value={scheduleData.patterns.preferredDays} />
+                        <PatternRow label="Typical length" value={scheduleData.patterns.typicalDuration} />
+                        <PatternRow label="Meetings/week" value={scheduleData.patterns.meetingsPerWeek} />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
@@ -353,6 +450,15 @@ function FeatureRow({
   );
 }
 
+function PatternRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-[10px] text-white/30 shrink-0">{label}</span>
+      <span className="text-[10px] text-white/65 text-right">{value}</span>
+    </div>
+  );
+}
+
 function Tag({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -389,32 +495,19 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
-function GoogleIcon() {
+function SyncIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="shrink-0">
-      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4" />
-      <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853" />
-      <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05" />
-      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335" />
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.06-3.39L10 6h5V1l-1.35 1.35z" fill="currentColor" />
     </svg>
   );
 }
 
-function MicrosoftIcon() {
+function SpinnerIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 21 21" fill="none" className="shrink-0">
-      <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-      <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-      <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-      <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0 animate-spin">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round" />
     </svg>
   );
 }
 
-function AppleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 814 1000" fill="currentColor" className="text-white/60 shrink-0">
-      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-42.8-157.1-122.7c-60.1-90.4-108.4-229-108.4-360.2 0-199.3 131-305.3 259.7-305.3 69.4 0 126.9 45.7 170.1 45.7 41 0 106.1-48.4 183.6-48.4zM520.8 69c-41.5 50.2-109.2 88.9-176.9 88.9-.3-6.4-.5-13-.5-19.7C343.4 67 437.3 0 504.9 0c39.9 0 81.2 23.8 81.2 23.8-1.5 16.1-28.4 68.6-65.3 45.2z" />
-    </svg>
-  );
-}

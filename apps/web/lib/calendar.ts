@@ -16,10 +16,25 @@ export async function createCalendarEvent(
     endISO: string;
     attendeeEmail: string;
     organizerEmail: string;
-  }
+  },
+  onTokenRefresh?: (newToken: string, expiresAt: Date) => Promise<void>
 ): Promise<string | null> {
   const auth = makeOAuth2Client();
   auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+  // Persist refreshed token if the caller provides a callback
+  if (onTokenRefresh) {
+    auth.on("tokens", (tokens) => {
+      if (tokens.access_token) {
+        const expiresAt = tokens.expiry_date
+          ? new Date(tokens.expiry_date)
+          : new Date(Date.now() + 3600 * 1000);
+        onTokenRefresh(tokens.access_token, expiresAt).catch((err) =>
+          console.error("[calendar] Failed to persist refreshed token:", err)
+        );
+      }
+    });
+  }
 
   const calendar = google.calendar({ version: "v3", auth });
 

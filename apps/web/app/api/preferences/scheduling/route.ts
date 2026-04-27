@@ -8,12 +8,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { enabled } = await req.json() as { enabled: boolean };
+  const body = await req.json() as { enabled?: boolean; schedulingPreferences?: string };
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { schedulingEnabled: enabled },
-  });
+  const data: { schedulingEnabled?: boolean; schedulingPreferences?: string } = {};
+  if (typeof body.enabled === "boolean") data.schedulingEnabled = body.enabled;
+  if (typeof body.schedulingPreferences === "string") data.schedulingPreferences = body.schedulingPreferences;
+
+  await prisma.user.update({ where: { id: session.user.id }, data });
 
   return NextResponse.json({ success: true });
 }

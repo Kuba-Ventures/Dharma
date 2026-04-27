@@ -15,6 +15,9 @@ model User {
   image               String?
   schedulingEnabled   Boolean              @default(true)
   tone                String               @default("Concise")
+  toneProfile             String?
+  toneExample             String?
+  schedulingPreferences   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   googleCredential    GoogleCredential?

@@ -23,12 +23,14 @@ export async function POST(req: NextRequest) {
     durationMinutes: body.durationMinutes ?? 60,
   };
 
-  // Load all credentials in parallel
-  const [googleCred, microsoftCred, appleCred] = await Promise.all([
+  // Load credentials and user preferences in parallel
+  const [googleCred, microsoftCred, appleCred, user] = await Promise.all([
     prisma.googleCredential.findUnique({ where: { userId } }),
     prisma.microsoftCredential.findUnique({ where: { userId } }),
     prisma.appleCredential.findUnique({ where: { userId } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { schedulingPreferences: true } }),
   ]);
+  const schedulingPreferences = user?.schedulingPreferences ?? undefined;
 
   const providers: CalendarProvider[] = [];
 
@@ -82,7 +84,8 @@ export async function POST(req: NextRequest) {
   const isReal = providers.length > 0;
 
   const { slots } = await getAvailableSlots(provider, request);
-  const suggestedSlots = slots.slice(0, 3);
+  const suggestedSlots = slots.slice(0, 3);       // shown as chips in the UI
+  const candidateSlots = slots.slice(0, 9);        // wider pool so AI can pick the best-fit times
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
 
       if (hasApiKey && request.rawText.trim()) {
         try {
-          for await (const chunk of generateAIReply(suggestedSlots, request.rawText)) {
+          for await (const chunk of generateAIReply(candidateSlots, request.rawText, "America/New_York", false, schedulingPreferences)) {
             controller.enqueue(
               enc.encode(JSON.stringify({ type: "chunk", text: chunk }) + "\n")
             );

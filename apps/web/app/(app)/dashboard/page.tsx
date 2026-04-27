@@ -10,12 +10,10 @@ export default async function DashboardPage() {
 
   const userId = session.user.id;
 
-  const [user, googleCred, microsoftCred, appleCred] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { schedulingEnabled: true, tone: true } }),
-    prisma.googleCredential.findUnique({ where: { userId } }),
-    prisma.microsoftCredential.findUnique({ where: { userId } }),
-    prisma.appleCredential.findUnique({ where: { userId } }),
-  ]);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { schedulingEnabled: true, tone: true },
+  });
 
   return (
     <div className="space-y-6">
@@ -27,12 +25,6 @@ export default async function DashboardPage() {
         <DashboardWrapper
           schedulingEnabled={user?.schedulingEnabled ?? true}
           tone={user?.tone ?? ""}
-          googleEmail={googleCred?.email}
-          microsoft={!!microsoftCred}
-          microsoftEmail={microsoftCred?.email}
-          microsoftConfigured={!!process.env.MICROSOFT_CLIENT_ID}
-          apple={!!appleCred}
-          appleEmail={appleCred?.appleId}
         />
       </Suspense>
     </div>

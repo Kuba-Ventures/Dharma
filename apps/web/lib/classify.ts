@@ -1,24 +1,36 @@
 async function callClaude(prompt: string, maxTokens = 80): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return "";
+  if (!apiKey) {
+    console.error("[classify] ANTHROPIC_API_KEY is not set — classification skipped");
+    return "";
+  }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
 
-  if (!response.ok) return "";
-  const data = (await response.json()) as { content: Array<{ text: string }> };
-  return data.content[0]?.text ?? "";
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`[classify] Anthropic API error ${response.status}: ${body}`);
+      return "";
+    }
+    const data = (await response.json()) as { content: Array<{ text: string }> };
+    return data.content[0]?.text ?? "";
+  } catch (err) {
+    console.error("[classify] Anthropic API call failed:", err);
+    return "";
+  }
 }
 
 function parseJSON<T>(text: string): T | null {

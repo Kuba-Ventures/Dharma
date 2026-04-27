@@ -42,7 +42,9 @@ Rules:
     throw new Error(`Anthropic API error ${response.status}: ${body}`);
   }
 
-  const reader = response.body!.getReader();
+  if (!response.body) throw new Error("Anthropic API returned no response body");
+
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -72,7 +74,8 @@ export async function* generateAIReply(
   slots: TimeSlot[],
   schedulingRequest: string,
   timezone = "America/New_York",
-  allOfferedTimesBusy = false
+  allOfferedTimesBusy = false,
+  preferences?: string
 ): AsyncGenerator<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -82,16 +85,20 @@ export async function* generateAIReply(
   const ownerTimezone = "America/New_York";
   const formattedSlots = slots.map((s) => `• ${formatSlot(s, ownerTimezone)}`).join("\n");
 
+  const preferenceLine = preferences
+    ? `\n- The user's scheduling preferences: "${preferences}". From the slots listed, select and propose only the 2–3 that best match these preferences. Do not mention or apologize for slots outside the preferred window — just lead with the best ones.`
+    : "";
+
   const systemPrompt = `You write email replies on behalf of the user.
 
 Rules:
 - Write ONLY the email body. No subject line. No "Here is a reply:" preamble.
 - Mirror the tone of the incoming request: casual request → casual reply, formal → formal.
 - Keep it short — 2 to 4 sentences maximum.
-- Include all the available time slots naturally in the text. Times are in ET.
+- Choose 2–3 of the available time slots and include them naturally in the text. Times are in ET.
 - End with a friendly call to action (e.g. "let me know what works").
 - Do not sign off with a name — the user will add their own signature.
-- NEVER claim the other person's proposed times "don't work" unless explicitly told they conflict.`;
+- NEVER claim the other person's proposed times "don't work" unless explicitly told they conflict.${preferenceLine}`;
 
   const conflict = allOfferedTimesBusy
     ? "Unfortunately those specific times don't work on my calendar, but"
@@ -120,7 +127,9 @@ Rules:
     throw new Error(`Anthropic API error ${response.status}: ${body}`);
   }
 
-  const reader = response.body!.getReader();
+  if (!response.body) throw new Error("Anthropic API returned no response body");
+
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 

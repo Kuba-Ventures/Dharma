@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { getNewMessageIds, getMessage, createDraft } from "../../../../lib/gmail";
-import { classifyEmail, extractConfirmedTime, extractProposedTimes, detectTimezoneFromText } from "../../../../lib/classify";
+import { getNewMessageIds, getMessage, createDraft, applyGmailLabels } from "../../../../lib/gmail";
+import { classifyEmail, classifyEmailLabels, extractConfirmedTime, extractProposedTimes, detectTimezoneFromText } from "../../../../lib/classify";
 import { createCalendarEvent } from "../../../../lib/calendar";
 import { getAvailableSlots } from "@dharma/calendar-core";
 import { RealGoogleProvider } from "@dharma/providers-google";
@@ -94,6 +94,55 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
           if (!msg) continue;
 
+          // ── Label classification (rule-based + AI) ─────────────────────────
+          // Run in background — don't let label errors block scheduling logic
+          (async () => {
+            try {
+              const labels = await prisma.label.findMany({
+                where: { userId: googleCred.userId, enabled: true, gmailLabelId: { not: null } },
+                include: { rules: true },
+              });
+              if (!labels.length) return;
+
+              const ruleMatches = labels.filter((label) =>
+                label.rules.some((rule) => {
+                  const haystack =
+                    rule.field === "subject" ? msg.subject.toLowerCase()
+                    : rule.field === "from" ? msg.from.toLowerCase()
+                    : msg.body.toLowerCase();
+                  const needle = rule.value.toLowerCase();
+                  switch (rule.operator) {
+                    case "contains":     return haystack.includes(needle);
+                    case "not_contains": return !haystack.includes(needle);
+                    case "starts_with":  return haystack.startsWith(needle);
+                    case "is":           return haystack === needle;
+                    default:             return false;
+                  }
+                })
+              );
+
+              const labelsWithoutRules = labels.filter(
+                (l) => l.rules.length === 0 && !ruleMatches.find((m) => m.id === l.id)
+              );
+              let aiMatches: typeof labels = [];
+              if (labelsWithoutRules.length > 0 && process.env.ANTHROPIC_API_KEY) {
+                const aiNames = await classifyEmailLabels(
+                  msg.subject, msg.from, msg.body,
+                  labelsWithoutRules.map((l) => ({ name: l.name, description: l.description }))
+                );
+                aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
+              }
+
+              const gmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
+              if (gmailIds.length > 0) {
+                await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+                console.log(`[poll] Labels applied to ${messageId}: ${[...ruleMatches, ...aiMatches].map((l) => l.name).join(", ")}`);
+              }
+            } catch (err) {
+              console.error(`[poll] Label classification failed for ${messageId}:`, err);
+            }
+          })();
+
           const { isSchedulingRequest, isTimeConfirmation, durationMinutes } = await classifyEmail(
             msg.subject,
             msg.body
@@ -108,7 +157,11 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
             console.log(`[poll] Extracted meeting:`, JSON.stringify(meeting));
 
             if (meeting) {
-              const senderEmail = msg.from.match(/<([^>]+)>/)?.[1] ?? msg.from.trim();
+              // Parse sender email from "Display Name <email>" or plain "email" format
+              const angleMatch = msg.from.match(/<([^>]+)>/);
+              const senderEmail = angleMatch
+                ? angleMatch[1].trim()
+                : msg.from.replace(/\s*\(.*\)/, "").trim();
               const meetLink = await createCalendarEvent(
                 googleCred.accessToken,
                 googleCred.refreshToken,
@@ -118,6 +171,12 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
                   endISO: meeting.endISO,
                   attendeeEmail: senderEmail,
                   organizerEmail: email,
+                },
+                async (newAccessToken, expiresAt) => {
+                  await prisma.googleCredential.update({
+                    where: { email },
+                    data: { accessToken: newAccessToken, expiresAt },
+                  });
                 }
               );
               eventsCreated++;
