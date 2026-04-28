@@ -399,15 +399,10 @@ function LabelRow({
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
         <button className="flex-1 text-left min-w-0" onClick={onExpand}>
-          <span className={`text-xs font-medium ${isPreview ? "text-white/40" : "text-white/75"}`}>
-            #{item.name}
-          </span>
+          <span className="text-xs font-medium text-white/75">#{item.name}</span>
         </button>
-        {!isPreview && item.rules.length > 0 && !expanded && (
+        {item.rules.length > 0 && !expanded && (
           <span className="text-[10px] text-white/20 shrink-0">{item.rules.length} kw</span>
-        )}
-        {isPreview && (
-          <span className="text-[10px] text-white/20 shrink-0 italic">not applied</span>
         )}
         <button onClick={onExpand} className="text-white/20 hover:text-white/50 transition-colors shrink-0 px-0.5">
           <ChevronIcon expanded={expanded} />
@@ -430,16 +425,15 @@ function LabelRow({
           {item.description && (
             <p className="text-[10px] text-white/30 pt-2">{item.description}</p>
           )}
-
-          {isPreview ? (
-            <p className="text-[10px] text-white/20 italic">
-              Click &ldquo;Apply labels&rdquo; below to activate this label and add keywords
+          <div>
+            <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
+              Keywords — matching emails get this label
             </p>
-          ) : (
-            <div>
-              <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
-                Keywords — matching emails get this label
+            {isPreview ? (
+              <p className="text-[10px] text-white/20">
+                Apply labels below to activate keyword sorting for this label
               </p>
+            ) : (
               <div className="flex flex-wrap gap-1.5 items-center">
                 {item.rules.map((rule) => (
                   <span
@@ -455,7 +449,6 @@ function LabelRow({
                     </button>
                   </span>
                 ))}
-
                 {showInput ? (
                   <span className="inline-flex items-center gap-1">
                     <input
@@ -469,36 +462,22 @@ function LabelRow({
                       placeholder="keyword…"
                       className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
                     />
-                    <button
-                      onClick={submit}
-                      disabled={adding || !input.trim()}
-                      className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
-                    >
+                    <button onClick={submit} disabled={adding || !input.trim()} className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40">
                       {adding ? "…" : "Add"}
                     </button>
-                    <button
-                      onClick={() => { setShowInput(false); setInput(""); }}
-                      className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
-                    >
-                      ✕
-                    </button>
+                    <button onClick={() => { setShowInput(false); setInput(""); }} className="text-[11px] text-white/25 hover:text-white/50 transition-colors">✕</button>
                   </span>
                 ) : (
-                  <button
-                    onClick={() => setShowInput(true)}
-                    className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
-                  >
+                  <button onClick={() => setShowInput(true)} className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors">
                     + keyword
                   </button>
                 )}
+                {item.rules.length === 0 && !showInput && (
+                  <p className="text-[10px] text-white/20 w-full mt-0.5">No keywords yet — add some to auto-sort matching emails</p>
+                )}
               </div>
-              {item.rules.length === 0 && !showInput && (
-                <p className="text-[10px] text-white/20 mt-1.5">
-                  No keywords yet — add some to auto-sort matching emails
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
