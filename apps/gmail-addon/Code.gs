@@ -54,6 +54,7 @@ function buildComposeToneCard(subject) {
       CardService.newTextButton()
         .setText(tones[i])
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#b57bff')
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('generateFromCompose')
@@ -69,6 +70,7 @@ function buildComposeToneCard(subject) {
     CardService.newTextButton()
       .setText('Polish Draft')
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setBackgroundColor('#9e9e9e')
       .setOnClickAction(
         CardService.newAction()
           .setFunctionName('polishDraft')
@@ -109,6 +111,7 @@ function buildToneMenuCard(actionFunction, baseParams) {
       CardService.newTextButton()
         .setText(tone)
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#b57bff')
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName(actionFunction)
