@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import LabelsPanel from "./LabelsPanel";
+
+// ── Paste your Gmail add-on install URL here ───────────────────────────────
+// For testing: Apps Script editor → Deploy → Test deployments → copy the install link
+// For production: your Google Workspace Marketplace listing URL
+const ADDON_INSTALL_URL = "https://workspace.google.com/marketplace/app/dharma/609300901936";
+// ──────────────────────────────────────────────────────────────────────────
 import InboxPanel from "./InboxPanel";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -61,6 +67,15 @@ export default function DashboardWrapper({
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
+
+  const [addonDismissed, setAddonDismissed] = useState(false);
+  useEffect(() => {
+    setAddonDismissed(localStorage.getItem("dharma_addon_dismissed") === "true");
+  }, []);
+  function dismissAddon() {
+    localStorage.setItem("dharma_addon_dismissed", "true");
+    setAddonDismissed(true);
+  }
 
   // Feature toggles
   const [toneEnabled, setToneEnabled] = useState(!!initialTone);
@@ -196,8 +211,42 @@ export default function DashboardWrapper({
   return (
     <div>
       {toast && (
-        <div className="text-xs text-[#c8f5a0] bg-[#c8f5a0]/10 border border-[#c8f5a0]/20 rounded-xl px-4 py-2 text-center mb-3">
+        <div className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center mb-3">
           {toast}
+        </div>
+      )}
+
+      {/* ── Gmail add-on install banner ── */}
+      {!addonDismissed && (
+        <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 flex items-center justify-between gap-4 mb-1">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
+              <GmailIcon />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">Get Dharma in Gmail</p>
+              <p className="text-xs text-white/40 mt-0.5">
+                Install the Gmail add-on to draft replies and schedule meetings right from your inbox
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={ADDON_INSTALL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/15 border border-[#b57bff]/40 text-[#b57bff] hover:bg-[#b57bff]/20 transition-colors"
+            >
+              Install Add-on
+            </a>
+            <button
+              onClick={dismissAddon}
+              aria-label="Dismiss"
+              className="text-white/20 hover:text-white/50 transition-colors p-1"
+            >
+              <XIcon />
+            </button>
+          </div>
         </div>
       )}
 
@@ -260,7 +309,7 @@ export default function DashboardWrapper({
                       <button
                         onClick={handleSaveProfile}
                         disabled={profileSaving}
-                        className="text-xs px-3 py-1.5 rounded-full bg-[#c8f5a0]/10 border border-[#c8f5a0]/30 text-[#c8f5a0]/80 hover:bg-[#c8f5a0]/15 hover:text-[#c8f5a0] transition-colors disabled:opacity-40"
+                        className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/10 border border-[#b57bff]/30 text-[#b57bff]/80 hover:bg-[#b57bff]/15 hover:text-[#b57bff] transition-colors disabled:opacity-40"
                       >
                         {profileSaving ? "Saving…" : "Save"}
                       </button>
@@ -377,7 +426,7 @@ export default function DashboardWrapper({
                         <button
                           onClick={handleSaveSchedulingPrefs}
                           disabled={prefsSaving}
-                          className="text-xs px-3 py-1.5 rounded-full bg-[#c8f5a0]/10 border border-[#c8f5a0]/30 text-[#c8f5a0]/80 hover:bg-[#c8f5a0]/15 hover:text-[#c8f5a0] transition-colors disabled:opacity-40"
+                          className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/10 border border-[#b57bff]/30 text-[#b57bff]/80 hover:bg-[#b57bff]/15 hover:text-[#b57bff] transition-colors disabled:opacity-40"
                         >
                           {prefsSaving ? "Saving…" : "Save"}
                         </button>
@@ -465,7 +514,7 @@ function Tag({ label, active, onClick }: { label: string; active: boolean; onCli
       onClick={onClick}
       className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
         active
-          ? "bg-[#c8f5a0]/15 border-[#c8f5a0]/40 text-[#c8f5a0]"
+          ? "bg-[#b57bff]/15 border-[#b57bff]/40 text-[#b57bff]"
           : "bg-white/[0.05] border-white/[0.1] text-white/40 hover:text-white/60 hover:bg-white/[0.08]"
       }`}
     >
@@ -481,7 +530,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={enabled}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-        enabled ? "bg-[#c8f5a0]/70" : "bg-white/[0.12]"
+        enabled ? "bg-[#b57bff]/70" : "bg-white/[0.12]"
       }`}
     >
       <span
@@ -507,6 +556,23 @@ function SpinnerIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0 animate-spin">
       <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GmailIcon() {
+  return (
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+      <path d="M1 1.5L8 6.5L15 1.5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.25" strokeLinecap="round" />
+      <rect x="0.5" y="0.5" width="15" height="11" rx="1.5" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
