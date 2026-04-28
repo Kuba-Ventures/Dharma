@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // ── Industry presets ───────────────────────────────────────────────────────
 
@@ -17,44 +17,61 @@ const INDUSTRY_PRESETS: Record<IndustryKey, { label: string; presets: PresetLabe
   pe: {
     label: "Private Equity",
     presets: [
-      { name: "Keep Warm",                  description: "Relationship to maintain — not ready yet",        color: "#f5e6a0", colorKey: "yellow" },
-      { name: "Interested — Info Received",  description: "Target has shown interest and sent materials",   color: "#a0c8f5", colorKey: "blue"   },
-      { name: "LOI Issued",                 description: "Letter of Intent sent to target",                 color: "#c8a0f5", colorKey: "purple" },
-      { name: "Client Intro",               description: "Introduction made to a client or LP",             color: "#a0f5c8", colorKey: "teal"   },
-      { name: "Due Diligence",              description: "Active diligence process underway",               color: "#f5c8a0", colorKey: "orange" },
-      { name: "Closing",                    description: "Deal nearing final close",                        color: "#a0f5c8", colorKey: "teal"   },
-      { name: "Portfolio Company",          description: "Existing portfolio company communication",        color: "#a0c8f5", colorKey: "blue"   },
-      { name: "LP Update",                  description: "Limited partner updates and reporting",           color: "#c0c0c0", colorKey: "gray"   },
+      { name: "Keep Warm",                 description: "Relationship to maintain — not ready yet",        color: "#f5e6a0", colorKey: "yellow" },
+      { name: "Interested — Info Received", description: "Target has shown interest and sent materials",   color: "#a0c8f5", colorKey: "blue"   },
+      { name: "LOI Issued",                description: "Letter of Intent sent to target",                 color: "#c8a0f5", colorKey: "purple" },
+      { name: "Client Intro",              description: "Introduction made to a client or LP",             color: "#a0f5c8", colorKey: "teal"   },
+      { name: "Due Diligence",             description: "Active diligence process underway",               color: "#f5c8a0", colorKey: "orange" },
+      { name: "Closing",                   description: "Deal nearing final close",                        color: "#a0f5c8", colorKey: "teal"   },
+      { name: "Portfolio Company",         description: "Existing portfolio company communication",        color: "#a0c8f5", colorKey: "blue"   },
+      { name: "LP Update",                 description: "Limited partner updates and reporting",           color: "#c0c0c0", colorKey: "gray"   },
     ],
   },
   vc: {
     label: "Venture Capital",
     presets: [
-      { name: "Approached",                 description: "Initial outreach made to founder or company",     color: "#a0c8f5", colorKey: "blue"   },
-      { name: "Letter Sent",                description: "Formal interest letter or memo delivered",        color: "#c8a0f5", colorKey: "purple" },
-      { name: "Target Profiles Secured",    description: "Company profile or deck received for review",    color: "#a0f5c8", colorKey: "teal"   },
-      { name: "Term Sheet",                 description: "Term sheet issued or under negotiation",          color: "#f5c8a0", colorKey: "orange" },
-      { name: "Portfolio Update",           description: "Updates from existing portfolio companies",       color: "#a0c8f5", colorKey: "blue"   },
-      { name: "Deal Flow",                  description: "Inbound deal flow and sourcing threads",          color: "#f5e6a0", colorKey: "yellow" },
-      { name: "Pass",                       description: "Reviewed and decided not to pursue",              color: "#c0c0c0", colorKey: "gray"   },
-      { name: "LP Communication",           description: "Investor relations and LP correspondence",        color: "#f5a0a0", colorKey: "red"    },
+      { name: "Approached",                description: "Initial outreach made to founder or company",     color: "#a0c8f5", colorKey: "blue"   },
+      { name: "Letter Sent",               description: "Formal interest letter or memo delivered",        color: "#c8a0f5", colorKey: "purple" },
+      { name: "Target Profiles Secured",   description: "Company profile or deck received for review",    color: "#a0f5c8", colorKey: "teal"   },
+      { name: "Term Sheet",                description: "Term sheet issued or under negotiation",          color: "#f5c8a0", colorKey: "orange" },
+      { name: "Portfolio Update",          description: "Updates from existing portfolio companies",       color: "#a0c8f5", colorKey: "blue"   },
+      { name: "Deal Flow",                 description: "Inbound deal flow and sourcing threads",          color: "#f5e6a0", colorKey: "yellow" },
+      { name: "Pass",                      description: "Reviewed and decided not to pursue",              color: "#c0c0c0", colorKey: "gray"   },
+      { name: "LP Communication",          description: "Investor relations and LP correspondence",        color: "#f5a0a0", colorKey: "red"    },
     ],
   },
   rfa: {
     label: "RFA",
     presets: [
-      { name: "Client Inquiry",             description: "Direct question or request from a client",        color: "#a0c8f5", colorKey: "blue"   },
-      { name: "Research Request",           description: "Request for analysis or research report",         color: "#c8a0f5", colorKey: "purple" },
-      { name: "Compliance",                 description: "Regulatory or compliance-related correspondence", color: "#f5a0a0", colorKey: "red"    },
-      { name: "Report Delivered",           description: "Research or analysis report sent to client",      color: "#a0f5c8", colorKey: "teal"   },
-      { name: "Follow-up Required",         description: "Action item or follow-up pending",                color: "#f5e6a0", colorKey: "yellow" },
-      { name: "Meeting Scheduled",          description: "Call or meeting confirmed with a client",         color: "#a0c8f5", colorKey: "blue"   },
-      { name: "Prospect",                   description: "Potential new client or engagement",              color: "#c8a0f5", colorKey: "purple" },
+      { name: "Client Inquiry",            description: "Direct question or request from a client",        color: "#a0c8f5", colorKey: "blue"   },
+      { name: "Research Request",          description: "Request for analysis or research report",         color: "#c8a0f5", colorKey: "purple" },
+      { name: "Compliance",               description: "Regulatory or compliance-related correspondence",  color: "#f5a0a0", colorKey: "red"    },
+      { name: "Report Delivered",          description: "Research or analysis report sent to client",      color: "#a0f5c8", colorKey: "teal"   },
+      { name: "Follow-up Required",        description: "Action item or follow-up pending",                color: "#f5e6a0", colorKey: "yellow" },
+      { name: "Meeting Scheduled",         description: "Call or meeting confirmed with a client",         color: "#a0c8f5", colorKey: "blue"   },
+      { name: "Prospect",                  description: "Potential new client or engagement",              color: "#c8a0f5", colorKey: "purple" },
     ],
   },
 };
 
+const COLOR_OPTIONS = [
+  { key: "blue",   hex: "#a0c8f5" },
+  { key: "purple", hex: "#c8a0f5" },
+  { key: "teal",   hex: "#a0f5c8" },
+  { key: "yellow", hex: "#f5e6a0" },
+  { key: "orange", hex: "#f5c8a0" },
+  { key: "red",    hex: "#f5a0a0" },
+  { key: "gray",   hex: "#c0c0c0" },
+];
+
 // ── Types ──────────────────────────────────────────────────────────────────
+
+interface LabelRule {
+  id: string;
+  field: string;
+  operator: string;
+  value: string;
+}
 
 interface LabelRecord {
   id: string;
@@ -63,7 +80,7 @@ interface LabelRecord {
   color: string;
   enabled: boolean;
   gmailLabelId: string | null;
-  rules: unknown[];
+  rules: LabelRule[];
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -72,9 +89,14 @@ export default function LabelsPanel() {
   const [industry, setIndustry] = useState<IndustryKey | "">("");
   const [labels, setLabels] = useState<LabelRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ scanned: number; labeled: number } | null>(null);
   const [applying, setApplying] = useState(false);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColorKey, setNewColorKey] = useState("purple");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("dharma_industry") as IndustryKey | null;
@@ -90,49 +112,73 @@ export default function LabelsPanel() {
 
   function handleIndustryChange(key: IndustryKey | "") {
     setIndustry(key);
+    setScanResult(null);
     if (key) localStorage.setItem("dharma_industry", key);
     else localStorage.removeItem("dharma_industry");
-    setScanResult(null);
-  }
-
-  function findLabel(name: string): LabelRecord | undefined {
-    return labels.find((l) => l.name.toLowerCase() === name.toLowerCase());
-  }
-
-  async function togglePreset(preset: PresetLabel, enabled: boolean) {
-    const existing = findLabel(preset.name);
-    if (existing) {
-      setLabels((prev) => prev.map((l) => l.id === existing.id ? { ...l, enabled } : l));
-      await fetch(`/api/labels/${existing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled }),
-      });
-    } else if (enabled) {
-      const res = await fetch("/api/labels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: preset.name,
-          description: preset.description,
-          color: preset.color,
-          colorKey: preset.colorKey,
-        }),
-      });
-      if (res.ok) {
-        const label: LabelRecord = await res.json();
-        setLabels((prev) => [...prev, label]);
-      }
-    }
   }
 
   async function applyAll() {
     if (!industry) return;
     setApplying(true);
     for (const preset of INDUSTRY_PRESETS[industry].presets) {
-      await togglePreset(preset, true);
+      const exists = labels.find((l) => l.name.toLowerCase() === preset.name.toLowerCase());
+      if (!exists) {
+        const res = await fetch("/api/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: preset.name, description: preset.description, color: preset.color, colorKey: preset.colorKey }),
+        });
+        if (res.ok) {
+          const label: LabelRecord = await res.json();
+          setLabels((prev) => [...prev, { ...label, rules: label.rules ?? [] }]);
+        }
+      }
     }
     setApplying(false);
+  }
+
+  async function deleteLabel(id: string) {
+    setLabels((prev) => prev.filter((l) => l.id !== id));
+    if (expandedId === id) setExpandedId(null);
+    await fetch(`/api/labels/${id}`, { method: "DELETE" });
+  }
+
+  async function addKeyword(labelId: string, keyword: string) {
+    const res = await fetch(`/api/labels/${labelId}/rules`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field: "body", operator: "contains", value: keyword }),
+    });
+    if (res.ok) {
+      const rule: LabelRule = await res.json();
+      setLabels((prev) => prev.map((l) => l.id === labelId ? { ...l, rules: [...l.rules, rule] } : l));
+    }
+  }
+
+  async function deleteKeyword(labelId: string, ruleId: string) {
+    await fetch(`/api/labels/${labelId}/rules/${ruleId}`, { method: "DELETE" });
+    setLabels((prev) => prev.map((l) =>
+      l.id === labelId ? { ...l, rules: l.rules.filter((r) => r.id !== ruleId) } : l
+    ));
+  }
+
+  async function handleCreateLabel() {
+    if (!newName.trim()) return;
+    setCreating(true);
+    const color = COLOR_OPTIONS.find((c) => c.key === newColorKey)?.hex ?? "#c8a0f5";
+    const res = await fetch("/api/labels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim(), color, colorKey: newColorKey, description: "" }),
+    });
+    if (res.ok) {
+      const label: LabelRecord = await res.json();
+      setLabels((prev) => [...prev, { ...label, rules: label.rules ?? [] }]);
+      setNewName("");
+      setNewColorKey("purple");
+      setShowNewForm(false);
+    }
+    setCreating(false);
   }
 
   async function scanInbox() {
@@ -152,10 +198,8 @@ export default function LabelsPanel() {
     setScanning(false);
   }
 
-  const presets = industry ? INDUSTRY_PRESETS[industry].presets : [];
-
   return (
-    <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 space-y-4 h-full">
+    <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 space-y-3 h-full">
 
       {/* Industry selector */}
       <div className="flex items-center gap-3">
@@ -182,42 +226,86 @@ export default function LabelsPanel() {
         )}
       </div>
 
-      {/* Preset labels */}
-      {!industry && (
-        <p className="text-xs text-white/25">Select an industry to see label presets</p>
-      )}
-
-      {industry && (
+      {/* Labels list */}
+      {loading ? (
+        <p className="text-xs text-white/25 py-2">Loading…</p>
+      ) : labels.length === 0 ? (
+        <p className="text-xs text-white/25 py-2">
+          {industry
+            ? `Press "Apply all" to add ${INDUSTRY_PRESETS[industry].label} labels`
+            : "Select an industry above, or add a label below"}
+        </p>
+      ) : (
         <div className="space-y-1.5">
-          {loading ? (
-            <p className="text-xs text-white/25 py-2">Loading…</p>
-          ) : (
-            presets.map((preset) => {
-              const existing = findLabel(preset.name);
-              const isOn = existing ? existing.enabled : false;
-              return (
-                <div
-                  key={preset.name}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] border border-white/[0.05] px-3.5 py-2.5"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: preset.color }} />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-white/80 truncate">#{preset.name}</p>
-                      <p className="text-[10px] text-white/30 truncate mt-0.5">{preset.description}</p>
-                    </div>
-                  </div>
-                  <Toggle enabled={isOn} onChange={(v) => togglePreset(preset, v)} />
-                </div>
-              );
-            })
-          )}
+          {labels.map((label) => (
+            <LabelRow
+              key={label.id}
+              label={label}
+              expanded={expandedId === label.id}
+              onExpand={() => setExpandedId(expandedId === label.id ? null : label.id)}
+              onDelete={() => deleteLabel(label.id)}
+              onAddKeyword={(kw) => addKeyword(label.id, kw)}
+              onDeleteKeyword={(ruleId) => deleteKeyword(label.id, ruleId)}
+            />
+          ))}
         </div>
       )}
 
+      {/* New label form */}
+      {showNewForm ? (
+        <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] px-3.5 py-3 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5 shrink-0">
+              {COLOR_OPTIONS.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setNewColorKey(c.key)}
+                  className={`w-3.5 h-3.5 rounded-full transition-transform ${newColorKey === c.key ? "scale-125 ring-1 ring-white/40" : "opacity-60"}`}
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
+            </div>
+            <input
+              autoFocus
+              placeholder="Label name…"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateLabel()}
+              className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-white/25"
+            />
+          </div>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={handleCreateLabel}
+              disabled={creating || !newName.trim()}
+              className="text-xs px-3 py-1.5 rounded-lg bg-white text-[#1a1a1a] font-medium hover:bg-white/90 transition-colors disabled:opacity-40"
+            >
+              {creating ? "Creating…" : "Create"}
+            </button>
+            <button
+              onClick={() => { setShowNewForm(false); setNewName(""); }}
+              className="text-xs text-white/30 hover:text-white/60 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowNewForm(true)}
+          className="w-full py-2 text-xs text-white/25 hover:text-white/50 border border-dashed border-white/[0.08] hover:border-white/[0.18] rounded-xl transition-colors"
+        >
+          + Add label
+        </button>
+      )}
+
       {/* Scan row */}
-      <div className={`flex items-center justify-between gap-4 ${industry ? "border-t border-white/[0.06] pt-3" : ""}`}>
-        <p className="text-xs text-white/25">Labels apply to new emails automatically</p>
+      <div className="border-t border-white/[0.06] pt-2 flex items-center justify-between gap-4">
+        <p className="text-xs text-white/25">
+          {scanResult
+            ? `Scanned ${scanResult.scanned} emails — labeled ${scanResult.labeled}`
+            : "Scan inbox to apply labels retroactively"}
+        </p>
         <button
           onClick={scanInbox}
           disabled={scanning}
@@ -232,33 +320,149 @@ export default function LabelsPanel() {
         </button>
       </div>
 
-      {scanResult && (
-        <div className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center">
-          Scanned {scanResult.scanned} emails — labeled {scanResult.labeled}
-        </div>
-      )}
-
     </div>
   );
 }
 
-// ── Toggle ─────────────────────────────────────────────────────────────────
+// ── Label row ──────────────────────────────────────────────────────────────
 
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function LabelRow({
+  label, expanded, onExpand, onDelete, onAddKeyword, onDeleteKeyword,
+}: {
+  label: LabelRecord;
+  expanded: boolean;
+  onExpand: () => void;
+  onDelete: () => void;
+  onAddKeyword: (kw: string) => Promise<void>;
+  onDeleteKeyword: (ruleId: string) => void;
+}) {
+  const [input, setInput] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [showInput, setShowInput] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showInput) inputRef.current?.focus();
+  }, [showInput]);
+
+  async function submit() {
+    if (!input.trim()) return;
+    setAdding(true);
+    await onAddKeyword(input.trim());
+    setInput("");
+    setAdding(false);
+    setShowInput(false);
+  }
+
   return (
-    <button
-      onClick={() => onChange(!enabled)}
-      role="switch"
-      aria-checked={enabled}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-        enabled ? "bg-[#b57bff]/70" : "bg-white/[0.12]"
-      }`}
+    <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] overflow-hidden">
+      {/* Row header */}
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+        <button className="flex-1 text-left min-w-0" onClick={onExpand}>
+          <p className="text-xs font-medium text-white/80">#{label.name}</p>
+          {label.description && (
+            <p className="text-[10px] text-white/30 mt-0.5 truncate">{label.description}</p>
+          )}
+        </button>
+        {label.rules.length > 0 && !expanded && (
+          <span className="text-[10px] text-white/20 shrink-0">
+            {label.rules.length} keyword{label.rules.length !== 1 ? "s" : ""}
+          </span>
+        )}
+        <button
+          onClick={onExpand}
+          className="text-white/20 hover:text-white/50 transition-colors px-0.5 shrink-0"
+        >
+          <ChevronIcon expanded={expanded} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="text-white/15 hover:text-red-400/60 transition-colors text-sm leading-none shrink-0 pl-1"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Expanded: keyword editor */}
+      {expanded && (
+        <div className="border-t border-white/[0.05] px-3.5 py-3 space-y-2">
+          <p className="text-[10px] text-white/20 uppercase tracking-widest">
+            Keywords — emails containing these get this label
+          </p>
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {label.rules.map((rule) => (
+              <span
+                key={rule.id}
+                className="inline-flex items-center gap-1 text-[11px] bg-white/[0.06] border border-white/[0.08] rounded-full pl-2.5 pr-1.5 py-0.5 text-white/60"
+              >
+                {rule.value}
+                <button
+                  onClick={() => onDeleteKeyword(rule.id)}
+                  className="text-white/25 hover:text-white/60 transition-colors leading-none ml-0.5"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+
+            {showInput ? (
+              <span className="inline-flex items-center gap-1">
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submit();
+                    if (e.key === "Escape") { setShowInput(false); setInput(""); }
+                  }}
+                  placeholder="keyword…"
+                  className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
+                />
+                <button
+                  onClick={submit}
+                  disabled={adding || !input.trim()}
+                  className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                >
+                  {adding ? "…" : "Add"}
+                </button>
+                <button
+                  onClick={() => { setShowInput(false); setInput(""); }}
+                  className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
+                >
+                  ✕
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowInput(true)}
+                className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
+              >
+                + keyword
+              </button>
+            )}
+          </div>
+
+          {label.rules.length === 0 && !showInput && (
+            <p className="text-[10px] text-white/20 pt-0.5">
+              No keywords yet — emails won&apos;t be auto-sorted until you add some
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Chevron ────────────────────────────────────────────────────────────────
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      width="10" height="10" viewBox="0 0 10 10" fill="none"
+      className={`transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
     >
-      <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-          enabled ? "translate-x-[18px]" : "translate-x-[3px]"
-        }`}
-      />
-    </button>
+      <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
