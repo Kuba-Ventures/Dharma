@@ -338,7 +338,7 @@ export default function DashboardWrapper({
         <FeatureCard>
           <FeatureRow
             title="Tabs & Labels"
-            description="Automatically sort and label incoming emails by category"
+            description="Sort and label emails using industry-specific presets"
             enabled={labelsEnabled}
             onToggle={setLabelsEnabled}
           />
