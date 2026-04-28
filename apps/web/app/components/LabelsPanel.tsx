@@ -113,19 +113,25 @@ export default function LabelsPanel() {
   function handleIndustryChange(key: IndustryKey | "") {
     setIndustry(key);
     setScanResult(null);
+    setExpandedId(null);
     if (key) localStorage.setItem("dharma_industry", key);
     else localStorage.removeItem("dharma_industry");
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
   }
 
   async function applyAll() {
     if (!industry) return;
     setApplying(true);
+    setExpandedId(null);
 
-    // Delete all existing labels first
+    // Delete all existing labels (also removes from Gmail via the API)
     await Promise.all(labels.map((l) => fetch(`/api/labels/${l.id}`, { method: "DELETE" })));
     setLabels([]);
 
-    // Create industry presets sequentially to preserve order
+    // Create industry presets in order
     const created: LabelRecord[] = [];
     for (const preset of INDUSTRY_PRESETS[industry].presets) {
       const res = await fetch("/api/labels", {
@@ -139,6 +145,10 @@ export default function LabelsPanel() {
       }
     }
     setLabels(created);
+
+    // Register new labels in Gmail
+    await fetch("/api/labels/setup-gmail", { method: "POST" });
+
     setApplying(false);
   }
 
@@ -204,9 +214,9 @@ export default function LabelsPanel() {
   }
 
   return (
-    <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 space-y-3 h-full">
+    <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl px-5 py-4 flex flex-col gap-3 h-full">
 
-      {/* Industry selector */}
+      {/* Row 1: industry dropdown + scan inbox */}
       <div className="flex items-center gap-3">
         <label className="text-xs text-white/40 shrink-0">Industry</label>
         <select
@@ -220,43 +230,54 @@ export default function LabelsPanel() {
             <option key={key} value={key}>{val.label}</option>
           ))}
         </select>
-        {industry && (
-          <button
-            onClick={applyAll}
-            disabled={applying}
-            className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/10 border border-[#b57bff]/30 text-[#b57bff]/80 hover:bg-[#b57bff]/15 hover:text-[#b57bff] transition-colors disabled:opacity-40 shrink-0"
-          >
-            {applying ? "Applying…" : "Apply all"}
-          </button>
+        <button
+          onClick={scanInbox}
+          disabled={scanning}
+          className="text-xs bg-white/[0.07] hover:bg-white/[0.12] text-white/60 hover:text-white/80 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+        >
+          {scanning ? (
+            <>
+              <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white/70 rounded-full animate-spin" />
+              Scanning…
+            </>
+          ) : "Scan inbox"}
+        </button>
+      </div>
+
+      {scanResult && (
+        <p className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center">
+          Scanned {scanResult.scanned} emails — labeled {scanResult.labeled}
+        </p>
+      )}
+
+      {/* Label list */}
+      <div className="flex-1">
+        {loading ? (
+          <p className="text-xs text-white/25 py-2">Loading…</p>
+        ) : labels.length === 0 ? (
+          <p className="text-xs text-white/25 py-2">
+            {industry
+              ? `Select "Apply labels" below to load ${INDUSTRY_PRESETS[industry].label} labels`
+              : "Select an industry above to get started"}
+          </p>
+        ) : (
+          <div className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.05]">
+            {labels.map((label) => (
+              <LabelRow
+                key={label.id}
+                label={label}
+                expanded={expandedId === label.id}
+                onExpand={() => toggleExpanded(label.id)}
+                onDelete={() => deleteLabel(label.id)}
+                onAddKeyword={(kw) => addKeyword(label.id, kw)}
+                onDeleteKeyword={(ruleId) => deleteKeyword(label.id, ruleId)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Labels list */}
-      {loading ? (
-        <p className="text-xs text-white/25 py-2">Loading…</p>
-      ) : labels.length === 0 ? (
-        <p className="text-xs text-white/25 py-2">
-          {industry
-            ? `Press "Apply all" to add ${INDUSTRY_PRESETS[industry].label} labels`
-            : "Select an industry above, or add a label below"}
-        </p>
-      ) : (
-        <div className="space-y-1.5">
-          {labels.map((label) => (
-            <LabelRow
-              key={label.id}
-              label={label}
-              expanded={expandedId === label.id}
-              onExpand={() => setExpandedId(expandedId === label.id ? null : label.id)}
-              onDelete={() => deleteLabel(label.id)}
-              onAddKeyword={(kw) => addKeyword(label.id, kw)}
-              onDeleteKeyword={(ruleId) => deleteKeyword(label.id, ruleId)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* New label form */}
+      {/* New label form / button */}
       {showNewForm ? (
         <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] px-3.5 py-3 space-y-2.5">
           <div className="flex items-center gap-2">
@@ -298,30 +319,24 @@ export default function LabelsPanel() {
       ) : (
         <button
           onClick={() => setShowNewForm(true)}
-          className="w-full py-2 text-xs text-white/25 hover:text-white/50 border border-dashed border-white/[0.08] hover:border-white/[0.18] rounded-xl transition-colors"
+          className="text-xs text-white/25 hover:text-white/50 transition-colors text-left"
         >
           + Add label
         </button>
       )}
 
-      {/* Scan row */}
-      <div className="border-t border-white/[0.06] pt-2 flex items-center justify-between gap-4">
-        <p className="text-xs text-white/25">
-          {scanResult
-            ? `Scanned ${scanResult.scanned} emails — labeled ${scanResult.labeled}`
-            : "Scan inbox to apply labels retroactively"}
-        </p>
+      {/* Apply labels — bottom of card */}
+      <div className="border-t border-white/[0.06] pt-3">
         <button
-          onClick={scanInbox}
-          disabled={scanning}
-          className="text-xs bg-white/[0.07] hover:bg-white/[0.12] text-white/60 hover:text-white/80 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+          onClick={applyAll}
+          disabled={applying || !industry}
+          className="w-full py-2.5 text-xs font-medium rounded-xl bg-[#b57bff]/15 border border-[#b57bff]/30 text-[#b57bff] hover:bg-[#b57bff]/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          {scanning ? (
-            <>
-              <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white/70 rounded-full animate-spin" />
-              Scanning…
-            </>
-          ) : "Scan inbox"}
+          {applying
+            ? "Applying labels…"
+            : industry
+              ? `Apply ${INDUSTRY_PRESETS[industry].label} labels to Gmail`
+              : "Select an industry to apply labels"}
         </button>
       </div>
 
@@ -350,6 +365,11 @@ function LabelRow({
     if (showInput) inputRef.current?.focus();
   }, [showInput]);
 
+  // Close input when row collapses
+  useEffect(() => {
+    if (!expanded) { setShowInput(false); setInput(""); }
+  }, [expanded]);
+
   async function submit() {
     if (!input.trim()) return;
     setAdding(true);
@@ -360,25 +380,19 @@ function LabelRow({
   }
 
   return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] overflow-hidden">
-      {/* Row header */}
+    <div className="bg-white/[0.02]">
+      {/* Collapsed row */}
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
         <button className="flex-1 text-left min-w-0" onClick={onExpand}>
-          <p className="text-xs font-medium text-white/80">#{label.name}</p>
-          {label.description && (
-            <p className="text-[10px] text-white/30 mt-0.5 truncate">{label.description}</p>
-          )}
+          <span className="text-xs font-medium text-white/75">#{label.name}</span>
         </button>
         {label.rules.length > 0 && !expanded && (
           <span className="text-[10px] text-white/20 shrink-0">
-            {label.rules.length} keyword{label.rules.length !== 1 ? "s" : ""}
+            {label.rules.length} kw
           </span>
         )}
-        <button
-          onClick={onExpand}
-          className="text-white/20 hover:text-white/50 transition-colors px-0.5 shrink-0"
-        >
+        <button onClick={onExpand} className="text-white/20 hover:text-white/50 transition-colors shrink-0 px-0.5">
           <ChevronIcon expanded={expanded} />
         </button>
         <button
@@ -389,70 +403,74 @@ function LabelRow({
         </button>
       </div>
 
-      {/* Expanded: keyword editor */}
+      {/* Expanded: description + keywords */}
       {expanded && (
-        <div className="border-t border-white/[0.05] px-3.5 py-3 space-y-2">
-          <p className="text-[10px] text-white/20 uppercase tracking-widest">
-            Keywords — emails containing these get this label
-          </p>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {label.rules.map((rule) => (
-              <span
-                key={rule.id}
-                className="inline-flex items-center gap-1 text-[11px] bg-white/[0.06] border border-white/[0.08] rounded-full pl-2.5 pr-1.5 py-0.5 text-white/60"
-              >
-                {rule.value}
-                <button
-                  onClick={() => onDeleteKeyword(rule.id)}
-                  className="text-white/25 hover:text-white/60 transition-colors leading-none ml-0.5"
+        <div className="px-3.5 pb-3 space-y-2.5 border-t border-white/[0.04]">
+          {label.description && (
+            <p className="text-[10px] text-white/30 pt-2">{label.description}</p>
+          )}
+          <div>
+            <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
+              Keywords — matching emails get this label
+            </p>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {label.rules.map((rule) => (
+                <span
+                  key={rule.id}
+                  className="inline-flex items-center gap-1 text-[11px] bg-white/[0.06] border border-white/[0.08] rounded-full pl-2.5 pr-1.5 py-0.5 text-white/60"
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  {rule.value}
+                  <button
+                    onClick={() => onDeleteKeyword(rule.id)}
+                    className="text-white/25 hover:text-white/60 transition-colors leading-none ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
 
-            {showInput ? (
-              <span className="inline-flex items-center gap-1">
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submit();
-                    if (e.key === "Escape") { setShowInput(false); setInput(""); }
-                  }}
-                  placeholder="keyword…"
-                  className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
-                />
+              {showInput ? (
+                <span className="inline-flex items-center gap-1">
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submit();
+                      if (e.key === "Escape") { setShowInput(false); setInput(""); }
+                    }}
+                    placeholder="keyword…"
+                    className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
+                  />
+                  <button
+                    onClick={submit}
+                    disabled={adding || !input.trim()}
+                    className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                  >
+                    {adding ? "…" : "Add"}
+                  </button>
+                  <button
+                    onClick={() => { setShowInput(false); setInput(""); }}
+                    className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ) : (
                 <button
-                  onClick={submit}
-                  disabled={adding || !input.trim()}
-                  className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                  onClick={() => setShowInput(true)}
+                  className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
                 >
-                  {adding ? "…" : "Add"}
+                  + keyword
                 </button>
-                <button
-                  onClick={() => { setShowInput(false); setInput(""); }}
-                  className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
-                >
-                  ✕
-                </button>
-              </span>
-            ) : (
-              <button
-                onClick={() => setShowInput(true)}
-                className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
-              >
-                + keyword
-              </button>
+              )}
+            </div>
+            {label.rules.length === 0 && !showInput && (
+              <p className="text-[10px] text-white/20 mt-1.5">
+                No keywords — add some to auto-sort matching emails
+              </p>
             )}
           </div>
-
-          {label.rules.length === 0 && !showInput && (
-            <p className="text-[10px] text-white/20 pt-0.5">
-              No keywords yet — emails won&apos;t be auto-sorted until you add some
-            </p>
-          )}
         </div>
       )}
     </div>
