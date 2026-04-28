@@ -102,6 +102,7 @@ export default function LabelsPanel() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ scanned: number; labeled: number } | null>(null);
   const [applying, setApplying] = useState(false);
+  const [removedPresets, setRemovedPresets] = useState<Set<string>>(new Set());
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColorKey, setNewColorKey] = useState("purple");
@@ -123,6 +124,7 @@ export default function LabelsPanel() {
     setIndustry(key);
     setScanResult(null);
     setExpandedId(null);
+    setRemovedPresets(new Set());
     if (key) localStorage.setItem("dharma_industry", key);
     else localStorage.removeItem("dharma_industry");
   }
@@ -131,34 +133,69 @@ export default function LabelsPanel() {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
+  // What to display: industry presets (minus removed) + any custom DB labels not in presets.
+  // Switching industries or removing a preset updates instantly without touching the DB.
+  const presetNames = industry
+    ? new Set(INDUSTRY_PRESETS[industry].presets.map((p) => p.name.toLowerCase()))
+    : new Set<string>();
+
+  const displayItems: DisplayItem[] = industry
+    ? [
+        ...INDUSTRY_PRESETS[industry].presets
+          .filter((p) => !removedPresets.has(p.name))
+          .map((preset) => {
+            const existing = labels.find((l) => l.name.toLowerCase() === preset.name.toLowerCase());
+            return { dbId: existing?.id ?? null, name: preset.name, description: preset.description, color: preset.color, rules: existing?.rules ?? [] };
+          }),
+        // Custom labels the user added that aren't part of the industry preset
+        ...labels
+          .filter((l) => !presetNames.has(l.name.toLowerCase()))
+          .map((l) => ({ dbId: l.id, name: l.name, description: l.description, color: l.color, rules: l.rules })),
+      ]
+    : labels.map((l) => ({ dbId: l.id, name: l.name, description: l.description, color: l.color, rules: l.rules }));
+
   async function applyAll() {
     if (!industry) return;
     setApplying(true);
     setExpandedId(null);
 
-    // Delete all existing labels (also removes from Gmail via the API)
+    // Delete all existing DB labels (removes from Gmail too via the API)
     await Promise.all(labels.map((l) => fetch(`/api/labels/${l.id}`, { method: "DELETE" })));
     setLabels([]);
 
-    // Create industry presets in order
+    // Create exactly what's in the current display list
     const created: LabelRecord[] = [];
-    for (const preset of INDUSTRY_PRESETS[industry].presets) {
+    for (const item of displayItems) {
+      const preset = INDUSTRY_PRESETS[industry].presets.find((p) => p.name === item.name);
+      const colorKey = preset?.colorKey ?? "gray";
       const res = await fetch("/api/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: preset.name, description: preset.description, color: preset.color, colorKey: preset.colorKey }),
+        body: JSON.stringify({ name: item.name, description: item.description, color: item.color, colorKey }),
       });
       if (res.ok) {
         const label: LabelRecord = await res.json();
-        created.push({ ...label, rules: label.rules ?? [] });
+        created.push({ ...label, rules: [] });
       }
     }
     setLabels(created);
+    setRemovedPresets(new Set());
 
-    // Register new labels in Gmail
     await fetch("/api/labels/setup-gmail", { method: "POST" });
-
     setApplying(false);
+  }
+
+  function handleDeleteItem(item: DisplayItem) {
+    if (item.dbId) {
+      // Exists in DB — delete from server and Gmail
+      setLabels((prev) => prev.filter((l) => l.id !== item.dbId));
+      if (expandedId === item.name) setExpandedId(null);
+      fetch(`/api/labels/${item.dbId}`, { method: "DELETE" });
+    } else {
+      // Preview only — just remove from the display list
+      setRemovedPresets((prev) => new Set([...prev, item.name]));
+      if (expandedId === item.name) setExpandedId(null);
+    }
   }
 
   async function deleteLabel(id: string) {
@@ -282,7 +319,7 @@ export default function LabelsPanel() {
                 item={item}
                 expanded={expandedId === item.name}
                 onExpand={() => toggleExpanded(item.name)}
-                onDelete={item.dbId ? () => deleteLabel(item.dbId!) : null}
+                onDelete={() => handleDeleteItem(item)}
                 onAddKeyword={item.dbId ? (kw) => addKeyword(item.dbId!, kw) : null}
                 onDeleteKeyword={item.dbId ? (ruleId) => deleteKeyword(item.dbId!, ruleId) : null}
               />
@@ -366,7 +403,7 @@ function LabelRow({
   item: DisplayItem;
   expanded: boolean;
   onExpand: () => void;
-  onDelete: (() => void) | null;         // null = preview (not yet in DB)
+  onDelete: () => void;
   onAddKeyword: ((kw: string) => Promise<void>) | null;
   onDeleteKeyword: ((ruleId: string) => void) | null;
 }) {
@@ -407,16 +444,12 @@ function LabelRow({
         <button onClick={onExpand} className="text-white/20 hover:text-white/50 transition-colors shrink-0 px-0.5">
           <ChevronIcon expanded={expanded} />
         </button>
-        {onDelete ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="text-white/15 hover:text-red-400/60 transition-colors text-sm leading-none shrink-0 pl-1"
-          >
-            ×
-          </button>
-        ) : (
-          <span className="w-4 shrink-0" />
-        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="text-white/15 hover:text-red-400/60 transition-colors text-sm leading-none shrink-0 pl-1"
+        >
+          ×
+        </button>
       </div>
 
       {/* Expanded */}
