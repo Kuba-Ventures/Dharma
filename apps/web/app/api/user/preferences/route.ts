@@ -37,5 +37,5 @@ export async function GET(req: Request) {
     select: { schedulingEnabled: true },
   });
 
-  return NextResponse.json({ schedulingEnabled: user?.schedulingEnabled ?? false }, { headers: CORS });
+  return NextResponse.json({ schedulingEnabled: user?.schedulingEnabled ?? true }, { headers: CORS });
 }

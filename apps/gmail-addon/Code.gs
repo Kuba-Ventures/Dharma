@@ -10,7 +10,20 @@ function onGmailMessage(e) {
 
 function onComposeOpen(e) {
   var subject = (e.draftMetadata && e.draftMetadata.subject) ? e.draftMetadata.subject : '';
-  return buildComposeToneCard(subject);
+  var threadId = '';
+
+  // With draftAccess METADATA, e.gmail.messageId is the draft's message ID.
+  // Use it to get the thread ID directly instead of guessing from subject.
+  if (e.gmail && e.gmail.messageId) {
+    try {
+      var draft = Gmail.Users.Messages.get('me', e.gmail.messageId, { format: 'minimal' });
+      if (draft && draft.threadId) threadId = draft.threadId;
+    } catch (err) {
+      Logger.log('Could not resolve threadId from draft: ' + err.message);
+    }
+  }
+
+  return buildComposeToneCard(subject, threadId);
 }
 
 function buildWelcomeCard() {
@@ -31,7 +44,7 @@ function buildMainCard(messageId) {
 }
 
 // ── Compose-specific card: includes Polish Draft ──────────────────────────────
-function buildComposeToneCard(subject) {
+function buildComposeToneCard(subject, threadId) {
   var tones = ['My Tone', 'Concise', 'Formal / Legal'];
 
   try {
@@ -40,8 +53,10 @@ function buildComposeToneCard(subject) {
       headers: { 'Authorization': 'GoogleBearer ' + ScriptApp.getOAuthToken() },
       muteHttpExceptions: true,
     });
-    var prefs = JSON.parse(prefRes.getContentText());
-    if (prefs.schedulingEnabled) tones.push('Scheduling');
+    if (prefRes.getResponseCode() === 200) {
+      var prefs = JSON.parse(prefRes.getContentText());
+      if (prefs.schedulingEnabled) tones.push('Scheduling');
+    }
   } catch (err) {
     Logger.log('Prefs fetch error: ' + err.message);
   }
@@ -58,7 +73,7 @@ function buildComposeToneCard(subject) {
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('generateFromCompose')
-            .setParameters({ subject: subject, tone: tones[i] })
+            .setParameters({ subject: subject, tone: tones[i], threadId: threadId || '' })
         )
     );
   }
@@ -93,8 +108,10 @@ function buildToneMenuCard(actionFunction, baseParams) {
       headers: { 'Authorization': 'GoogleBearer ' + ScriptApp.getOAuthToken() },
       muteHttpExceptions: true,
     });
-    var prefs = JSON.parse(prefRes.getContentText());
-    if (prefs.schedulingEnabled) tones.push('Scheduling');
+    if (prefRes.getResponseCode() === 200) {
+      var prefs = JSON.parse(prefRes.getContentText());
+      if (prefs.schedulingEnabled) tones.push('Scheduling');
+    }
   } catch (err) {
     Logger.log('Prefs fetch error: ' + err.message);
   }
@@ -394,18 +411,18 @@ function generateFromCompose(e) {
   var subject = e.parameters.subject || '';
   var tone = e.parameters.tone || 'Concise';
   var accessToken = ScriptApp.getOAuthToken();
+  var threadId = e.parameters.threadId || null;
 
-  var originalSubject = subject.replace(/^(Re:\s*)+/i, '').trim();
-  var threadId = null;
-
-  if (originalSubject) {
-    try {
-      var threads = GmailApp.search('subject:"' + originalSubject + '"', 0, 1);
-      if (threads.length > 0) {
-        threadId = threads[0].getId();
+  // Fall back to subject search only if thread ID wasn't resolved at compose-open time
+  if (!threadId) {
+    var originalSubject = subject.replace(/^(Re:\s*)+/i, '').trim();
+    if (originalSubject) {
+      try {
+        var threads = GmailApp.search('subject:"' + originalSubject + '"', 0, 1);
+        if (threads.length > 0) threadId = threads[0].getId();
+      } catch (err) {
+        Logger.log('Thread search error: ' + err.message);
       }
-    } catch (err) {
-      Logger.log('Thread search error: ' + err.message);
     }
   }
 

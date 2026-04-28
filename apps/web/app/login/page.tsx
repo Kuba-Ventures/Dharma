@@ -47,6 +47,12 @@ function LoginContent() {
             Gmail + Calendar access required. You control what's automated.
           </p>
         </div>
+
+        <p className="text-[11px] text-white/20 text-center">
+          <a href="/privacy" className="underline hover:text-white/40">Privacy Policy</a>
+          {" · "}
+          <a href="/terms" className="underline hover:text-white/40">Terms of Service</a>
+        </p>
       </div>
     </main>
   );

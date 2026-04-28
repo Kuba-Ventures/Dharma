@@ -1,0 +1,123 @@
+export default function PrivacyPage() {
+  return (
+    <main className="min-h-screen bg-[#0c0c0e] px-6 py-16">
+      <div className="max-w-2xl mx-auto space-y-10">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-white">Privacy Policy</h1>
+          <p className="text-sm text-white/40">Last updated: April 27, 2025</p>
+        </div>
+
+        <Section title="Overview">
+          Dharma Automations ("Dharma", "we", "us") provides an AI-powered Gmail add-on and web
+          dashboard that helps you draft email replies, manage labels, and handle scheduling. This
+          policy explains what data we collect, how we use it, and your rights.
+        </Section>
+
+        <Section title="Data We Collect">
+          <ul className="list-disc list-inside space-y-2">
+            <li>
+              <strong className="text-white/80">Gmail content</strong> — message subjects, bodies,
+              and sender metadata, accessed solely to generate draft replies and detect scheduling
+              requests on your behalf.
+            </li>
+            <li>
+              <strong className="text-white/80">Google Calendar data</strong> — upcoming events and
+              availability, used to suggest meeting times.
+            </li>
+            <li>
+              <strong className="text-white/80">Account identifiers</strong> — your Google account
+              email address, used to authenticate you and associate your preferences.
+            </li>
+            <li>
+              <strong className="text-white/80">Preferences</strong> — tone settings, scheduling
+              preferences, and writing-style profiles you configure in the dashboard.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="How We Use Your Data">
+          We use your data exclusively to provide the Dharma service:
+          <ul className="list-disc list-inside space-y-2 mt-2">
+            <li>Generating AI-assisted email drafts using your selected tone and writing style</li>
+            <li>Detecting and responding to scheduling requests in your inbox</li>
+            <li>Applying Gmail labels and filters you configure</li>
+            <li>Storing your preferences so settings persist across sessions</li>
+          </ul>
+          We do not sell, rent, or share your personal data with third parties for advertising or
+          marketing purposes.
+        </Section>
+
+        <Section title="Third-Party Services">
+          Dharma uses the following third-party services to operate:
+          <ul className="list-disc list-inside space-y-2 mt-2">
+            <li>
+              <strong className="text-white/80">Anthropic (Claude API)</strong> — email content is
+              sent to Anthropic&apos;s API to generate draft replies. Anthropic&apos;s privacy
+              policy governs their handling of this data.
+            </li>
+            <li>
+              <strong className="text-white/80">Google APIs</strong> — we access Gmail and Google
+              Calendar through official Google APIs under your explicit OAuth authorization.
+            </li>
+            <li>
+              <strong className="text-white/80">Vercel</strong> — our infrastructure provider for
+              hosting and serverless functions.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="Data Retention">
+          We do not persistently store the content of your emails. Email content is processed
+          transiently to generate responses and is not written to our databases. Your preferences and
+          account information are retained until you delete your account.
+        </Section>
+
+        <Section title="Google API Scopes">
+          Dharma requests the following Google OAuth scopes:
+          <ul className="list-disc list-inside space-y-1 mt-2">
+            <li>Read Gmail messages and metadata</li>
+            <li>Compose and send email drafts on your behalf</li>
+            <li>Read Google Calendar events</li>
+          </ul>
+          You can revoke access at any time via your{" "}
+          <a
+            href="https://myaccount.google.com/permissions"
+            className="text-[#c8f5a0]/80 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google Account permissions page
+          </a>
+          .
+        </Section>
+
+        <Section title="Security">
+          All data is transmitted over HTTPS. We use industry-standard security practices to protect
+          your information. OAuth tokens are stored securely and never exposed client-side.
+        </Section>
+
+        <Section title="Your Rights">
+          You may request deletion of your account and associated data at any time by contacting us.
+          Upon request we will delete your stored preferences and account record within 30 days.
+        </Section>
+
+        <Section title="Contact">
+          For privacy questions or data deletion requests, contact us at{" "}
+          <a href="mailto:finley@qsbsrollover.com" className="text-[#c8f5a0]/80 underline">
+            finley@qsbsrollover.com
+          </a>
+          .
+        </Section>
+      </div>
+    </main>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-base font-semibold text-white">{title}</h2>
+      <div className="text-sm text-white/50 leading-relaxed space-y-2">{children}</div>
+    </div>
+  );
+}

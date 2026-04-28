@@ -46,7 +46,7 @@
             "runFunction": "onComposeOpen"
           }
         ],
-        "draftAccess": "NONE"
+        "draftAccess": "METADATA"
       }
     }
   }

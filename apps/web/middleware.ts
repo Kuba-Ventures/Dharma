@@ -10,6 +10,8 @@ export default auth((req) => {
 
   const isPublic =
     pathname === "/login" ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
     pathname.startsWith("/api/emails/thread-draft") ||

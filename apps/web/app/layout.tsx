@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Dharma Automations",
   description: "Turn scheduling requests into ready-to-send replies.",
   icons: { icon: "/logo.png" },
+  verification: { google: "SUsOgV_GSE3i_oIVGZ_T27koRqa9PpfNU4S_wqtNO38" },
 };
 
 export default function RootLayout({
