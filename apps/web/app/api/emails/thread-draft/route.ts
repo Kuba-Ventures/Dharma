@@ -165,6 +165,11 @@ Polished email:`;
     const toneKey = tone ?? "Concise";
 
     if (toneKey === "Scheduling") {
+    const schedulingUser = await prisma.user.findUnique({ where: { id: userId }, select: { schedulingEnabled: true } });
+    if (schedulingUser?.schedulingEnabled === false) {
+      return NextResponse.json({ error: "Scheduling is disabled. Enable it in your Dharma dashboard." }, { status: 403, headers: CORS });
+    }
+
     const now = new Date();
     const { timeMin, timeMax } = getRelevantTimeWindow(emailBody, now);
 

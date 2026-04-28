@@ -45,21 +45,7 @@ function buildMainCard(messageId) {
 
 // ── Compose-specific card: includes Polish Draft ──────────────────────────────
 function buildComposeToneCard(subject, threadId) {
-  var tones = ['My Tone', 'Concise', 'Formal / Legal'];
-
-  try {
-    var prefRes = UrlFetchApp.fetch(DHARMA_API + '/api/user/preferences', {
-      method: 'get',
-      headers: { 'Authorization': 'GoogleBearer ' + ScriptApp.getOAuthToken() },
-      muteHttpExceptions: true,
-    });
-    if (prefRes.getResponseCode() === 200) {
-      var prefs = JSON.parse(prefRes.getContentText());
-      if (prefs.schedulingEnabled) tones.push('Scheduling');
-    }
-  } catch (err) {
-    Logger.log('Prefs fetch error: ' + err.message);
-  }
+  var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
 
   var section = CardService.newCardSection()
     .addWidget(CardService.newTextParagraph().setText('Generate a reply:'));
@@ -100,21 +86,7 @@ function buildComposeToneCard(subject, threadId) {
 }
 
 function buildToneMenuCard(actionFunction, baseParams) {
-  var tones = ['My Tone', 'Concise', 'Formal / Legal'];
-
-  try {
-    var prefRes = UrlFetchApp.fetch(DHARMA_API + '/api/user/preferences', {
-      method: 'get',
-      headers: { 'Authorization': 'GoogleBearer ' + ScriptApp.getOAuthToken() },
-      muteHttpExceptions: true,
-    });
-    if (prefRes.getResponseCode() === 200) {
-      var prefs = JSON.parse(prefRes.getContentText());
-      if (prefs.schedulingEnabled) tones.push('Scheduling');
-    }
-  } catch (err) {
-    Logger.log('Prefs fetch error: ' + err.message);
-  }
+  var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
 
   var section = CardService.newCardSection();
 
