@@ -242,14 +242,6 @@ export default function LabelsPanel() {
     setCreating(false);
   }
 
-  // When an industry is selected, show its presets enriched with any matching DB labels.
-  // Switching industries instantly updates the list without waiting for Apply.
-  const displayItems: DisplayItem[] = industry
-    ? INDUSTRY_PRESETS[industry].presets.map((preset) => {
-        const existing = labels.find((l) => l.name.toLowerCase() === preset.name.toLowerCase());
-        return { dbId: existing?.id ?? null, name: preset.name, description: preset.description, color: preset.color, rules: existing?.rules ?? [] };
-      })
-    : labels.map((l) => ({ dbId: l.id, name: l.name, description: l.description, color: l.color, rules: l.rules }));
 
   async function scanInbox() {
     setScanning(true);
