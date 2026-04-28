@@ -99,18 +99,34 @@ JSON only, no other text.`;
   return parsed;
 }
 
+function googleErrMessage(err: unknown): string | null {
+  const code = (err as { code?: number })?.code;
+  if (code === 401) return "Google access expired — sign out and sign back in to reconnect";
+  if (code === 403) return "Gmail permission denied — sign out and sign back in to re-grant access";
+  return null;
+}
+
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
 
+  const cred = await prisma.googleCredential.findUnique({ where: { userId } });
+  if (!cred) {
+    return NextResponse.json(
+      { error: "Google account not linked — sign out and sign back in to reconnect" },
+      { status: 401 }
+    );
+  }
+
   let bodies: string[];
   try {
     bodies = await fetchSentEmailBodies(userId);
   } catch (err) {
     console.error("[tone/sync] Failed to fetch sent emails:", err);
-    return NextResponse.json({ error: "Failed to fetch sent emails" }, { status: 502 });
+    const msg = googleErrMessage(err) ?? "Failed to fetch sent emails";
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 
   if (bodies.length < 3) {

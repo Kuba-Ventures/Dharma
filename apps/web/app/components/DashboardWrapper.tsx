@@ -170,8 +170,12 @@ export default function DashboardWrapper({
     setCalSyncStatus(null);
     try {
       const res = await fetch("/api/calendar/google/sync", { method: "POST" });
-      if (!res.ok) throw new Error();
-      setCalSyncStatus("Calendar synced successfully");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setCalSyncStatus(body.error ?? "Sync failed — please try again");
+      } else {
+        setCalSyncStatus("Calendar synced successfully");
+      }
     } catch {
       setCalSyncStatus("Sync failed — please try again");
     } finally {
