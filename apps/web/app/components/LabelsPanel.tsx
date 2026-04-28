@@ -83,6 +83,15 @@ interface LabelRecord {
   rules: LabelRule[];
 }
 
+// DisplayItem: a preset enriched with DB data if the label already exists
+interface DisplayItem {
+  dbId: string | null; // null = not yet in DB (preview only)
+  name: string;
+  description: string;
+  color: string;
+  rules: LabelRule[];
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function LabelsPanel() {
@@ -196,6 +205,15 @@ export default function LabelsPanel() {
     setCreating(false);
   }
 
+  // When an industry is selected, show its presets enriched with any matching DB labels.
+  // Switching industries instantly updates the list without waiting for Apply.
+  const displayItems: DisplayItem[] = industry
+    ? INDUSTRY_PRESETS[industry].presets.map((preset) => {
+        const existing = labels.find((l) => l.name.toLowerCase() === preset.name.toLowerCase());
+        return { dbId: existing?.id ?? null, name: preset.name, description: preset.description, color: preset.color, rules: existing?.rules ?? [] };
+      })
+    : labels.map((l) => ({ dbId: l.id, name: l.name, description: l.description, color: l.color, rules: l.rules }));
+
   async function scanInbox() {
     setScanning(true);
     setScanResult(null);
@@ -254,23 +272,19 @@ export default function LabelsPanel() {
       <div className="flex-1">
         {loading ? (
           <p className="text-xs text-white/25 py-2">Loading…</p>
-        ) : labels.length === 0 ? (
-          <p className="text-xs text-white/25 py-2">
-            {industry
-              ? `Select "Apply labels" below to load ${INDUSTRY_PRESETS[industry].label} labels`
-              : "Select an industry above to get started"}
-          </p>
+        ) : displayItems.length === 0 ? (
+          <p className="text-xs text-white/25 py-2">Select an industry above to get started</p>
         ) : (
           <div className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.05]">
-            {labels.map((label) => (
+            {displayItems.map((item) => (
               <LabelRow
-                key={label.id}
-                label={label}
-                expanded={expandedId === label.id}
-                onExpand={() => toggleExpanded(label.id)}
-                onDelete={() => deleteLabel(label.id)}
-                onAddKeyword={(kw) => addKeyword(label.id, kw)}
-                onDeleteKeyword={(ruleId) => deleteKeyword(label.id, ruleId)}
+                key={item.name}
+                item={item}
+                expanded={expandedId === item.name}
+                onExpand={() => toggleExpanded(item.name)}
+                onDelete={item.dbId ? () => deleteLabel(item.dbId!) : null}
+                onAddKeyword={item.dbId ? (kw) => addKeyword(item.dbId!, kw) : null}
+                onDeleteKeyword={item.dbId ? (ruleId) => deleteKeyword(item.dbId!, ruleId) : null}
               />
             ))}
           </div>
@@ -347,31 +361,31 @@ export default function LabelsPanel() {
 // ── Label row ──────────────────────────────────────────────────────────────
 
 function LabelRow({
-  label, expanded, onExpand, onDelete, onAddKeyword, onDeleteKeyword,
+  item, expanded, onExpand, onDelete, onAddKeyword, onDeleteKeyword,
 }: {
-  label: LabelRecord;
+  item: DisplayItem;
   expanded: boolean;
   onExpand: () => void;
-  onDelete: () => void;
-  onAddKeyword: (kw: string) => Promise<void>;
-  onDeleteKeyword: (ruleId: string) => void;
+  onDelete: (() => void) | null;         // null = preview (not yet in DB)
+  onAddKeyword: ((kw: string) => Promise<void>) | null;
+  onDeleteKeyword: ((ruleId: string) => void) | null;
 }) {
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isPreview = !item.dbId;
 
   useEffect(() => {
     if (showInput) inputRef.current?.focus();
   }, [showInput]);
 
-  // Close input when row collapses
   useEffect(() => {
     if (!expanded) { setShowInput(false); setInput(""); }
   }, [expanded]);
 
   async function submit() {
-    if (!input.trim()) return;
+    if (!input.trim() || !onAddKeyword) return;
     setAdding(true);
     await onAddKeyword(input.trim());
     setInput("");
@@ -381,96 +395,110 @@ function LabelRow({
 
   return (
     <div className="bg-white/[0.02]">
-      {/* Collapsed row */}
+      {/* Row header */}
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
         <button className="flex-1 text-left min-w-0" onClick={onExpand}>
-          <span className="text-xs font-medium text-white/75">#{label.name}</span>
-        </button>
-        {label.rules.length > 0 && !expanded && (
-          <span className="text-[10px] text-white/20 shrink-0">
-            {label.rules.length} kw
+          <span className={`text-xs font-medium ${isPreview ? "text-white/40" : "text-white/75"}`}>
+            #{item.name}
           </span>
+        </button>
+        {!isPreview && item.rules.length > 0 && !expanded && (
+          <span className="text-[10px] text-white/20 shrink-0">{item.rules.length} kw</span>
+        )}
+        {isPreview && (
+          <span className="text-[10px] text-white/20 shrink-0 italic">not applied</span>
         )}
         <button onClick={onExpand} className="text-white/20 hover:text-white/50 transition-colors shrink-0 px-0.5">
           <ChevronIcon expanded={expanded} />
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="text-white/15 hover:text-red-400/60 transition-colors text-sm leading-none shrink-0 pl-1"
-        >
-          ×
-        </button>
+        {onDelete ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="text-white/15 hover:text-red-400/60 transition-colors text-sm leading-none shrink-0 pl-1"
+          >
+            ×
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
       </div>
 
-      {/* Expanded: description + keywords */}
+      {/* Expanded */}
       {expanded && (
         <div className="px-3.5 pb-3 space-y-2.5 border-t border-white/[0.04]">
-          {label.description && (
-            <p className="text-[10px] text-white/30 pt-2">{label.description}</p>
+          {item.description && (
+            <p className="text-[10px] text-white/30 pt-2">{item.description}</p>
           )}
-          <div>
-            <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
-              Keywords — matching emails get this label
-            </p>
-            <div className="flex flex-wrap gap-1.5 items-center">
-              {label.rules.map((rule) => (
-                <span
-                  key={rule.id}
-                  className="inline-flex items-center gap-1 text-[11px] bg-white/[0.06] border border-white/[0.08] rounded-full pl-2.5 pr-1.5 py-0.5 text-white/60"
-                >
-                  {rule.value}
-                  <button
-                    onClick={() => onDeleteKeyword(rule.id)}
-                    className="text-white/25 hover:text-white/60 transition-colors leading-none ml-0.5"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
 
-              {showInput ? (
-                <span className="inline-flex items-center gap-1">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submit();
-                      if (e.key === "Escape") { setShowInput(false); setInput(""); }
-                    }}
-                    placeholder="keyword…"
-                    className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
-                  />
-                  <button
-                    onClick={submit}
-                    disabled={adding || !input.trim()}
-                    className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+          {isPreview ? (
+            <p className="text-[10px] text-white/20 italic">
+              Click &ldquo;Apply labels&rdquo; below to activate this label and add keywords
+            </p>
+          ) : (
+            <div>
+              <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
+                Keywords — matching emails get this label
+              </p>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {item.rules.map((rule) => (
+                  <span
+                    key={rule.id}
+                    className="inline-flex items-center gap-1 text-[11px] bg-white/[0.06] border border-white/[0.08] rounded-full pl-2.5 pr-1.5 py-0.5 text-white/60"
                   >
-                    {adding ? "…" : "Add"}
-                  </button>
+                    {rule.value}
+                    <button
+                      onClick={() => onDeleteKeyword?.(rule.id)}
+                      className="text-white/25 hover:text-white/60 transition-colors leading-none ml-0.5"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+
+                {showInput ? (
+                  <span className="inline-flex items-center gap-1">
+                    <input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submit();
+                        if (e.key === "Escape") { setShowInput(false); setInput(""); }
+                      }}
+                      placeholder="keyword…"
+                      className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
+                    />
+                    <button
+                      onClick={submit}
+                      disabled={adding || !input.trim()}
+                      className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                    >
+                      {adding ? "…" : "Add"}
+                    </button>
+                    <button
+                      onClick={() => { setShowInput(false); setInput(""); }}
+                      className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ) : (
                   <button
-                    onClick={() => { setShowInput(false); setInput(""); }}
-                    className="text-[11px] text-white/25 hover:text-white/50 transition-colors"
+                    onClick={() => setShowInput(true)}
+                    className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
                   >
-                    ✕
+                    + keyword
                   </button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => setShowInput(true)}
-                  className="text-[10px] text-white/25 hover:text-white/55 border border-dashed border-white/[0.1] hover:border-white/[0.2] rounded-full px-2.5 py-0.5 transition-colors"
-                >
-                  + keyword
-                </button>
+                )}
+              </div>
+              {item.rules.length === 0 && !showInput && (
+                <p className="text-[10px] text-white/20 mt-1.5">
+                  No keywords yet — add some to auto-sort matching emails
+                </p>
               )}
             </div>
-            {label.rules.length === 0 && !showInput && (
-              <p className="text-[10px] text-white/20 mt-1.5">
-                No keywords — add some to auto-sort matching emails
-              </p>
-            )}
-          </div>
+          )}
         </div>
       )}
     </div>
