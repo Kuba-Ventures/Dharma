@@ -120,20 +120,25 @@ export default function LabelsPanel() {
   async function applyAll() {
     if (!industry) return;
     setApplying(true);
+
+    // Delete all existing labels first
+    await Promise.all(labels.map((l) => fetch(`/api/labels/${l.id}`, { method: "DELETE" })));
+    setLabels([]);
+
+    // Create industry presets sequentially to preserve order
+    const created: LabelRecord[] = [];
     for (const preset of INDUSTRY_PRESETS[industry].presets) {
-      const exists = labels.find((l) => l.name.toLowerCase() === preset.name.toLowerCase());
-      if (!exists) {
-        const res = await fetch("/api/labels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: preset.name, description: preset.description, color: preset.color, colorKey: preset.colorKey }),
-        });
-        if (res.ok) {
-          const label: LabelRecord = await res.json();
-          setLabels((prev) => [...prev, { ...label, rules: label.rules ?? [] }]);
-        }
+      const res = await fetch("/api/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: preset.name, description: preset.description, color: preset.color, colorKey: preset.colorKey }),
+      });
+      if (res.ok) {
+        const label: LabelRecord = await res.json();
+        created.push({ ...label, rules: label.rules ?? [] });
       }
     }
+    setLabels(created);
     setApplying(false);
   }
 
