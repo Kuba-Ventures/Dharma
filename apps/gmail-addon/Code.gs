@@ -379,6 +379,13 @@ function insertPolishedDraft(e) {
   return notificationResponse('No draft ID found in cache. meta=' + JSON.stringify(meta) + ' text_len=' + (polishedText ? polishedText.length : 0));
 }
 
+function textToGmailHtml(text) {
+  return text.split('\n').map(function(line) {
+    var safe = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<div>' + (safe === '' ? '<br>' : safe) + '</div>';
+  }).join('');
+}
+
 function generateFromCompose(e) {
   var subject = e.parameters.subject || '';
   var tone = e.parameters.tone || 'Concise';
@@ -429,7 +436,7 @@ function generateFromCompose(e) {
   return CardService.newUpdateDraftActionResponseBuilder()
     .setUpdateDraftBodyAction(
       CardService.newUpdateDraftBodyAction()
-        .addUpdateContent(data.text, CardService.ContentType.TEXT)
+        .addUpdateContent(textToGmailHtml(data.text), CardService.ContentType.MUTABLE_HTML)
         .setUpdateType(CardService.UpdateDraftBodyType.INSERT_AT_START)
     )
     .build();
