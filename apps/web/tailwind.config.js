@@ -29,7 +29,7 @@ module.exports = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Plus Jakarta Sans", "sans-serif"],
-        sans: ["var(--font-sans)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Arial", "ui-sans-serif", "sans-serif"],
       },
       animation: {
         float: "float 6s ease-in-out infinite",
