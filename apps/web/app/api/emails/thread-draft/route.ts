@@ -7,6 +7,12 @@ import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser, createDraft } from "../../../../lib/gmail";
 import { google } from "googleapis";
 
+// Hard rules applied to every draft regardless of tone
+const WRITING_RULES = `\
+- Never use em-dashes (—). Use a comma or period instead.
+- No generic openers like "Thanks for reaching out" or "Hope you're well".
+- No subject line.`;
+
 const TONE_INSTRUCTIONS: Record<string, string> = {
   "My Tone": "Write in a natural, professional but personal tone — direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
   Concise: "Write a brief, direct reply. No filler words, no pleasantries beyond a quick greeting. Get to the point in 2-4 sentences.",
@@ -113,12 +119,10 @@ export async function POST(req: Request) {
 ${toneBlock}
 
 Rules:
+${WRITING_RULES}
 - Keep all the same intent and key points — do not add information not implied by the notes.
-- No generic openers like "Thanks for reaching out" or "Hope you're well".
 - No sign-off name at the end — the sender's signature handles that.
-- No subject line.
 - Keep it concise.
-- Never use em-dashes (—). Use a comma or period instead.
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Their notes/draft:
@@ -208,12 +212,11 @@ Polished email:`;
 ${toneBlock}
 
 Scheduling rules:
+${WRITING_RULES}
 - Check whether any time proposed in the email conflicts with the busy times below.
 - If the proposed time IS blocked, say it does not work and propose 2-3 specific free times from the gaps in the calendar that fit the scheduling preferences.
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
-- Never use em-dashes (use a comma or period instead).
 - Never name or describe what event is blocking the time — just say the time does not work.
-- Do NOT use generic openers like "Thanks for reaching out" or "I hope you're doing well".
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
 - Do not include any sign-off name at the end.
 - Keep it to 2-3 sentences.
@@ -233,7 +236,12 @@ Reply draft:`;
       const toneInstruction = TONE_INSTRUCTIONS[toneKey] ?? TONE_INSTRUCTIONS.Concise;
       prompt = `${toneInstruction}
 
-You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft. Do not include a subject line. End with just the name "Finley" — do not include a sign-off like "Best" or "Sincerely".
+You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft.
+
+Rules:
+${WRITING_RULES}
+- End with just the name "Finley" — do not include a sign-off like "Best" or "Sincerely".
+- If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Email from: ${from}
 Subject: ${subject}
