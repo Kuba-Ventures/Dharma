@@ -9,6 +9,7 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   const isPublic =
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
