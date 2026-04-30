@@ -2,6 +2,7 @@ import { auth } from "../../lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "../../lib/auth";
 import Image from "next/image";
+import Link from "next/link";
 import Sidebar from "../components/Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,10 +13,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-[#0c0c0e] flex">
       {/* Sidebar */}
       <aside className="w-52 shrink-0 border-r border-white/[0.06] flex flex-col py-7 px-3">
-        <div className="flex items-center gap-2.5 px-3 mb-8">
+        <Link href="/" className="flex items-center gap-2.5 px-3 mb-8 hover:opacity-80 transition-opacity">
           <Image src="/logo.png" alt="Dharma" width={26} height={26} priority />
           <span className="text-white font-bold text-sm">Dharma</span>
-        </div>
+        </Link>
         <Sidebar />
       </aside>
 
