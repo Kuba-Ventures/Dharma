@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 function LoginContent() {
   const params = useSearchParams();
@@ -13,7 +14,9 @@ function LoginContent() {
     <main className="min-h-screen bg-[#0c0c0e] flex items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-10">
         <div className="text-center space-y-3">
-          <Image src="/logo.png" alt="Dharma Automations" width={64} height={64} className="mx-auto" priority />
+          <Link href="/">
+            <Image src="/logo.png" alt="Dharma Automations" width={64} height={64} className="mx-auto hover:opacity-80 transition-opacity" priority />
+          </Link>
           <h1 className="text-[1.75rem] font-bold text-white leading-tight">
             Dharma Automations
           </h1>
