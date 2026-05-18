@@ -62,8 +62,8 @@ Analyze their tone and writing style carefully. Pay close attention to:
 
 Return a JSON object with exactly two fields:
 {
-  "summary": "A 1-2 sentence description of their writing style starting with 'Writes with...' — focus on tone, formality, and sentence structure only. Do not mention the person's name, do not mention specific greetings or sign-offs, do not say 'uses casual greetings like' or 'often ending with'.",
-  "example": "A short sample email (3-6 sentences) written in their exact style — a professional but realistic scenario like following up on a project or responding to a meeting request. Use their actual patterns. End the email at the closing word only (e.g. 'Thanks,' or 'Best,') — do not include any name or title after it."
+  "summary": "A 1-2 sentence description of their writing style starting with 'Writes with...' Focus on tone, formality, and sentence structure only. Do not mention the person's name, do not mention specific greetings or sign-offs, do not say 'uses casual greetings like' or 'often ending with'.",
+  "example": "A short sample email (3-6 sentences) written in their exact style. Use a professional but realistic scenario like following up on a project or responding to a meeting request. Use their actual patterns. End the email at the closing word only (e.g. 'Thanks,' or 'Best,'). Do not include any name or title after it."
 }
 
 JSON only, no other text.`;
@@ -101,8 +101,8 @@ JSON only, no other text.`;
 
 function googleErrMessage(err: unknown): string | null {
   const code = (err as { code?: number })?.code;
-  if (code === 401) return "Google access expired — sign out and sign back in to reconnect";
-  if (code === 403) return "Gmail permission denied — sign out and sign back in to re-grant access";
+  if (code === 401) return "Google access expired. Sign out and sign back in to reconnect.";
+  if (code === 403) return "Gmail permission denied. Sign out and sign back in to re-grant access.";
   return null;
 }
 
@@ -115,7 +115,7 @@ export async function POST() {
   const cred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!cred) {
     return NextResponse.json(
-      { error: "Google account not linked — sign out and sign back in to reconnect" },
+      { error: "Google account not linked. Sign out and sign back in to reconnect." },
       { status: 401 }
     );
   }

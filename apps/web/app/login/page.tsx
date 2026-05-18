@@ -21,7 +21,7 @@ function LoginContent() {
             Dharma Automations
           </h1>
           <p className="text-white/40 text-sm leading-relaxed">
-            AI automation for your Gmail inbox —<br />labels, tone, and scheduling.
+            AI automation for your Gmail inbox:<br />labels, tone, and scheduling.
           </p>
         </div>
 
@@ -29,7 +29,7 @@ function LoginContent() {
           <div className="space-y-1">
             <p className="text-sm text-white/70 font-medium">Sign in to continue</p>
             <p className="text-xs text-white/30 leading-relaxed">
-              Dharma connects to your Gmail and Google Calendar to apply labels, draft replies, and manage scheduling — all from one toggle.
+              Dharma connects to your Gmail and Google Calendar to apply labels, draft replies, and manage scheduling, all from one toggle.
             </p>
           </div>
 

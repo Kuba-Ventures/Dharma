@@ -181,7 +181,7 @@ const STEPS: Step[] = [
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
           Checking your calendar...
         </p>
-        {["Tuesday, May 6 — 2:00 PM", "Wednesday, May 7 — 11:00 AM", "Friday, May 9 — 3:00 PM"].map((slot) => (
+        {["Tuesday, May 6 at 2:00 PM", "Wednesday, May 7 at 11:00 AM", "Friday, May 9 at 3:00 PM"].map((slot) => (
           <div key={slot} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
             <CheckCircleIcon className="w-4 h-4 text-primary shrink-0" />
             <span className="text-sm text-foreground">{slot}</span>
@@ -203,7 +203,7 @@ const STEPS: Step[] = [
         </p>
         <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4">
           <p className="text-sm text-foreground/90 leading-relaxed">
-            I&apos;m free Tuesday at 2pm or Wednesday at 11am — let me know what works best for you.
+            I&apos;m free Tuesday at 2pm or Wednesday at 11am. Let me know what works best for you.
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -230,12 +230,12 @@ const STEPS: Step[] = [
         </div>
         <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4">
           <p className="text-sm text-foreground/90 leading-relaxed">
-            I&apos;m free Tuesday at 2pm or Wednesday at 11am — let me know what works.
+            I&apos;m free Tuesday at 2pm or Wednesday at 11am. Let me know what works.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-primary font-medium">
           <CheckCircleIcon className="w-5 h-5 shrink-0" />
-          Reply sent — scheduling done.
+          Reply sent. Scheduling done.
         </div>
       </div>
     ),
@@ -333,7 +333,7 @@ function HeroSection() {
             </h1>
 
             <p className="text-lg sm:text-xl text-muted-foreground mb-8 leading-relaxed">
-              Turn scheduling emails into ready-to-send replies with suggested times — no booking links, no setup headache, no new workflow.
+              Turn scheduling emails into ready-to-send replies with suggested times. No booking links, no setup headache, no new workflow.
             </p>
 
             <div className="flex flex-col gap-4 mb-10">
@@ -386,7 +386,7 @@ function HeroSection() {
                       <ZapIcon className="w-3 h-3 text-white" />
                     </div>
                     <p className="text-sm text-foreground/90 leading-relaxed">
-                      I&apos;m free Tuesday at 2pm or Wednesday at 11am — let me know what works best for you.
+                      I&apos;m free Tuesday at 2pm or Wednesday at 11am. Let me know what works best for you.
                     </p>
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
                       <span className="text-xs text-muted-foreground">Drafted by Dharma Automations</span>
@@ -498,7 +498,7 @@ function ComparisonSection() {
       positive: true,
       badge: true,
       points: [
-        "Inbox-native — no new tools",
+        "Inbox-native, no new tools",
         "Assistive, not autonomous",
         "You stay in control always",
         "Free forever during beta",
@@ -627,9 +627,10 @@ function Footer() {
           <span className="text-sm font-semibold text-foreground">Dharma Automations</span>
         </div>
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
-          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+          <Link href="/support" className="hover:text-foreground transition-colors">Support</Link>
           <a href="mailto:finley@qsbsrollover.com" className="hover:text-foreground transition-colors">Contact</a>
-          <a href="https://twitter.com" className="hover:text-foreground transition-colors">Twitter</a>
         </div>
       </div>
     </footer>

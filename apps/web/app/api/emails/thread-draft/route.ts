@@ -9,15 +9,15 @@ import { google } from "googleapis";
 
 // Hard rules applied to every draft regardless of tone
 const WRITING_RULES = `\
-- Never use em-dashes (—). Use a comma or period instead.
+- Never use em-dashes. Use a comma or period instead.
 - No generic openers like "Thanks for reaching out" or "Hope you're well".
 - No subject line.`;
 
 const TONE_INSTRUCTIONS: Record<string, string> = {
-  "My Tone": "Write in a natural, professional but personal tone — direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
+  "My Tone": "Write in a natural, professional but personal tone: direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
   Concise: "Write a brief, direct reply. No filler words, no pleasantries beyond a quick greeting. Get to the point in 2-4 sentences.",
   "Formal / Legal": "Write in formal, precise language appropriate for legal or official correspondence. Use complete sentences, avoid contractions, and maintain a professional distance.",
-  "Casual / Friendly": "Write in a warm, conversational tone. It's okay to be a little informal — use contractions, keep it light and approachable.",
+  "Casual / Friendly": "Write in a warm, conversational tone. It's okay to be a little informal, use contractions, keep it light and approachable.",
 };
 
 function getRelevantTimeWindow(emailText: string, now: Date): { timeMin: string; timeMax: string } {
@@ -120,8 +120,8 @@ ${toneBlock}
 
 Rules:
 ${WRITING_RULES}
-- Keep all the same intent and key points — do not add information not implied by the notes.
-- No sign-off name at the end — the sender's signature handles that.
+- Keep all the same intent and key points; do not add information not implied by the notes.
+- No sign-off name at the end; the sender's signature handles that.
 - Keep it concise.
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
@@ -216,7 +216,7 @@ ${WRITING_RULES}
 - Check whether any time proposed in the email conflicts with the busy times below.
 - If the proposed time IS blocked, say it does not work and propose 2-3 specific free times from the gaps in the calendar that fit the scheduling preferences.
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
-- Never name or describe what event is blocking the time — just say the time does not work.
+- Never name or describe what event is blocking the time; just say the time does not work.
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
 - Do not include any sign-off name at the end.
 - Keep it to 2-3 sentences.
@@ -240,7 +240,7 @@ You are drafting a reply on behalf of Finley Underwood. Read the email below and
 
 Rules:
 ${WRITING_RULES}
-- End with just the name "Finley" — do not include a sign-off like "Best" or "Sincerely".
+- End with just the name "Finley"; do not include a sign-off like "Best" or "Sincerely".
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Email from: ${from}
@@ -268,7 +268,7 @@ Reply draft:`;
 
   if (!claudeRes.ok) return NextResponse.json({ error: "Claude failed" }, { status: 500, headers: CORS });
   const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
-  const replyBody = (claudeData.content[0]?.text?.trim() ?? "").replace(/—/g, ",");
+  const replyBody = (claudeData.content[0]?.text?.trim() ?? "").replace(/\u2014/g, ",");
 
   return NextResponse.json({ ok: true, text: replyBody }, { headers: CORS });
   } catch (err: any) {

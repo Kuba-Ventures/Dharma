@@ -32,7 +32,7 @@ const PRESET_TONES: { id: Tone; description: string; example: string }[] = [
     id: "Casual / Friendly",
     description: "Warm and conversational for informal threads",
     example:
-      "Hey Sarah!\n\nJust wanted to check in on the proposal — no rush, but let me know how it's looking when you get a chance!\n\nCheers,\nFinley",
+      "Hey Sarah!\n\nJust wanted to check in on the proposal, no rush, but let me know how it's looking when you get a chance!\n\nCheers,\nFinley",
   },
 ];
 
@@ -172,12 +172,12 @@ export default function DashboardWrapper({
       const res = await fetch("/api/calendar/google/sync", { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
-        setCalSyncStatus(body.error ?? "Sync failed — please try again");
+        setCalSyncStatus(body.error ?? "Sync failed. Please try again.");
       } else {
         setCalSyncStatus("Calendar synced successfully");
       }
     } catch {
-      setCalSyncStatus("Sync failed — please try again");
+      setCalSyncStatus("Sync failed. Please try again.");
     } finally {
       setCalSyncing(false);
     }

@@ -17,8 +17,8 @@ const INDUSTRY_PRESETS: Record<IndustryKey, { label: string; presets: PresetLabe
   pe: {
     label: "Private Equity",
     presets: [
-      { name: "Keep Warm",                 description: "Relationship to maintain — not ready yet",        color: "#f5e6a0", colorKey: "yellow" },
-      { name: "Interested — Info Received", description: "Target has shown interest and sent materials",   color: "#a0c8f5", colorKey: "blue"   },
+      { name: "Keep Warm",                 description: "Relationship to maintain, not ready yet",         color: "#f5e6a0", colorKey: "yellow" },
+      { name: "Interested: Info Received", description: "Target has shown interest and sent materials",    color: "#a0c8f5", colorKey: "blue"   },
       { name: "LOI Issued",                description: "Letter of Intent sent to target",                 color: "#c8a0f5", colorKey: "purple" },
       { name: "Client Intro",              description: "Introduction made to a client or LP",             color: "#a0f5c8", colorKey: "teal"   },
       { name: "Due Diligence",             description: "Active diligence process underway",               color: "#f5c8a0", colorKey: "orange" },
@@ -293,7 +293,7 @@ export default function LabelsPanel() {
 
       {scanResult && (
         <p className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center">
-          Scanned {scanResult.scanned} emails — labeled {scanResult.labeled}
+          Scanned {scanResult.scanned} emails, labeled {scanResult.labeled}
         </p>
       )}
 
@@ -452,7 +452,7 @@ function LabelRow({
           )}
           <div>
             <p className="text-[10px] text-white/20 uppercase tracking-widest mb-2">
-              Keywords — matching emails get this label
+              Keywords: matching emails get this label
             </p>
             {isPreview ? (
               <p className="text-[10px] text-white/20">
@@ -498,7 +498,7 @@ function LabelRow({
                   </button>
                 )}
                 {item.rules.length === 0 && !showInput && (
-                  <p className="text-[10px] text-white/20 w-full mt-0.5">No keywords yet — add some to auto-sort matching emails</p>
+                  <p className="text-[10px] text-white/20 w-full mt-0.5">No keywords yet. Add some to auto-sort matching emails.</p>
                 )}
               </div>
             )}

@@ -40,7 +40,7 @@ export default function CalendarConnections({
     }
     const errorParam = params.get("error");
     if (errorParam?.startsWith("microsoft")) {
-      setToast("Could not connect Outlook — please try again");
+      setToast("Could not connect Outlook. Please try again.");
       router.replace("/");
     }
   }, [params, router]);

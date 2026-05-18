@@ -86,7 +86,7 @@ export async function* generateAIReply(
   const formattedSlots = slots.map((s) => `• ${formatSlot(s, ownerTimezone)}`).join("\n");
 
   const preferenceLine = preferences
-    ? `\n- The user's scheduling preferences: "${preferences}". From the slots listed, select and propose only the 2–3 that best match these preferences. Do not mention or apologize for slots outside the preferred window — just lead with the best ones.`
+    ? `\n- The user's scheduling preferences: "${preferences}". From the slots listed, select and propose only the 2-3 that best match these preferences. Do not mention or apologize for slots outside the preferred window; just lead with the best ones.`
     : "";
 
   const systemPrompt = `You write email replies on behalf of the user.
@@ -94,10 +94,10 @@ export async function* generateAIReply(
 Rules:
 - Write ONLY the email body. No subject line. No "Here is a reply:" preamble.
 - Mirror the tone of the incoming request: casual request → casual reply, formal → formal.
-- Keep it short — 2 to 4 sentences maximum.
-- Choose 2–3 of the available time slots and include them naturally in the text. Times are in ET.
+- Keep it short: 2 to 4 sentences maximum.
+- Choose 2-3 of the available time slots and include them naturally in the text. Times are in ET.
 - End with a friendly call to action (e.g. "let me know what works").
-- Do not sign off with a name — the user will add their own signature.
+- Do not sign off with a name; the user will add their own signature.
 - NEVER claim the other person's proposed times "don't work" unless explicitly told they conflict.${preferenceLine}`;
 
   const conflict = allOfferedTimesBusy

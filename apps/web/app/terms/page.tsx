@@ -1,15 +1,25 @@
+import Link from "next/link";
+import Image from "next/image";
+
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-[#0c0c0e] px-6 py-16">
       <div className="max-w-2xl mx-auto space-y-10">
+        <div className="flex items-center gap-3 mb-2">
+          <Link href="/" className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors text-sm">
+            <Image src="/logo.png" alt="Dharma" width={20} height={20} className="object-contain" />
+            Dharma Automations
+          </Link>
+        </div>
+
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-white">Terms of Service</h1>
-          <p className="text-sm text-white/40">Last updated: April 27, 2025</p>
+          <p className="text-sm text-white/40">Last updated: April 30, 2026</p>
         </div>
 
         <Section title="Acceptance">
-          By installing the Dharma Gmail add-on or using the Dharma dashboard, you agree to these
-          Terms of Service. If you do not agree, do not use the service.
+          By installing the Dharma Chrome extension or using the Dharma dashboard, you agree to
+          these Terms of Service. If you do not agree, do not use the service.
         </Section>
 
         <Section title="Description of Service">
@@ -37,7 +47,7 @@ export default function TermsPage() {
 
         <Section title="AI-Generated Content">
           Dharma uses AI to generate email drafts and scheduling suggestions. All AI-generated
-          content is a suggestion only — you are solely responsible for reviewing and approving any
+          content is a suggestion only; you are solely responsible for reviewing and approving any
           content before it is sent. We do not guarantee the accuracy, completeness, or
           appropriateness of AI-generated output.
         </Section>
@@ -69,7 +79,7 @@ export default function TermsPage() {
 
         <Section title="Termination">
           We reserve the right to suspend or terminate your access if you violate these Terms. You
-          may stop using the service at any time by uninstalling the add-on and deleting your
+          may stop using the service at any time by uninstalling the extension and deleting your
           account.
         </Section>
 
@@ -85,6 +95,11 @@ export default function TermsPage() {
           </a>
           .
         </Section>
+
+        <div className="pt-4 border-t border-white/10 flex gap-6 text-xs text-white/30">
+          <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</Link>
+          <Link href="/support" className="hover:text-white/60 transition-colors">Support</Link>
+        </div>
       </div>
     </main>
   );

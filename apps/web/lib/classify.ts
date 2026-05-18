@@ -117,7 +117,7 @@ export async function classifyEmail(
   durationMinutes: number;
 }> {
   const text = await callClaude(
-    `Classify this email:\n\nSubject: ${subject}\nBody:\n${body.slice(0, 800)}\n\nReply with JSON only:\n{"isSchedulingRequest": boolean, "isTimeConfirmation": boolean, "durationMinutes": 30|60|90}\n\n- isSchedulingRequest: true if the email is trying to set up a meeting, call, or get-together — even if casual, short, or uses slang like "tmrw", "lmk", "wanna meet", "catch up", "hop on a call", etc.\n- isTimeConfirmation: true if the sender is agreeing to or confirming a specific time that was previously proposed`,
+    `Classify this email:\n\nSubject: ${subject}\nBody:\n${body.slice(0, 800)}\n\nReply with JSON only:\n{"isSchedulingRequest": boolean, "isTimeConfirmation": boolean, "durationMinutes": 30|60|90}\n\n- isSchedulingRequest: true if the email is trying to set up a meeting, call, or get-together, even if casual, short, or uses slang like "tmrw", "lmk", "wanna meet", "catch up", "hop on a call", etc.\n- isTimeConfirmation: true if the sender is agreeing to or confirming a specific time that was previously proposed`,
     100
   );
 

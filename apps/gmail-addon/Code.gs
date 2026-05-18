@@ -326,11 +326,11 @@ function polishDraftInner(e) {
 function insertPolishedDraft(e) {
   var cacheKey = e.parameters.cacheKey;
   var cached = CacheService.getUserCache().get(cacheKey);
-  if (!cached) return notificationResponse('Draft expired — please regenerate.');
+  if (!cached) return notificationResponse('Draft expired. Please regenerate.');
   CacheService.getUserCache().remove(cacheKey);
 
   var parsed;
-  try { parsed = JSON.parse(cached); } catch (_) { return notificationResponse('Cache error — please regenerate.'); }
+  try { parsed = JSON.parse(cached); } catch (_) { return notificationResponse('Cache error. Please regenerate.'); }
 
   var polishedText = parsed.text;
   var meta = parsed.meta;

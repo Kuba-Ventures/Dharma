@@ -1,35 +1,46 @@
+import Link from "next/link";
+import Image from "next/image";
+
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[#0c0c0e] px-6 py-16">
       <div className="max-w-2xl mx-auto space-y-10">
+        <div className="flex items-center gap-3 mb-2">
+          <Link href="/" className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors text-sm">
+            <Image src="/logo.png" alt="Dharma" width={20} height={20} className="object-contain" />
+            Dharma Automations
+          </Link>
+        </div>
+
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-white">Privacy Policy</h1>
-          <p className="text-sm text-white/40">Last updated: April 27, 2025</p>
+          <p className="text-sm text-white/40">Last updated: April 30, 2026</p>
         </div>
 
         <Section title="Overview">
-          Dharma Automations ("Dharma", "we", "us") provides an AI-powered Gmail add-on and web
-          dashboard that helps you draft email replies, manage labels, and handle scheduling. This
-          policy explains what data we collect, how we use it, and your rights.
+          Dharma Automations (&quot;Dharma&quot;, &quot;we&quot;, &quot;us&quot;) provides an
+          AI-powered Gmail extension and web dashboard that helps you draft email replies, manage
+          labels, and handle scheduling. This policy explains what data we collect, how we use it,
+          and your rights.
         </Section>
 
         <Section title="Data We Collect">
           <ul className="list-disc list-inside space-y-2">
             <li>
-              <strong className="text-white/80">Gmail content</strong> — message subjects, bodies,
+              <strong className="text-white/80">Gmail content</strong>: message subjects, bodies,
               and sender metadata, accessed solely to generate draft replies and detect scheduling
               requests on your behalf.
             </li>
             <li>
-              <strong className="text-white/80">Google Calendar data</strong> — upcoming events and
+              <strong className="text-white/80">Google Calendar data</strong>: upcoming events and
               availability, used to suggest meeting times.
             </li>
             <li>
-              <strong className="text-white/80">Account identifiers</strong> — your Google account
+              <strong className="text-white/80">Account identifiers</strong>: your Google account
               email address, used to authenticate you and associate your preferences.
             </li>
             <li>
-              <strong className="text-white/80">Preferences</strong> — tone settings, scheduling
+              <strong className="text-white/80">Preferences</strong>: tone settings, scheduling
               preferences, and writing-style profiles you configure in the dashboard.
             </li>
           </ul>
@@ -51,16 +62,16 @@ export default function PrivacyPage() {
           Dharma uses the following third-party services to operate:
           <ul className="list-disc list-inside space-y-2 mt-2">
             <li>
-              <strong className="text-white/80">Anthropic (Claude API)</strong> — email content is
+              <strong className="text-white/80">Anthropic (Claude API)</strong>: email content is
               sent to Anthropic&apos;s API to generate draft replies. Anthropic&apos;s privacy
               policy governs their handling of this data.
             </li>
             <li>
-              <strong className="text-white/80">Google APIs</strong> — we access Gmail and Google
+              <strong className="text-white/80">Google APIs</strong>: we access Gmail and Google
               Calendar through official Google APIs under your explicit OAuth authorization.
             </li>
             <li>
-              <strong className="text-white/80">Vercel</strong> — our infrastructure provider for
+              <strong className="text-white/80">Vercel</strong>: our infrastructure provider for
               hosting and serverless functions.
             </li>
           </ul>
@@ -108,6 +119,11 @@ export default function PrivacyPage() {
           </a>
           .
         </Section>
+
+        <div className="pt-4 border-t border-white/10 flex gap-6 text-xs text-white/30">
+          <Link href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</Link>
+          <Link href="/support" className="hover:text-white/60 transition-colors">Support</Link>
+        </div>
       </div>
     </main>
   );

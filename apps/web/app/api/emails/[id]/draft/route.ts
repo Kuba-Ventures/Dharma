@@ -7,13 +7,13 @@ import { google } from "googleapis";
 
 const TONE_INSTRUCTIONS: Record<string, string> = {
   "My Tone":
-    "Write in a natural, professional but personal tone — direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
+    "Write in a natural, professional but personal tone: direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
   Concise:
     "Write a brief, direct reply. No filler words, no pleasantries beyond a quick greeting. Get to the point in 2-4 sentences.",
   "Formal / Legal":
     "Write in formal, precise language appropriate for legal or official correspondence. Use complete sentences, avoid contractions, and maintain a professional distance.",
   "Casual / Friendly":
-    "Write in a warm, conversational tone. It's okay to be a little informal — use contractions, keep it light and approachable.",
+    "Write in a warm, conversational tone. It's okay to be a little informal, use contractions, keep it light and approachable.",
 };
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -76,7 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const prompt = `${toneInstruction}
 
-You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft. Do not include a subject line. End with just the name "Finley" — do not include a sign-off like "Best" or "Sincerely".
+You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft. Do not include a subject line. End with just the name "Finley"; do not include a sign-off like "Best" or "Sincerely".
 
 Email from: ${from}
 Subject: ${subject}

@@ -27,7 +27,7 @@ async function analyzePatterns(events: { start: string; end: string }[]): Promis
       preferredWindow: "Not enough data",
       preferredDays: "Not enough data",
       typicalDuration: "Not enough data",
-      meetingsPerWeek: "—",
+      meetingsPerWeek: "N/A",
       insight: "Sync more calendar activity to see your scheduling patterns.",
     };
   }
@@ -43,7 +43,7 @@ ${lines}
 
 Return a JSON object with exactly these fields:
 {
-  "preferredWindow": "A 1-2 sentence description of when they prefer to meet based strictly on the data above. State the actual time range they cluster in, describe it (e.g. 'late morning' or 'early afternoon'), then note what time slots they appear to avoid (early morning, late afternoon, evening). Format: 'Prefers [time range] — [description of those hours]; avoids [times not seen in data].' Be specific with actual times from the data.",
+  "preferredWindow": "A 1-2 sentence description of when they prefer to meet based strictly on the data above. State the actual time range they cluster in, describe it (e.g. 'late morning' or 'early afternoon'), then note what time slots they appear to avoid (early morning, late afternoon, evening). Format: 'Prefers [time range] ([description of those hours]); avoids [times not seen in data].' Be specific with actual times from the data.",
   "preferredDays": "The days they most often schedule meetings, e.g. 'Tuesday – Thursday' or 'Weekdays'",
   "typicalDuration": "Most common meeting length, e.g. '30 minutes' or '1 hour'",
   "meetingsPerWeek": "Average number of meetings per week as a range, e.g. '3–4'",
@@ -126,9 +126,9 @@ export async function GET() {
   } catch {
     patterns = {
       preferredWindow: "Analysis unavailable",
-      preferredDays: "—",
-      typicalDuration: "—",
-      meetingsPerWeek: "—",
+      preferredDays: "N/A",
+      typicalDuration: "N/A",
+      meetingsPerWeek: "N/A",
       insight: "Could not analyse calendar patterns.",
     };
   }
