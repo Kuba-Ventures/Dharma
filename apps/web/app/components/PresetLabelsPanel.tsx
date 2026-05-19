@@ -205,7 +205,11 @@ export default function PresetLabelsPanel() {
 
       // 2. Back-scan recent inbox so any messages that arrived before/during
       // setup get classified.
-      const scanRes = await fetch("/api/labels/back-scan", { method: "POST" });
+      const scanRes = await fetch("/api/labels/back-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
       if (!scanRes.ok) {
         const err = await scanRes.json().catch(() => ({})) as { error?: string };
         setResult(`Labels synced. Back-scan failed: ${err.error ?? "unknown error"}`);

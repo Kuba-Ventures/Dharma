@@ -16,12 +16,18 @@ import {
 const MAX_THREADS = 30;
 const CONCURRENCY = 5;
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+
+  // When invoked from the "Sync inbox" button, the caller passes force=true to
+  // bypass the ClassifiedThread dedupe and re-classify recent threads under
+  // the *current* preset. Auto-poll callers should omit it.
+  const body = (await req.json().catch(() => ({}))) as { force?: boolean };
+  const force = body.force === true;
 
   const [presetRow, cred] = await Promise.all([
     prisma.labelPreset.findUnique({ where: { userId } }),
@@ -79,11 +85,18 @@ export async function POST() {
     if (candidates.length >= MAX_THREADS) break;
   }
 
-  const existing = await prisma.classifiedThread.findMany({
-    where: { userId, threadId: { in: candidates.map((c) => c.threadId) } },
-    select: { threadId: true },
-  });
-  const alreadySet = new Set(existing.map((e) => e.threadId));
+  // Dedupe only when not forced; the Sync Inbox button always forces a fresh
+  // pass so preset changes get reflected on previously-seen threads.
+  const alreadySet = force
+    ? new Set<string>()
+    : new Set(
+        (
+          await prisma.classifiedThread.findMany({
+            where: { userId, threadId: { in: candidates.map((c) => c.threadId) } },
+            select: { threadId: true },
+          })
+        ).map((e) => e.threadId),
+      );
   const toClassify = candidates.filter((c) => !alreadySet.has(c.threadId));
 
   let scanned = 0;
