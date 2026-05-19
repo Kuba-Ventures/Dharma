@@ -164,13 +164,13 @@ function extractBody(payload: any): string {
 // Either form resolves to the same { backgroundColor, textColor } pair.
 const GMAIL_HEX_TO_TEXT: Record<string, string> = {
   // Row 1 — vibrant
-  "#cc3a21": "#ffffff",  "#eaa041": "#ffffff",  "#f2c960": "#1d1d1d",
+  "#cc3a21": "#ffffff",  "#eaa041": "#ffffff",  "#f2c960": "#000000",
   "#149e60": "#ffffff",  "#3dc789": "#ffffff",  "#2da2bb": "#ffffff",
   "#4a86e8": "#ffffff",  "#8e63ce": "#ffffff",  "#b694e8": "#000000",
   "#e07798": "#ffffff",
   // Row 2 — deep / saturated
-  "#fb4c2f": "#ffffff",  "#ffad47": "#ffffff",  "#fad165": "#1d1d1d",
-  "#16a766": "#ffffff",  "#43d692": "#1d1d1d",  "#4986e7": "#ffffff",
+  "#fb4c2f": "#ffffff",  "#ffad47": "#ffffff",  "#fad165": "#000000",
+  "#16a766": "#ffffff",  "#43d692": "#000000",  "#4986e7": "#ffffff",
   "#a479e2": "#ffffff",  "#f691b3": "#000000",  "#cf8933": "#ffffff",
   "#653e9b": "#ffffff",
   // Row 3 — pastel / soft
