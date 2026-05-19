@@ -71,6 +71,7 @@ export default function PresetLabelsPanel() {
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [savingPreset, setSavingPreset] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Custom preset state
   const [customName, setCustomName] = useState("");
@@ -168,6 +169,61 @@ export default function PresetLabelsPanel() {
       setResult("Failed to apply labels");
     } finally {
       setApplying(false);
+    }
+  }
+
+  async function syncInbox() {
+    setSyncing(true);
+    setResult(null);
+    try {
+      // 1. Re-apply preset so colors, names, and new labels are pushed to Gmail.
+      const provisionPayload: Record<string, unknown> = { preset };
+      if (preset === "Custom") {
+        const cleaned = customLabels
+          .map((l) => ({ ...l, shortName: l.shortName.trim() }))
+          .filter((l) => l.shortName);
+        if (!customName.trim() || cleaned.length === 0) {
+          setResult("Add a preset name and at least one label first.");
+          setSyncing(false);
+          return;
+        }
+        provisionPayload.customName = customName.trim();
+        provisionPayload.customLabels = cleaned;
+      }
+      const provRes = await fetch("/api/labels/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(provisionPayload),
+      });
+      if (!provRes.ok) {
+        const err = await provRes.json().catch(() => ({})) as { error?: string };
+        setResult(err.error ?? "Sync failed during label setup");
+        return;
+      }
+      const provData = await provRes.json() as { total: number; created: number; updated: number };
+      setProvisioned(provData.total);
+
+      // 2. Back-scan recent inbox so any messages that arrived before/during
+      // setup get classified.
+      const scanRes = await fetch("/api/labels/back-scan", { method: "POST" });
+      if (!scanRes.ok) {
+        const err = await scanRes.json().catch(() => ({})) as { error?: string };
+        setResult(`Labels synced. Back-scan failed: ${err.error ?? "unknown error"}`);
+        return;
+      }
+      const scanData = await scanRes.json() as { scanned: number; tagged: number; skipped: number; total: number };
+      const labelBits: string[] = [];
+      if (provData.created) labelBits.push(`${provData.created} new`);
+      if (provData.updated) labelBits.push(`${provData.updated} updated`);
+      setResult(
+        `✓ Labels synced${labelBits.length ? ` (${labelBits.join(", ")})` : ""}. ` +
+        `Scanned ${scanData.scanned} thread${scanData.scanned === 1 ? "" : "s"}, ` +
+        `tagged ${scanData.tagged}${scanData.skipped ? ` (${scanData.skipped} already classified)` : ""}.`
+      );
+    } catch {
+      setResult("Sync failed");
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -276,15 +332,25 @@ export default function PresetLabelsPanel() {
         </p>
       )}
 
-      <button
-        onClick={applyToGmail}
-        disabled={applying}
-        className="w-full py-2.5 text-xs font-medium rounded-xl bg-[#b57bff]/15 border border-[#b57bff]/30 text-[#b57bff] hover:bg-[#b57bff]/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        {applying
-          ? "Creating labels in Gmail…"
-          : `Apply ${presetIsCustom ? (customName.trim() || "Custom") : preset} labels to Gmail`}
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={applyToGmail}
+          disabled={applying || syncing}
+          className="w-full py-2.5 text-xs font-medium rounded-xl bg-[#b57bff]/15 border border-[#b57bff]/30 text-[#b57bff] hover:bg-[#b57bff]/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {applying
+            ? "Creating labels in Gmail…"
+            : `Apply ${presetIsCustom ? (customName.trim() || "Custom") : preset} labels to Gmail`}
+        </button>
+        <button
+          onClick={syncInbox}
+          disabled={applying || syncing}
+          title="Push current colors and names to Gmail, then classify recent inbox messages that were missed."
+          className="w-full py-2 text-xs font-medium rounded-xl bg-white/[0.04] border border-white/[0.1] text-white/70 hover:bg-white/[0.07] hover:text-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {syncing ? "Syncing inbox…" : "Sync inbox"}
+        </button>
+      </div>
     </div>
   );
 }

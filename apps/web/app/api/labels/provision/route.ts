@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import { createGmailLabel, listGmailLabels } from "../../../../lib/gmail";
+import { createGmailLabel, listGmailLabels, updateGmailLabel } from "../../../../lib/gmail";
 import { isPresetKey, resolvePresetSpec, type CustomPresetLabel } from "../../../../lib/labelPresets";
 
 export async function POST(req: Request) {
@@ -45,11 +45,15 @@ export async function POST(req: Request) {
 
   let created = 0;
   let linked = 0;
+  let updated = 0;
   const provisioned: Array<{ name: string; gmailLabelId: string }> = [];
 
   for (const label of spec.labels) {
     let gmailLabelId = existingByName.get(label.name) ?? null;
     if (gmailLabelId) {
+      // Sync color back to Gmail in case the user picked a new one in the UI.
+      const ok = await updateGmailLabel(userId, gmailLabelId, { colorKey: label.colorKey });
+      if (ok) updated++;
       linked++;
     } else {
       gmailLabelId = await createGmailLabel(userId, label.name, label.colorKey);
@@ -91,6 +95,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     created,
     linked,
+    updated,
     total: provisioned.length,
     preset: presetKey,
     displayName: spec.displayName,

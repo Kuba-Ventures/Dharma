@@ -255,6 +255,26 @@ export async function createGmailLabel(
   }
 }
 
+export async function updateGmailLabel(
+  userId: string,
+  gmailLabelId: string,
+  opts: { name?: string; colorKey?: string }
+): Promise<boolean> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    const requestBody: { name?: string; color?: { backgroundColor: string; textColor: string } } = {};
+    if (opts.name) requestBody.name = opts.name;
+    if (opts.colorKey) requestBody.color = resolveGmailColor(opts.colorKey);
+    if (!requestBody.name && !requestBody.color) return true;
+    await gmail.users.labels.patch({ userId: "me", id: gmailLabelId, requestBody });
+    return true;
+  } catch (err) {
+    console.error("[gmail] updateGmailLabel failed:", err);
+    return false;
+  }
+}
+
 export async function deleteGmailLabel(
   userId: string,
   gmailLabelId: string
