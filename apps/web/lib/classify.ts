@@ -215,6 +215,10 @@ export interface PresetClassification {
   priority: number;
 }
 
+function normalizeLabel(s: string): string {
+  return s.trim().toLowerCase().replace(/[-_\s]+/g, "");
+}
+
 export async function classifyForPreset(
   args: {
     /** Display name for the preset, e.g. "VC" or "Kuba Ventures". */
@@ -290,8 +294,11 @@ Use null for label only as a last resort.`;
     const parsed = parseJSON<{ label: string | null; priority: number }>(text);
     if (!parsed) return { label: null, priority: 0 };
 
-    const validNames = new Set<string>(labelNames);
-    const label = parsed.label && validNames.has(parsed.label) ? parsed.label : null;
+    // Case- and whitespace-insensitive lookup: Haiku occasionally lowercases or
+    // hyphenates the label slightly (e.g. "meeting" vs "Meeting") which
+    // previously caused valid matches to fall through to null.
+    const canonical = new Map(labelNames.map((n) => [normalizeLabel(n), n]));
+    const label = parsed.label ? canonical.get(normalizeLabel(parsed.label)) ?? null : null;
     const priority = typeof parsed.priority === "number" ? parsed.priority : 0;
     return { label, priority };
   } catch (err) {
