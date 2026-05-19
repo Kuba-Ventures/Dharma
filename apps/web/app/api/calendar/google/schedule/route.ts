@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { makeAuthForUser } from "../../../../../lib/gmail";
+import { logUsage } from "../../../../../lib/usage";
 import { prisma } from "../../../../../lib/prisma";
 import { google } from "googleapis";
 
@@ -20,7 +21,7 @@ export interface SchedulePatterns {
   insight: string;
 }
 
-async function analyzePatterns(events: { start: string; end: string }[]): Promise<SchedulePatterns> {
+async function analyzePatterns(events: { start: string; end: string }[], userId: string): Promise<SchedulePatterns> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || events.length < 3) {
     return {
@@ -67,7 +68,18 @@ JSON only, no other text.`;
   });
 
   if (!res.ok) throw new Error(`Anthropic error ${res.status}`);
-  const data = (await res.json()) as { content: Array<{ text: string }> };
+  const data = (await res.json()) as {
+    content: Array<{ text: string }>;
+    usage?: { input_tokens: number; output_tokens: number };
+  };
+  if (data.usage) {
+    await logUsage({
+      userId,
+      eventType: "schedule",
+      model: "claude-haiku-4-5-20251001",
+      usage: data.usage,
+    });
+  }
   const match = data.content[0]?.text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON in response");
   return JSON.parse(match[0]) as SchedulePatterns;
@@ -122,7 +134,7 @@ export async function GET() {
 
   let patterns: SchedulePatterns;
   try {
-    patterns = await analyzePatterns(pastForAnalysis);
+    patterns = await analyzePatterns(pastForAnalysis, session.user.id);
   } catch {
     patterns = {
       preferredWindow: "Analysis unavailable",

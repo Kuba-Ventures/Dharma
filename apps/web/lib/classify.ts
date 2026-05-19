@@ -1,4 +1,13 @@
-async function callClaude(prompt: string, maxTokens = 80): Promise<string> {
+import { logUsage, type EventType } from "./usage";
+import { LABEL_PRESETS, type PresetKey } from "./labelPresets";
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+
+async function callClaude(
+  prompt: string,
+  maxTokens = 80,
+  opts: { userId?: string; eventType?: EventType } = {}
+): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     console.error("[classify] ANTHROPIC_API_KEY is not set — classification skipped");
@@ -14,7 +23,7 @@ async function callClaude(prompt: string, maxTokens = 80): Promise<string> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: HAIKU_MODEL,
         max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -25,7 +34,18 @@ async function callClaude(prompt: string, maxTokens = 80): Promise<string> {
       console.error(`[classify] Anthropic API error ${response.status}: ${body}`);
       return "";
     }
-    const data = (await response.json()) as { content: Array<{ text: string }> };
+    const data = (await response.json()) as {
+      content: Array<{ text: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+    if (opts.userId && opts.eventType && data.usage) {
+      await logUsage({
+        userId: opts.userId,
+        eventType: opts.eventType,
+        model: HAIKU_MODEL,
+        usage: data.usage,
+      });
+    }
     return data.content[0]?.text ?? "";
   } catch (err) {
     console.error("[classify] Anthropic API call failed:", err);
@@ -73,7 +93,8 @@ export async function classifyEmailLabels(
   subject: string,
   from: string,
   body: string,
-  labels: Array<{ name: string; description: string }>
+  labels: Array<{ name: string; description: string }>,
+  userId?: string
 ): Promise<string[]> {
   if (!labels.length) return [];
 
@@ -94,7 +115,8 @@ SKIP labeling entirely (return []) for:
 For real human emails, apply labels that clearly fit. It's fine to apply 1-2 labels when confident.
 
 Labels:\n${labelList}\n\nEmail:\nFrom: ${from}\nSubject: ${subject}\nBody:\n${body.slice(0, 600)}\n\nReturn a JSON array of matching label names ([] if automated or no clear match): ["Label1"]\nJSON only, no explanation.`,
-    200
+    200,
+    { userId, eventType: "classify" }
   );
 
   const arrMatch = text.match(/\[[\s\S]*?\]/);
@@ -110,7 +132,8 @@ Labels:\n${labelList}\n\nEmail:\nFrom: ${from}\nSubject: ${subject}\nBody:\n${bo
 
 export async function classifyEmail(
   subject: string,
-  body: string
+  body: string,
+  userId?: string
 ): Promise<{
   isSchedulingRequest: boolean;
   isTimeConfirmation: boolean;
@@ -118,7 +141,8 @@ export async function classifyEmail(
 }> {
   const text = await callClaude(
     `Classify this email:\n\nSubject: ${subject}\nBody:\n${body.slice(0, 800)}\n\nReply with JSON only:\n{"isSchedulingRequest": boolean, "isTimeConfirmation": boolean, "durationMinutes": 30|60|90}\n\n- isSchedulingRequest: true if the email is trying to set up a meeting, call, or get-together, even if casual, short, or uses slang like "tmrw", "lmk", "wanna meet", "catch up", "hop on a call", etc.\n- isTimeConfirmation: true if the sender is agreeing to or confirming a specific time that was previously proposed`,
-    100
+    100,
+    { userId, eventType: "classify" }
   );
 
   return (
@@ -136,11 +160,13 @@ export async function classifyEmail(
 export async function extractProposedTimes(
   subject: string,
   body: string,
-  todayISO: string
+  todayISO: string,
+  userId?: string
 ): Promise<Array<{ startISO: string; endISO: string }> | null> {
   const text = await callClaude(
     `Today is ${todayISO}. Does this email propose one or more specific meeting times for the recipient to choose from?\n\nSubject: ${subject}\nBody:\n${body.slice(0, 800)}\n\nIf YES, return a JSON array of every proposed slot:\n[{"startISO":"ISO8601 with tz offset","endISO":"ISO8601 with tz offset"}, ...]\n\nIf the email only asks when the recipient is free (no specific times given), return: null\n\nJSON only, no explanation.`,
-    400
+    400,
+    { userId, eventType: "schedule" }
   );
 
   const arrMatch = text.match(/\[[\s\S]*\]/);
@@ -161,11 +187,13 @@ export async function extractProposedTimes(
 export async function extractConfirmedTime(
   subject: string,
   body: string,
-  todayISO: string
+  todayISO: string,
+  userId?: string
 ): Promise<{ startISO: string; endISO: string; title: string } | null> {
   const text = await callClaude(
     `Today's date is ${todayISO}. Extract the confirmed meeting time from this email.\n\nSubject: ${subject}\nBody:\n${body.slice(0, 800)}\n\nReply with JSON only (no explanation):\n{"startISO": "ISO8601 datetime with timezone offset", "endISO": "ISO8601 datetime with timezone offset", "title": "short meeting title"}\n\nIf no specific time can be extracted, reply: {"startISO": null}`,
-    150
+    150,
+    { userId, eventType: "schedule" }
   );
 
   const parsed = parseJSON<{ startISO: string | null; endISO: string; title: string }>(text);
@@ -177,4 +205,76 @@ export async function extractConfirmedTime(
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
 
   return { startISO: parsed.startISO, endISO: parsed.endISO, title: parsed.title };
+}
+
+// ── Preset label classifier (Feature 1) ────────────────────────────────────
+
+export interface PresetClassification {
+  /** Short label name (e.g. "Portfolio") or null if no clear match. */
+  label: string | null;
+  /** 0..1 — confidence the email is high-priority / time-sensitive. */
+  priority: number;
+}
+
+export async function classifyForPreset(
+  preset: PresetKey,
+  subject: string,
+  from: string,
+  snippet: string,
+  body: string,
+  userId: string
+): Promise<PresetClassification> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { label: null, priority: 0 };
+
+  const labelNames = LABEL_PRESETS[preset]
+    .map((l) => l.shortName)
+    .filter((n) => n !== "High-Priority");
+
+  const systemPrompt = `You classify business emails for a ${preset} professional. Return ONLY a JSON object: {"label": "<label_name>", "priority": <0..1>} where label is one of: ${JSON.stringify(labelNames)} (or null if no clear match). Priority is your confidence the email is high-priority/time-sensitive.`;
+
+  const userMessage = `Subject: ${subject}\nFrom: ${from}\nSnippet: ${snippet}\nBody (first 1500 chars): ${body.slice(0, 1500)}`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: HAIKU_MODEL,
+        max_tokens: 120,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error(`[classify-preset] Anthropic error ${response.status}: ${errBody}`);
+      return { label: null, priority: 0 };
+    }
+
+    const data = (await response.json()) as {
+      content: Array<{ text: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+    if (data.usage) {
+      await logUsage({ userId, eventType: "classify", model: HAIKU_MODEL, usage: data.usage });
+    }
+
+    const text = data.content[0]?.text ?? "";
+    const parsed = parseJSON<{ label: string | null; priority: number }>(text);
+    if (!parsed) return { label: null, priority: 0 };
+
+    const validNames = new Set(labelNames);
+    const label = parsed.label && validNames.has(parsed.label) ? parsed.label : null;
+    const priority = typeof parsed.priority === "number" ? parsed.priority : 0;
+    return { label, priority };
+  } catch (err) {
+    console.error("[classify-preset] Failed:", err);
+    return { label: null, priority: 0 };
+  }
 }

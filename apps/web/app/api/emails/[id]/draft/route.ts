@@ -3,6 +3,7 @@ import { auth } from "../../../../../lib/auth";
 import { verifyExtensionToken } from "../../../../../lib/extension-token";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser, createDraft } from "../../../../../lib/gmail";
+import { logUsage } from "../../../../../lib/usage";
 import { google } from "googleapis";
 
 const TONE_INSTRUCTIONS: Record<string, string> = {
@@ -100,8 +101,20 @@ Reply draft:`;
   });
 
   if (!claudeRes.ok) return NextResponse.json({ error: "Claude failed" }, { status: 500 });
-  const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
+  const claudeData = await claudeRes.json() as {
+    content: Array<{ text: string }>;
+    usage?: { input_tokens: number; output_tokens: number };
+  };
   const replyBody = claudeData.content[0]?.text?.trim() ?? "";
+
+  if (claudeData.usage) {
+    await logUsage({
+      userId,
+      eventType: "draft",
+      model: "claude-haiku-4-5-20251001",
+      usage: claudeData.usage,
+    });
+  }
 
   // Save as Gmail draft
   await createDraft(googleCred.accessToken, googleCred.refreshToken, {

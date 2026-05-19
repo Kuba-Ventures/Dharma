@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, createDraft, applyGmailLabels } from "../../../../lib/gmail";
-import { classifyEmail, classifyEmailLabels, extractConfirmedTime, extractProposedTimes, detectTimezoneFromText } from "../../../../lib/classify";
+import { classifyEmail, classifyEmailLabels, classifyForPreset, extractConfirmedTime, extractProposedTimes, detectTimezoneFromText } from "../../../../lib/classify";
+import { LABEL_PRESETS, HIGH_PRIORITY_NAME, isPresetKey } from "../../../../lib/labelPresets";
 import { createCalendarEvent } from "../../../../lib/calendar";
 import { getAvailableSlots } from "@dharma/calendar-core";
 import { RealGoogleProvider } from "@dharma/providers-google";
 import { generateReply, generateAIReply, generateConfirmationReply } from "@dharma/reply-generation";
 import type { SchedulingRequest } from "@dharma/types";
+import { logUsage } from "../../../../lib/usage";
 
 // Accepts both:
 //   x-cron-secret header (local poller script)
@@ -128,7 +130,8 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               if (labelsWithoutRules.length > 0 && process.env.ANTHROPIC_API_KEY) {
                 const aiNames = await classifyEmailLabels(
                   msg.subject, msg.from, msg.body,
-                  labelsWithoutRules.map((l) => ({ name: l.name, description: l.description }))
+                  labelsWithoutRules.map((l) => ({ name: l.name, description: l.description })),
+                  googleCred.userId
                 );
                 aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
               }
@@ -143,9 +146,65 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
             }
           })();
 
+          // ── Preset label classification (Feature 1: Tabs & Labels) ─────────
+          // Industry-preset auto-tagging using Haiku 4.5. Idempotent per thread.
+          (async () => {
+            try {
+              const presetRow = await prisma.labelPreset.findUnique({
+                where: { userId: googleCred.userId },
+              });
+              if (!presetRow?.enabled || !isPresetKey(presetRow.preset)) return;
+              if (!process.env.ANTHROPIC_API_KEY) return;
+
+              // Skip if this thread has already been classified once.
+              const already = await prisma.classifiedThread.findUnique({
+                where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+              });
+              if (already) return;
+
+              const result = await classifyForPreset(
+                presetRow.preset,
+                msg.subject,
+                msg.from,
+                msg.body.slice(0, 200),
+                msg.body,
+                googleCred.userId,
+              );
+
+              const presetSpec = LABEL_PRESETS[presetRow.preset];
+              const matched = result.label
+                ? presetSpec.find((l) => l.shortName === result.label)
+                : null;
+
+              const labelNamesToApply: string[] = [];
+              if (matched) labelNamesToApply.push(matched.name);
+              if (result.priority > 0.75) labelNamesToApply.push(HIGH_PRIORITY_NAME);
+
+              if (labelNamesToApply.length > 0) {
+                const mappings = await prisma.labelMapping.findMany({
+                  where: { userId: googleCred.userId, labelName: { in: labelNamesToApply } },
+                });
+                const gmailIds = mappings.map((m) => m.gmailLabelId);
+                if (gmailIds.length > 0) {
+                  await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+                  console.log(`[poll] Preset labels applied to ${messageId}: ${mappings.map((m) => m.labelName).join(", ")} (priority=${result.priority.toFixed(2)})`);
+                }
+              }
+
+              await prisma.classifiedThread.upsert({
+                where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+                create: { userId: googleCred.userId, threadId: msg.threadId },
+                update: {},
+              });
+            } catch (err) {
+              console.error(`[poll] Preset classification failed for ${messageId}:`, err);
+            }
+          })();
+
           const { isSchedulingRequest, isTimeConfirmation, durationMinutes } = await classifyEmail(
             msg.subject,
-            msg.body
+            msg.body,
+            googleCred.userId
           );
 
           // ── Time confirmation → create calendar event ──────────────────────
@@ -153,7 +212,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
             console.log(`[poll] Time confirmation detected: "${msg.subject}" from ${msg.from}`);
             console.log(`[poll] Email body: ${msg.body.slice(0, 200)}`);
             const todayISO = new Date().toISOString().slice(0, 10);
-            const meeting = await extractConfirmedTime(msg.subject, msg.body, todayISO);
+            const meeting = await extractConfirmedTime(msg.subject, msg.body, todayISO, googleCred.userId);
             console.log(`[poll] Extracted meeting:`, JSON.stringify(meeting));
 
             if (meeting) {
@@ -215,7 +274,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
           // ── Step 1: check if the email offers specific times ──────────────
           // e.g. an EA sending "I have Tue 1:30 PM, Wed 3 PM, Thu 4 PM PDT"
-          const proposedTimes = await extractProposedTimes(msg.subject, msg.body, todayISO);
+          const proposedTimes = await extractProposedTimes(msg.subject, msg.body, todayISO, googleCred.userId);
           console.log(`[poll] Proposed times found: ${proposedTimes?.length ?? 0}`);
 
           let replyBody: string;
@@ -241,7 +300,12 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
             if (process.env.ANTHROPIC_API_KEY) {
               let text = "";
               try {
-                for await (const chunk of generateConfirmationReply(confirmedSlot, msg.body, senderTimezone)) {
+                for await (const chunk of generateConfirmationReply(
+                  confirmedSlot,
+                  msg.body,
+                  senderTimezone,
+                  async (u) => { await logUsage({ userId: googleCred.userId, eventType: "draft", model: u.model, usage: { input_tokens: u.inputTokens, output_tokens: u.outputTokens } }); }
+                )) {
                   text += chunk;
                 }
                 replyBody = text;
@@ -262,7 +326,14 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
             if (process.env.ANTHROPIC_API_KEY && msg.body.trim()) {
               let text = "";
               try {
-                for await (const chunk of generateAIReply(suggestedSlots, msg.body, "America/New_York", allOfferedTimesBusy)) {
+                for await (const chunk of generateAIReply(
+                  suggestedSlots,
+                  msg.body,
+                  "America/New_York",
+                  allOfferedTimesBusy,
+                  undefined,
+                  async (u) => { await logUsage({ userId: googleCred.userId, eventType: "draft", model: u.model, usage: { input_tokens: u.inputTokens, output_tokens: u.outputTokens } }); }
+                )) {
                   text += chunk;
                 }
                 replyBody = text;

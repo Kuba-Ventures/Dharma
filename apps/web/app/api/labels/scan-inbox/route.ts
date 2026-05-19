@@ -50,7 +50,8 @@ export async function POST() {
     if (labelsWithoutRules.length > 0 && process.env.ANTHROPIC_API_KEY) {
       const aiNames = await classifyEmailLabels(
         msg.subject, msg.from, msg.snippet,
-        labelsWithoutRules.map((l) => ({ name: l.name, description: l.description }))
+        labelsWithoutRules.map((l) => ({ name: l.name, description: l.description })),
+        userId
       );
       aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
     }

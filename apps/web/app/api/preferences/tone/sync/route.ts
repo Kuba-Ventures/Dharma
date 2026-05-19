@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../../lib/gmail";
+import { logUsage } from "../../../../../lib/usage";
 import { google } from "googleapis";
 
 const SENT_SAMPLE_COUNT = 25;
@@ -37,7 +38,7 @@ async function fetchSentEmailBodies(userId: string): Promise<string[]> {
     .map((r) => r.value as string);
 }
 
-async function analyzeTonesWithClaude(bodies: string[]): Promise<{ summary: string; example: string }> {
+async function analyzeTonesWithClaude(bodies: string[], userId: string): Promise<{ summary: string; example: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
@@ -87,7 +88,18 @@ JSON only, no other text.`;
     throw new Error(`Anthropic API error ${response.status}: ${text}`);
   }
 
-  const data = (await response.json()) as { content: Array<{ text: string }> };
+  const data = (await response.json()) as {
+    content: Array<{ text: string }>;
+    usage?: { input_tokens: number; output_tokens: number };
+  };
+  if (data.usage) {
+    await logUsage({
+      userId,
+      eventType: "tone_sync",
+      model: "claude-haiku-4-5-20251001",
+      usage: data.usage,
+    });
+  }
   const raw = data.content[0]?.text ?? "";
 
   const match = raw.match(/\{[\s\S]*\}/);
@@ -135,7 +147,7 @@ export async function POST() {
 
   let result: { summary: string; example: string };
   try {
-    result = await analyzeTonesWithClaude(bodies);
+    result = await analyzeTonesWithClaude(bodies, userId);
   } catch (err) {
     console.error("[tone/sync] Claude analysis failed:", err);
     return NextResponse.json({ error: "Tone analysis failed" }, { status: 502 });

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import LabelsPanel from "./LabelsPanel";
+import PresetLabelsPanel from "./PresetLabelsPanel";
+import MetricsCard from "./MetricsCard";
 
 // ── Paste your Gmail add-on install URL here ───────────────────────────────
 // For testing: Apps Script editor → Deploy → Test deployments → copy the install link
@@ -82,6 +83,23 @@ export default function DashboardWrapper({
   const [selectedTone, setSelectedTone] = useState<Tone | null>((initialTone as Tone) || null);
   const [labelsEnabled, setLabelsEnabled] = useState(false);
   const [schedulingEnabled, setSchedulingEnabled] = useState(initialSchedulingEnabled);
+
+  // Load Tabs & Labels enabled state from server on mount
+  useEffect(() => {
+    fetch("/api/labels/status")
+      .then((r) => r.json())
+      .then((data: { enabled: boolean }) => setLabelsEnabled(!!data.enabled))
+      .catch(() => null);
+  }, []);
+
+  async function handleLabelsToggle(enabled: boolean) {
+    setLabelsEnabled(enabled);
+    await fetch("/api/labels/preset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }).catch(() => null);
+  }
 
   // My Tone sync state
   const [toneProfile, setToneProfile] = useState("");
@@ -342,15 +360,15 @@ export default function DashboardWrapper({
         <FeatureCard>
           <FeatureRow
             title="Tabs & Labels"
-            description="Sort and label emails using industry-specific presets"
+            description="Auto-tag incoming Gmail with industry-specific labels. Turning off stops classification but leaves existing labels in Gmail."
             enabled={labelsEnabled}
-            onToggle={setLabelsEnabled}
+            onToggle={handleLabelsToggle}
           />
         </FeatureCard>
 
         {/* Labels detail panel */}
         <div>
-          {labelsEnabled && <LabelsPanel />}
+          {labelsEnabled && <PresetLabelsPanel />}
         </div>
 
         {/* ── Scheduling card ── */}
@@ -466,6 +484,8 @@ export default function DashboardWrapper({
           <InboxPanel selectedTone={selectedTone} />
         </div>
       </div>
+
+      <MetricsCard />
 
     </div>
   );

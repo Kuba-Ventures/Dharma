@@ -1,11 +1,18 @@
 import type { TimeSlot } from "@dharma/types";
 import { formatSlot } from "../index";
 
+export interface UsageReport {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 // Generates a short reply confirming a specific proposed time works.
 export async function* generateConfirmationReply(
   slot: TimeSlot,
   originalRequest: string,
-  timezone = "America/New_York"
+  timezone = "America/New_York",
+  onUsage?: (usage: UsageReport) => void | Promise<void>
 ): AsyncGenerator<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -47,6 +54,8 @@ Rules:
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -59,15 +68,30 @@ Rules:
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
-      if (data === "[DONE]") return;
+      if (data === "[DONE]") {
+        if (onUsage) await onUsage({ model: "claude-sonnet-4-20250514", inputTokens, outputTokens });
+        return;
+      }
       try {
-        const event = JSON.parse(data) as { type: string; delta?: { type: string; text: string } };
+        const event = JSON.parse(data) as {
+          type: string;
+          delta?: { type: string; text: string };
+          message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+          usage?: { input_tokens?: number; output_tokens?: number };
+        };
         if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
           yield event.delta.text;
+        }
+        if (event.type === "message_start" && event.message?.usage?.input_tokens) {
+          inputTokens = event.message.usage.input_tokens;
+        }
+        if (event.type === "message_delta" && event.usage?.output_tokens) {
+          outputTokens = event.usage.output_tokens;
         }
       } catch { /* skip malformed chunk */ }
     }
   }
+  if (onUsage) await onUsage({ model: "claude-sonnet-4-20250514", inputTokens, outputTokens });
 }
 
 export async function* generateAIReply(
@@ -75,7 +99,8 @@ export async function* generateAIReply(
   schedulingRequest: string,
   timezone = "America/New_York",
   allOfferedTimesBusy = false,
-  preferences?: string
+  preferences?: string,
+  onUsage?: (usage: UsageReport) => void | Promise<void>
 ): AsyncGenerator<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
@@ -132,6 +157,8 @@ Rules:
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -144,16 +171,31 @@ Rules:
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
-      if (data === "[DONE]") return;
+      if (data === "[DONE]") {
+        if (onUsage) await onUsage({ model: "claude-sonnet-4-20250514", inputTokens, outputTokens });
+        return;
+      }
 
       try {
-        const event = JSON.parse(data) as { type: string; delta?: { type: string; text: string } };
+        const event = JSON.parse(data) as {
+          type: string;
+          delta?: { type: string; text: string };
+          message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+          usage?: { input_tokens?: number; output_tokens?: number };
+        };
         if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
           yield event.delta.text;
+        }
+        if (event.type === "message_start" && event.message?.usage?.input_tokens) {
+          inputTokens = event.message.usage.input_tokens;
+        }
+        if (event.type === "message_delta" && event.usage?.output_tokens) {
+          outputTokens = event.usage.output_tokens;
         }
       } catch {
         // malformed chunk — skip
       }
     }
   }
+  if (onUsage) await onUsage({ model: "claude-sonnet-4-20250514", inputTokens, outputTokens });
 }
