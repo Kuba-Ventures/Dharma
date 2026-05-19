@@ -234,7 +234,24 @@ export async function classifyForPreset(
   const { displayName, labelNames, subject, from, snippet, body, userId } = args;
   if (labelNames.length === 0) return { label: null, priority: 0 };
 
-  const systemPrompt = `You classify business emails for a ${displayName} professional. Return ONLY a JSON object: {"label": "<label_name>", "priority": <0..1>} where label is one of: ${JSON.stringify(labelNames)} (or null if no clear match). Priority is your confidence the email is high-priority/time-sensitive.`;
+  const systemPrompt = `You are a decisive email classifier for a ${displayName} professional.
+
+Pick the SINGLE best-fit label from this list:
+${labelNames.map((n) => `- ${n}`).join("\n")}
+
+Rules:
+- Match on intent first (what does the sender want?), then topic.
+- A request to schedule a call/meeting → "Meeting" if it exists, else "Follow-Up" / "Respond" if they exist.
+- A bill, invoice, payment receipt, or pricing question → "Billing" / "Payments" / "Invoices" if any exist.
+- A contract, NDA, or legal doc → "Legal" / "Contracts" if any exist.
+- A status/progress update from a portfolio company or client → "Portfolio" / "Client-Update" / "Update" if any exist.
+- Be DECISIVE. Return null ONLY if absolutely none of the labels could conceivably apply (rare).
+- Pick the label that the user would most likely have wanted, even if the fit isn't perfect.
+
+Also rate priority 0..1 — how time-sensitive / high-stakes is this email?
+
+Return ONLY a JSON object like: {"label": "Meeting", "priority": 0.6}
+Use null for label only as a last resort.`;
 
   const userMessage = `Subject: ${subject}\nFrom: ${from}\nSnippet: ${snippet}\nBody (first 1500 chars): ${body.slice(0, 1500)}`;
 
@@ -249,6 +266,7 @@ export async function classifyForPreset(
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: 120,
+        temperature: 0,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       }),
