@@ -22,36 +22,26 @@ export default function MetricsCard() {
   }, []);
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between px-1 mb-2">
-        <div>
-          <h2 className="text-sm font-medium text-white">Metrics</h2>
-          <p className="text-xs text-white/30 mt-0.5">
-            Drafts, classifications, and Anthropic spend
-          </p>
-        </div>
-      </div>
-      <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Cell
-            label="Drafts this week"
-            value={loading ? "…" : String(data?.draftsThisWeek ?? 0)}
-          />
-          <Cell
-            label="Avg cost per draft"
-            value={loading ? "…" : formatUsd(data?.avgCostPerDraft ?? 0)}
-          />
-          <Cell
-            label="Emails tagged"
-            value={loading ? "…" : String(data?.emailsTagged ?? 0)}
-          />
-          <Cell
-            label="Total spend (30d)"
-            value={loading ? "…" : formatUsd(data?.totalSpend30d ?? 0)}
-          />
-          <Cell label="Time saved" value="Coming soon" muted />
-          <Cell label="Reply rate" value="Coming soon" muted />
-        </div>
+    <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Cell
+          label="Drafts this week"
+          value={loading ? "…" : String(data?.draftsThisWeek ?? 0)}
+        />
+        <Cell
+          label="Avg cost per draft"
+          value={loading ? "…" : formatUsd(data?.avgCostPerDraft ?? 0)}
+        />
+        <Cell
+          label="Emails tagged"
+          value={loading ? "…" : String(data?.emailsTagged ?? 0)}
+        />
+        <Cell
+          label="Total spend (30d)"
+          value={loading ? "…" : formatUsd(data?.totalSpend30d ?? 0)}
+        />
+        <Cell label="Time saved" value="Coming soon" muted />
+        <Cell label="Reply rate" value="Coming soon" muted />
       </div>
     </div>
   );

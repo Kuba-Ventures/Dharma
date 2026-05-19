@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PresetLabelsPanel from "./PresetLabelsPanel";
-import MetricsCard from "./MetricsCard";
 
 // ── Paste your Gmail add-on install URL here ───────────────────────────────
 // For testing: Apps Script editor → Deploy → Test deployments → copy the install link
@@ -484,8 +483,6 @@ export default function DashboardWrapper({
           <InboxPanel selectedTone={selectedTone} />
         </div>
       </div>
-
-      <MetricsCard />
 
     </div>
   );
