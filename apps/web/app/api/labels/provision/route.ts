@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { createGmailLabel, listGmailLabels } from "../../../../lib/gmail";
-import { LABEL_PRESETS, isPresetKey } from "../../../../lib/labelPresets";
+import { isPresetKey, resolvePresetSpec, type CustomPresetLabel } from "../../../../lib/labelPresets";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -11,7 +11,11 @@ export async function POST(req: Request) {
   }
   const userId = session.user.id;
 
-  const body = (await req.json().catch(() => ({}))) as { preset?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    preset?: string;
+    customName?: string | null;
+    customLabels?: CustomPresetLabel[] | null;
+  };
   const presetKey = body.preset;
   if (!presetKey || !isPresetKey(presetKey)) {
     return NextResponse.json({ error: "Invalid preset" }, { status: 400 });
@@ -22,9 +26,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Google not connected" }, { status: 400 });
   }
 
-  const presetLabels = LABEL_PRESETS[presetKey];
+  // For Custom presets, the request body carries the spec (we also persist it
+  // so subsequent polls can classify). For built-ins, the spec is hardcoded.
+  const spec = resolvePresetSpec({
+    preset: presetKey,
+    customName: body.customName,
+    customLabels: body.customLabels,
+  });
+  if (!spec || spec.labels.length === 0) {
+    return NextResponse.json(
+      { error: "Custom preset needs a name and at least one label" },
+      { status: 400 }
+    );
+  }
 
-  // Pull existing Gmail labels so we can link rather than fail on 409 conflicts.
   const existing = await listGmailLabels(userId);
   const existingByName = new Map(existing.map((l) => [l.name, l.id]));
 
@@ -32,7 +47,7 @@ export async function POST(req: Request) {
   let linked = 0;
   const provisioned: Array<{ name: string; gmailLabelId: string }> = [];
 
-  for (const label of presetLabels) {
+  for (const label of spec.labels) {
     let gmailLabelId = existingByName.get(label.name) ?? null;
     if (gmailLabelId) {
       linked++;
@@ -51,11 +66,26 @@ export async function POST(req: Request) {
     }
   }
 
-  // Persist preset choice + enable classification.
+  // Persist preset choice (and custom spec if applicable). Enable classification.
   await prisma.labelPreset.upsert({
     where: { userId },
-    create: { userId, preset: presetKey, enabled: true },
-    update: { preset: presetKey, enabled: true },
+    create: {
+      userId,
+      preset: presetKey,
+      enabled: true,
+      customName: presetKey === "Custom" ? (body.customName ?? null) : null,
+      customLabels: (presetKey === "Custom"
+        ? (body.customLabels ?? null)
+        : null) as unknown as object,
+    },
+    update: {
+      preset: presetKey,
+      enabled: true,
+      ...(presetKey === "Custom" && {
+        customName: body.customName ?? null,
+        customLabels: (body.customLabels ?? null) as unknown as object,
+      }),
+    },
   });
 
   return NextResponse.json({
@@ -63,6 +93,7 @@ export async function POST(req: Request) {
     linked,
     total: provisioned.length,
     preset: presetKey,
+    displayName: spec.displayName,
     labels: provisioned,
   });
 }

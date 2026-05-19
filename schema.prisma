@@ -137,13 +137,16 @@ model VerificationToken {
 // ── Industry-preset labels (VC / PE / Legal / General) ─────────────────────
 
 model LabelPreset {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  preset    String   // "VC" | "PE" | "Legal" | "General"
-  enabled   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preset       String   // "VC" | "PE" | "Legal" | "General" | "Custom"
+  enabled      Boolean  @default(false)
+  // Only used when preset == "Custom":
+  customName   String?  // e.g. "Kuba Ventures" — also used as Gmail label prefix
+  customLabels Json?    // [{ shortName, colorKey, displayHex }]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model LabelMapping {

@@ -1,5 +1,4 @@
 import { logUsage, type EventType } from "./usage";
-import { LABEL_PRESETS, type PresetKey } from "./labelPresets";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
@@ -217,21 +216,25 @@ export interface PresetClassification {
 }
 
 export async function classifyForPreset(
-  preset: PresetKey,
-  subject: string,
-  from: string,
-  snippet: string,
-  body: string,
-  userId: string
+  args: {
+    /** Display name for the preset, e.g. "VC" or "Kuba Ventures". */
+    displayName: string;
+    /** Short label names the classifier may pick from (no "High-Priority"). */
+    labelNames: string[];
+    subject: string;
+    from: string;
+    snippet: string;
+    body: string;
+    userId: string;
+  }
 ): Promise<PresetClassification> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { label: null, priority: 0 };
 
-  const labelNames = LABEL_PRESETS[preset]
-    .map((l) => l.shortName)
-    .filter((n) => n !== "High-Priority");
+  const { displayName, labelNames, subject, from, snippet, body, userId } = args;
+  if (labelNames.length === 0) return { label: null, priority: 0 };
 
-  const systemPrompt = `You classify business emails for a ${preset} professional. Return ONLY a JSON object: {"label": "<label_name>", "priority": <0..1>} where label is one of: ${JSON.stringify(labelNames)} (or null if no clear match). Priority is your confidence the email is high-priority/time-sensitive.`;
+  const systemPrompt = `You classify business emails for a ${displayName} professional. Return ONLY a JSON object: {"label": "<label_name>", "priority": <0..1>} where label is one of: ${JSON.stringify(labelNames)} (or null if no clear match). Priority is your confidence the email is high-priority/time-sensitive.`;
 
   const userMessage = `Subject: ${subject}\nFrom: ${from}\nSnippet: ${snippet}\nBody (first 1500 chars): ${body.slice(0, 1500)}`;
 
@@ -269,7 +272,7 @@ export async function classifyForPreset(
     const parsed = parseJSON<{ label: string | null; priority: number }>(text);
     if (!parsed) return { label: null, priority: 0 };
 
-    const validNames = new Set(labelNames);
+    const validNames = new Set<string>(labelNames);
     const label = parsed.label && validNames.has(parsed.label) ? parsed.label : null;
     const priority = typeof parsed.priority === "number" ? parsed.priority : 0;
     return { label, priority };

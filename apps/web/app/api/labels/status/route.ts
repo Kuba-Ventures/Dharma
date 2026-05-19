@@ -18,5 +18,7 @@ export async function GET() {
     preset: preset?.preset ?? null,
     enabled: preset?.enabled ?? false,
     count: mappingCount,
+    customName: preset?.customName ?? null,
+    customLabels: preset?.customLabels ?? null,
   });
 }

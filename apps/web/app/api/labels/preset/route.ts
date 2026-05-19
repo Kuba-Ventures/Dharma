@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import { isPresetKey } from "../../../../lib/labelPresets";
+import { isPresetKey, type CustomPresetLabel } from "../../../../lib/labelPresets";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -13,6 +13,8 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     preset?: string;
     enabled?: boolean;
+    customName?: string | null;
+    customLabels?: CustomPresetLabel[] | null;
   };
 
   if (body.preset !== undefined && !isPresetKey(body.preset)) {
@@ -30,12 +32,21 @@ export async function POST(req: Request) {
       userId,
       preset: body.preset ?? "General",
       enabled: body.enabled ?? false,
+      customName: body.customName ?? null,
+      customLabels: (body.customLabels ?? null) as unknown as object,
     },
     update: {
       ...(body.preset !== undefined && { preset: body.preset }),
       ...(body.enabled !== undefined && { enabled: body.enabled }),
+      ...(body.customName !== undefined && { customName: body.customName }),
+      ...(body.customLabels !== undefined && { customLabels: body.customLabels as unknown as object }),
     },
   });
 
-  return NextResponse.json({ preset: next.preset, enabled: next.enabled });
+  return NextResponse.json({
+    preset: next.preset,
+    enabled: next.enabled,
+    customName: next.customName,
+    customLabels: next.customLabels,
+  });
 }

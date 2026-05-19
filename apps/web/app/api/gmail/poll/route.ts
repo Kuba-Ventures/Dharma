@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, createDraft, applyGmailLabels } from "../../../../lib/gmail";
 import { classifyEmail, classifyEmailLabels, classifyForPreset, extractConfirmedTime, extractProposedTimes, detectTimezoneFromText } from "../../../../lib/classify";
-import { LABEL_PRESETS, HIGH_PRIORITY_NAME, isPresetKey } from "../../../../lib/labelPresets";
+import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { createCalendarEvent } from "../../../../lib/calendar";
 import { getAvailableSlots } from "@dharma/calendar-core";
 import { RealGoogleProvider } from "@dharma/providers-google";
@@ -156,29 +156,44 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               if (!presetRow?.enabled || !isPresetKey(presetRow.preset)) return;
               if (!process.env.ANTHROPIC_API_KEY) return;
 
+              const spec = resolvePresetSpec({
+                preset: presetRow.preset,
+                customName: presetRow.customName,
+                customLabels: presetRow.customLabels,
+              });
+              if (!spec || spec.labels.length === 0) return;
+
               // Skip if this thread has already been classified once.
               const already = await prisma.classifiedThread.findUnique({
                 where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
               });
               if (already) return;
 
-              const result = await classifyForPreset(
-                presetRow.preset,
-                msg.subject,
-                msg.from,
-                msg.body.slice(0, 200),
-                msg.body,
-                googleCred.userId,
-              );
+              const labelNames = spec.labels
+                .map((l) => l.shortName)
+                .filter((n) => n !== "High-Priority");
 
-              const presetSpec = LABEL_PRESETS[presetRow.preset];
+              const result = await classifyForPreset({
+                displayName: spec.displayName,
+                labelNames,
+                subject: msg.subject,
+                from: msg.from,
+                snippet: msg.body.slice(0, 200),
+                body: msg.body,
+                userId: googleCred.userId,
+              });
+
               const matched = result.label
-                ? presetSpec.find((l) => l.shortName === result.label)
+                ? spec.labels.find((l) => l.shortName === result.label)
                 : null;
 
               const labelNamesToApply: string[] = [];
               if (matched) labelNamesToApply.push(matched.name);
-              if (result.priority > 0.75) labelNamesToApply.push(HIGH_PRIORITY_NAME);
+              // High-Priority auto-tag only applies to the built-in Dharma presets,
+              // which all ship a "Dharma/High-Priority" label.
+              if (result.priority > 0.75 && isBuiltInPresetKey(presetRow.preset)) {
+                labelNamesToApply.push(HIGH_PRIORITY_NAME);
+              }
 
               if (labelNamesToApply.length > 0) {
                 const mappings = await prisma.labelMapping.findMany({
