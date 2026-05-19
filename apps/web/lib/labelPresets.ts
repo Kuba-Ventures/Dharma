@@ -10,8 +10,9 @@
 export type PresetKey = "VC" | "PE" | "Legal" | "General" | "Custom";
 export type BuiltInPresetKey = "VC" | "PE" | "Legal" | "General";
 
-export type GmailColorKey =
-  | "green" | "red" | "orange" | "blue" | "purple" | "teal" | "yellow" | "gray";
+// Either a named legacy color ("blue", "red", ...) or any Gmail-valid hex like "#cc3a21".
+// lib/gmail.ts::resolveGmailColor accepts both forms.
+export type GmailColorKey = string;
 
 export interface CustomPresetLabel {
   shortName: string;

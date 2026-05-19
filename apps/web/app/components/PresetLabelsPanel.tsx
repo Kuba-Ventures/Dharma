@@ -7,11 +7,9 @@ import { useEffect, useState } from "react";
 type PresetKey = "VC" | "PE" | "Legal" | "General" | "Custom";
 const PRESET_KEYS: PresetKey[] = ["VC", "PE", "Legal", "General", "Custom"];
 
-type GmailColorKey = "green" | "red" | "orange" | "blue" | "purple" | "teal" | "yellow" | "gray";
-
 interface CustomLabel {
   shortName: string;
-  colorKey: GmailColorKey;
+  colorKey: string;     // hex like "#cc3a21" (legacy named keys also accepted by the API)
   displayHex: string;
 }
 
@@ -20,16 +18,15 @@ interface PresetLabel {
   displayHex: string;
 }
 
-const COLOR_PALETTE: { key: GmailColorKey; hex: string }[] = [
-  { key: "green",  hex: "#16a765" },
-  { key: "red",    hex: "#fb4c2f" },
-  { key: "blue",   hex: "#4a86e8" },
-  { key: "purple", hex: "#8e63ce" },
-  { key: "orange", hex: "#ffad47" },
-  { key: "teal",   hex: "#2da2bb" },
-  { key: "yellow", hex: "#f2c960" },
-  { key: "gray",   hex: "#999999" },
+// Three vibrancy rows of Gmail's full label palette. Each hex is both the
+// background color and the `colorKey` sent to the API.
+const COLOR_ROWS: string[][] = [
+  ["#cc3a21","#eaa041","#f2c960","#149e60","#3dc789","#2da2bb","#4a86e8","#8e63ce","#b694e8","#e07798"],
+  ["#fb4c2f","#ffad47","#fad165","#16a766","#43d692","#4986e7","#a479e2","#f691b3","#cf8933","#653e9b"],
+  ["#f2b2a8","#ffc8af","#fce8b3","#b3efd3","#a0eac9","#98d7e4","#b6cff5","#e3d7ff","#d0bcf1","#fbd3e0"],
 ];
+
+const DEFAULT_COLOR_HEX = "#4a86e8"; // vibrant blue (row 1)
 
 const BUILT_IN_LABELS: Record<Exclude<PresetKey, "Custom">, PresetLabel[]> = {
   VC: [
@@ -78,7 +75,7 @@ export default function PresetLabelsPanel() {
   // Custom preset state
   const [customName, setCustomName] = useState("");
   const [customLabels, setCustomLabels] = useState<CustomLabel[]>([
-    { shortName: "", colorKey: "blue", displayHex: "#4a86e8" },
+    { shortName: "", colorKey: DEFAULT_COLOR_HEX, displayHex: DEFAULT_COLOR_HEX },
   ]);
 
   useEffect(() => {
@@ -115,10 +112,12 @@ export default function PresetLabelsPanel() {
   }
 
   function addLabel() {
-    setCustomLabels((prev) => [
-      ...prev,
-      { shortName: "", colorKey: "purple", displayHex: "#8e63ce" },
-    ]);
+    setCustomLabels((prev) => {
+      // Cycle through row 1 so each new row gets a distinct color out of the box.
+      const row = COLOR_ROWS[0];
+      const next = row[prev.length % row.length];
+      return [...prev, { shortName: "", colorKey: next, displayHex: next }];
+    });
   }
 
   function removeLabel(idx: number) {
@@ -220,8 +219,8 @@ export default function PresetLabelsPanel() {
             {customLabels.map((label, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <ColorPickerDot
-                  selectedKey={label.colorKey}
-                  onPick={(c) => updateLabel(idx, { colorKey: c.key, displayHex: c.hex })}
+                  selectedHex={label.colorKey}
+                  onPick={(hex) => updateLabel(idx, { colorKey: hex, displayHex: hex })}
                 />
                 <input
                   type="text"
@@ -291,34 +290,41 @@ export default function PresetLabelsPanel() {
 }
 
 function ColorPickerDot({
-  selectedKey,
+  selectedHex,
   onPick,
 }: {
-  selectedKey: GmailColorKey;
-  onPick: (c: { key: GmailColorKey; hex: string }) => void;
+  selectedHex: string;
+  onPick: (hex: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = COLOR_PALETTE.find((c) => c.key === selectedKey) ?? COLOR_PALETTE[0];
   return (
     <div className="relative shrink-0">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-5 h-5 rounded-full border border-white/20 ring-1 ring-black/40"
-        style={{ backgroundColor: selected.hex }}
+        style={{ backgroundColor: selectedHex }}
         aria-label="Pick color"
         type="button"
       />
       {open && (
-        <div className="absolute z-10 top-7 left-0 bg-[#1f1f1f] border border-white/[0.1] rounded-lg p-1.5 shadow-lg flex gap-1">
-          {COLOR_PALETTE.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => { onPick(c); setOpen(false); }}
-              className={`w-4 h-4 rounded-full transition-transform ${c.key === selectedKey ? "scale-125 ring-1 ring-white/50" : "opacity-70 hover:opacity-100"}`}
-              style={{ backgroundColor: c.hex }}
-              type="button"
-              aria-label={c.key}
-            />
+        <div className="absolute z-20 top-7 left-0 bg-[#1f1f1f] border border-white/[0.1] rounded-lg p-2 shadow-lg space-y-1.5">
+          {COLOR_ROWS.map((row, rowIdx) => (
+            <div key={rowIdx} className="flex gap-1.5">
+              {row.map((hex) => (
+                <button
+                  key={hex}
+                  onClick={() => { onPick(hex); setOpen(false); }}
+                  className={`w-4 h-4 rounded-full transition-transform ${
+                    hex.toLowerCase() === selectedHex.toLowerCase()
+                      ? "scale-125 ring-1 ring-white/50"
+                      : "opacity-80 hover:opacity-100 hover:scale-110"
+                  }`}
+                  style={{ backgroundColor: hex }}
+                  type="button"
+                  aria-label={hex}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}

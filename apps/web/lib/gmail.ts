@@ -157,17 +157,67 @@ function extractBody(payload: any): string {
   return "";
 }
 
-// Gmail label background colors (must be from Gmail's supported palette)
-export const GMAIL_COLORS: Record<string, { backgroundColor: string; textColor: string }> = {
-  blue:   { backgroundColor: "#4986e7", textColor: "#ffffff" },
-  purple: { backgroundColor: "#a479e2", textColor: "#ffffff" },
-  green:  { backgroundColor: "#16a766", textColor: "#ffffff" },
-  teal:   { backgroundColor: "#2da2bb", textColor: "#ffffff" },
-  yellow: { backgroundColor: "#f2c960", textColor: "#1d1d1d" },
-  orange: { backgroundColor: "#ff7537", textColor: "#ffffff" },
-  red:    { backgroundColor: "#cc3a21", textColor: "#ffffff" },
-  gray:   { backgroundColor: "#999999", textColor: "#ffffff" },
+// Gmail label background colors (must be from Gmail's supported palette).
+// Two access paths supported:
+//   - Named keys ("blue", "red", ...) for legacy callers (built-in presets).
+//   - Hex keys ("#4a86e8", ...) for the new expanded palette.
+// Either form resolves to the same { backgroundColor, textColor } pair.
+const GMAIL_HEX_TO_TEXT: Record<string, string> = {
+  // Row 1 — vibrant
+  "#cc3a21": "#ffffff",  "#eaa041": "#ffffff",  "#f2c960": "#1d1d1d",
+  "#149e60": "#ffffff",  "#3dc789": "#ffffff",  "#2da2bb": "#ffffff",
+  "#4a86e8": "#ffffff",  "#8e63ce": "#ffffff",  "#b694e8": "#000000",
+  "#e07798": "#ffffff",
+  // Row 2 — deep / saturated
+  "#fb4c2f": "#ffffff",  "#ffad47": "#ffffff",  "#fad165": "#1d1d1d",
+  "#16a766": "#ffffff",  "#43d692": "#1d1d1d",  "#4986e7": "#ffffff",
+  "#a479e2": "#ffffff",  "#f691b3": "#000000",  "#cf8933": "#ffffff",
+  "#653e9b": "#ffffff",
+  // Row 3 — pastel / soft
+  "#f2b2a8": "#822111",  "#ffc8af": "#7a2e0b",  "#fce8b3": "#594c05",
+  "#b3efd3": "#0b4f30",  "#a0eac9": "#04502e",  "#98d7e4": "#0d3b44",
+  "#b6cff5": "#1c4587",  "#e3d7ff": "#3d188e",  "#d0bcf1": "#41236d",
+  "#fbd3e0": "#711a36",
 };
+
+const NAMED_COLOR_TO_HEX: Record<string, string> = {
+  blue: "#4986e7", purple: "#a479e2", green: "#16a766", teal: "#2da2bb",
+  yellow: "#f2c960", orange: "#ff7537", red: "#cc3a21", gray: "#999999",
+};
+
+// "#ff7537" and "#999999" are valid Gmail colors used only by legacy presets —
+// register them so named lookups still resolve through GMAIL_HEX_TO_TEXT.
+Object.assign(GMAIL_HEX_TO_TEXT, { "#ff7537": "#ffffff", "#999999": "#ffffff" });
+
+function resolveGmailColor(colorKey: string): { backgroundColor: string; textColor: string } {
+  // Accept hex (with or without "#") or a named key.
+  const normalized = colorKey.startsWith("#") ? colorKey.toLowerCase() : `#${colorKey.toLowerCase()}`;
+  if (GMAIL_HEX_TO_TEXT[normalized]) {
+    return { backgroundColor: normalized, textColor: GMAIL_HEX_TO_TEXT[normalized] };
+  }
+  const hex = NAMED_COLOR_TO_HEX[colorKey];
+  if (hex && GMAIL_HEX_TO_TEXT[hex]) {
+    return { backgroundColor: hex, textColor: GMAIL_HEX_TO_TEXT[hex] };
+  }
+  // Fallback to gray — never reject; Gmail will surface its own error if any.
+  return { backgroundColor: "#999999", textColor: "#ffffff" };
+}
+
+// Backward-compatible export for callers that read named keys directly.
+export const GMAIL_COLORS: Record<string, { backgroundColor: string; textColor: string }> =
+  Object.fromEntries(
+    Object.entries(NAMED_COLOR_TO_HEX).map(([name, hex]) => [
+      name,
+      { backgroundColor: hex, textColor: GMAIL_HEX_TO_TEXT[hex] ?? "#ffffff" },
+    ])
+  );
+
+/** All Gmail-valid background hexes grouped into three vibrancy rows for the picker. */
+export const GMAIL_COLOR_ROWS: string[][] = [
+  ["#cc3a21","#eaa041","#f2c960","#149e60","#3dc789","#2da2bb","#4a86e8","#8e63ce","#b694e8","#e07798"],
+  ["#fb4c2f","#ffad47","#fad165","#16a766","#43d692","#4986e7","#a479e2","#f691b3","#cf8933","#653e9b"],
+  ["#f2b2a8","#ffc8af","#fce8b3","#b3efd3","#a0eac9","#98d7e4","#b6cff5","#e3d7ff","#d0bcf1","#fbd3e0"],
+];
 
 export async function listGmailLabels(
   userId: string
@@ -193,7 +243,7 @@ export async function createGmailLabel(
   try {
     const { auth } = await makeAuthForUser(userId);
     const gmail = google.gmail({ version: "v1", auth });
-    const color = GMAIL_COLORS[colorKey] ?? GMAIL_COLORS.gray;
+    const color = resolveGmailColor(colorKey);
     const res = await gmail.users.labels.create({
       userId: "me",
       requestBody: { name, labelListVisibility: "labelShow", messageListVisibility: "show", color },
