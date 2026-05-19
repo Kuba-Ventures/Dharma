@@ -200,8 +200,20 @@ export default function PresetLabelsPanel() {
         setResult(err.error ?? "Sync failed during label setup");
         return;
       }
-      const provData = await provRes.json() as { total: number; created: number; updated: number };
+      const provData = await provRes.json() as {
+        total: number;
+        created: number;
+        updated: number;
+        failures?: Array<{ name: string; error: string }>;
+      };
       setProvisioned(provData.total);
+      if (provData.failures && provData.failures.length > 0) {
+        const summary = provData.failures
+          .map((f) => `${f.name}: ${f.error}`)
+          .join(" | ");
+        setResult(`Label sync hit errors → ${summary}`);
+        return;
+      }
 
       // 2. Back-scan recent inbox so any messages that arrived before/during
       // setup get classified.

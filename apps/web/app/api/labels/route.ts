@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   // Create in Gmail if connected
   const googleCred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (googleCred) {
-    const gmailLabelId = await createGmailLabel(userId, `#${label.name}`, colorKey);
+    const { id: gmailLabelId } = await createGmailLabel(userId, `#${label.name}`, colorKey);
     if (gmailLabelId) {
       await prisma.label.update({ where: { id: label.id }, data: { gmailLabelId } });
       return NextResponse.json({ ...label, gmailLabelId });

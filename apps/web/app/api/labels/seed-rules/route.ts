@@ -83,7 +83,7 @@ export async function POST() {
 
   // Create Gmail label for Communications if missing
   if (!commLabel.gmailLabelId) {
-    const gmailLabelId = await createGmailLabel(userId, "#Communications", COLOR_MAP.Communications.colorKey);
+    const { id: gmailLabelId } = await createGmailLabel(userId, "#Communications", COLOR_MAP.Communications.colorKey);
     if (gmailLabelId) {
       await prisma.label.update({ where: { id: commLabel.id }, data: { gmailLabelId } });
     }

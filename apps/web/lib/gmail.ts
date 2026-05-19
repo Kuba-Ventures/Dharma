@@ -239,7 +239,7 @@ export async function createGmailLabel(
   userId: string,
   name: string,
   colorKey: string
-): Promise<string | null> {
+): Promise<{ id: string | null; error?: string }> {
   try {
     const { auth } = await makeAuthForUser(userId);
     const gmail = google.gmail({ version: "v1", auth });
@@ -248,10 +248,18 @@ export async function createGmailLabel(
       userId: "me",
       requestBody: { name, labelListVisibility: "labelShow", messageListVisibility: "show", color },
     });
-    return res.data.id ?? null;
-  } catch (err) {
-    console.error("[gmail] createGmailLabel failed:", err);
-    return null;
+    return { id: res.data.id ?? null };
+  } catch (err: unknown) {
+    // 409 → label already exists (often hidden from labels.list); look it up.
+    const code = (err as { code?: number })?.code;
+    if (code === 409) {
+      const existing = await listGmailLabels(userId);
+      const found = existing.find((l) => l.name === name);
+      if (found) return { id: found.id };
+    }
+    const errMsg = (err as Error)?.message ?? String(err);
+    console.error(`[gmail] createGmailLabel("${name}") failed:`, errMsg);
+    return { id: null, error: errMsg };
   }
 }
 

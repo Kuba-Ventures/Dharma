@@ -47,17 +47,22 @@ export async function POST(req: Request) {
   let linked = 0;
   let updated = 0;
   const provisioned: Array<{ name: string; gmailLabelId: string }> = [];
+  const failures: Array<{ name: string; error: string }> = [];
 
   for (const label of spec.labels) {
-    let gmailLabelId = existingByName.get(label.name) ?? null;
+    let gmailLabelId: string | null = existingByName.get(label.name) ?? null;
     if (gmailLabelId) {
-      // Sync color back to Gmail in case the user picked a new one in the UI.
       const ok = await updateGmailLabel(userId, gmailLabelId, { colorKey: label.colorKey });
       if (ok) updated++;
       linked++;
     } else {
-      gmailLabelId = await createGmailLabel(userId, label.name, label.colorKey);
-      if (gmailLabelId) created++;
+      const createRes = await createGmailLabel(userId, label.name, label.colorKey);
+      gmailLabelId = createRes.id;
+      if (gmailLabelId) {
+        created++;
+      } else {
+        failures.push({ name: label.name, error: createRes.error ?? "unknown" });
+      }
     }
 
     if (gmailLabelId) {
@@ -100,5 +105,6 @@ export async function POST(req: Request) {
     preset: presetKey,
     displayName: spec.displayName,
     labels: provisioned,
+    failures,
   });
 }

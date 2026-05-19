@@ -34,7 +34,7 @@ export async function POST() {
 
     // Otherwise create it
     if (!gmailLabelId) {
-      gmailLabelId = await createGmailLabel(userId, gmailName, colorKey);
+      gmailLabelId = (await createGmailLabel(userId, gmailName, colorKey)).id;
     }
 
     if (gmailLabelId) {
