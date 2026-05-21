@@ -1,0 +1,49 @@
+name: sync PROJECT.md to Kuba-Vault
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'PROJECT.md'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      CLIENT_SLUG: dharma
+      VAULT_REPO: Kuba-Ventures/Kuba-Vault
+
+    steps:
+      - name: Checkout this client repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Kuba-Vault
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.VAULT_REPO }}
+          token: ${{ secrets.KUBA_VAULT_PAT }}
+          path: vault
+
+      - name: Copy PROJECT.md into vault/clients/
+        run: |
+          mkdir -p vault/clients
+          cp PROJECT.md "vault/clients/${CLIENT_SLUG}.md"
+
+      - name: Commit + push to Kuba-Vault
+        working-directory: vault
+        run: |
+          git config user.name  "kuba-sync-bot"
+          git config user.email "kuba-sync@users.noreply.github.com"
+          git add "clients/${CLIENT_SLUG}.md"
+          if git diff --cached --quiet; then
+            echo "no change, nothing to commit"
+            exit 0
+          fi
+          git commit -m "sync ${CLIENT_SLUG}: PROJECT.md updated from client repo"
+          git push
