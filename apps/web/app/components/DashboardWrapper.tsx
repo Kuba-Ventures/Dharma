@@ -7,7 +7,7 @@ import PresetLabelsPanel from "./PresetLabelsPanel";
 // ── Paste your Gmail add-on install URL here ───────────────────────────────
 // For testing: Apps Script editor → Deploy → Test deployments → copy the install link
 // For production: your Google Workspace Marketplace listing URL
-const ADDON_INSTALL_URL = "https://workspace.google.com/marketplace/app/dharma/609300901936";
+const ADDON_INSTALL_URL = "https://workspace.google.com/marketplace/app/dharma/63757021962";
 // ──────────────────────────────────────────────────────────────────────────
 import InboxPanel from "./InboxPanel";
 
