@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, createDraft, applyGmailLabels } from "../../../../lib/gmail";
-import { classifyEmail, classifyEmailLabels } from "../../../../lib/classify";
+import { classifyEmail, classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
+import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { getAvailableSlots } from "@dharma/calendar-core";
 import { RealGoogleProvider } from "@dharma/providers-google";
 import { generateReply, generateAIReply } from "@dharma/reply-generation";
@@ -114,6 +115,69 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error("[gmail/webhook] Label application failed:", err);
+      }
+
+      // Preset label classification (mirrors /api/gmail/poll). Idempotent per thread.
+      try {
+        const presetRow = await prisma.labelPreset.findUnique({
+          where: { userId: googleCred.userId },
+        });
+        if (presetRow?.enabled && isPresetKey(presetRow.preset) && process.env.ANTHROPIC_API_KEY) {
+          const spec = resolvePresetSpec({
+            preset: presetRow.preset,
+            customName: presetRow.customName,
+            customLabels: presetRow.customLabels,
+          });
+          if (spec && spec.labels.length > 0) {
+            const already = await prisma.classifiedThread.findUnique({
+              where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+            });
+            if (!already) {
+              const labelNames = spec.labels
+                .map((l) => l.shortName)
+                .filter((n) => n !== "High-Priority");
+
+              const result = await classifyForPreset({
+                displayName: spec.displayName,
+                labelNames,
+                subject: msg.subject,
+                from: msg.from,
+                snippet: msg.body.slice(0, 200),
+                body: msg.body,
+                userId: googleCred.userId,
+              });
+
+              const matched = result.label
+                ? spec.labels.find((l) => l.shortName === result.label)
+                : null;
+
+              const labelNamesToApply: string[] = [];
+              if (matched) labelNamesToApply.push(matched.name);
+              if (result.priority > 0.75 && isBuiltInPresetKey(presetRow.preset)) {
+                labelNamesToApply.push(HIGH_PRIORITY_NAME);
+              }
+
+              if (labelNamesToApply.length > 0) {
+                const mappings = await prisma.labelMapping.findMany({
+                  where: { userId: googleCred.userId, labelName: { in: labelNamesToApply } },
+                });
+                const gmailIds = mappings.map((m) => m.gmailLabelId);
+                if (gmailIds.length > 0) {
+                  await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+                  console.log(`[gmail/webhook] Preset labels applied to ${messageId}: ${mappings.map((m) => m.labelName).join(", ")} (priority=${result.priority.toFixed(2)})`);
+                }
+              }
+
+              await prisma.classifiedThread.upsert({
+                where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+                create: { userId: googleCred.userId, threadId: msg.threadId },
+                update: {},
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[gmail/webhook] Preset classification failed:", err);
       }
 
       const { isSchedulingRequest, durationMinutes } = await classifyEmail(
