@@ -13,6 +13,7 @@ export default auth((req) => {
     pathname === "/login" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/support" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
     pathname.startsWith("/api/emails/thread-draft") ||

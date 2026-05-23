@@ -70,10 +70,10 @@ export default function DashboardWrapper({
 
   const [addonDismissed, setAddonDismissed] = useState(false);
   useEffect(() => {
-    setAddonDismissed(localStorage.getItem("dharma_addon_dismissed") === "true");
+    setAddonDismissed(localStorage.getItem("dharma_addon_dismissed_v2") === "true");
   }, []);
   function dismissAddon() {
-    localStorage.setItem("dharma_addon_dismissed", "true");
+    localStorage.setItem("dharma_addon_dismissed_v2", "true");
     setAddonDismissed(true);
   }
 
