@@ -57,9 +57,17 @@ const PenIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
-const SendIcon = ({ className = "" }: { className?: string }) => (
+const TagIcon = ({ className = "" }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-    <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+    <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+    <circle cx="7.5" cy="7.5" r="1" fill="currentColor" />
+  </svg>
+);
+
+const FlagIcon = ({ className = "" }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+    <line x1="4" x2="4" y1="22" y2="15" />
   </svg>
 );
 
@@ -144,8 +152,9 @@ type Step = {
 const STEPS: Step[] = [
   {
     number: "01",
-    title: "An email arrives",
-    Icon: MailIcon,
+    title: "Draft replies in your voice",
+    description: "Dharma generates a personalized style from your sent messages, including your sign-offs, your phrasing, the way you actually write. Switch between My Tone, Concise, or Legal per reply. Edit anything before it goes out.",
+    Icon: PenIcon,
     mockup: (
       <div className="space-y-4">
         <div className="flex items-center gap-3 mb-5">
@@ -159,21 +168,27 @@ const STEPS: Step[] = [
         </div>
         <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-none p-4">
           <p className="text-sm text-foreground/90 leading-relaxed">
-            Hey! The new designs look great. Are you free sometime this week to chat through the implementation details?
+            Hey! The new designs look great. Mind sharing your feedback by EOD Thursday?
           </p>
         </div>
-        <div className="flex justify-start pt-1">
-          <button className="flex items-center gap-2 bg-primary/20 text-primary border border-primary/30 px-4 py-2 rounded-xl text-sm font-medium shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-            <SparklesIcon className="w-4 h-4" />
-            <span>Suggest Times</span>
-          </button>
+        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+          <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/20 text-primary border border-primary/30 shadow-[0_0_12px_rgba(99,102,241,0.3)]">My Tone</span>
+          <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">Concise</span>
+          <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">Legal</span>
+          <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">Scheduling</span>
+        </div>
+        <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4">
+          <p className="text-sm text-foreground/90 leading-relaxed">
+            Thanks, Sarah, I&apos;ll have feedback by EOD Thursday. Let me know if you&apos;d like to pre-read any of it.
+          </p>
         </div>
       </div>
     ),
   },
   {
     number: "02",
-    title: "Check availability",
+    title: "Scheduling, handled",
+    description: "Dharma reads the thread, checks your calendar, and drafts a reply with two or three open times. You review, you send. No links, no forms.",
     Icon: CalendarIcon,
     mockup: (
       <div className="space-y-3">
@@ -185,7 +200,7 @@ const STEPS: Step[] = [
           <div key={slot} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
             <CheckCircleIcon className="w-4 h-4 text-primary shrink-0" />
             <span className="text-sm text-foreground">{slot}</span>
-            <span className="ml-auto text-xs text-primary font-medium">Available</span>
+            <span className="ml-auto text-xs text-primary font-medium">Open</span>
           </div>
         ))}
       </div>
@@ -193,57 +208,63 @@ const STEPS: Step[] = [
   },
   {
     number: "03",
-    title: "Draft a reply",
-    Icon: PenIcon,
+    title: "Auto-tag what matters",
+    description: "VC outreach, PE diligence, client comms, legal, internal: Dharma labels incoming threads live, with presets built for finance workflows or custom labels you define.",
+    Icon: TagIcon,
     mockup: (
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground flex items-center gap-2">
-          <SparklesIcon className="w-3.5 h-3.5 text-primary" />
-          Drafting reply...
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground mb-4 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+          Labeling threads...
         </p>
-        <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4">
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            I&apos;m free Tuesday at 2pm or Wednesday at 11am. Let me know what works best for you.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center shrink-0">
-            <ZapIcon className="w-2.5 h-2.5 text-white" />
+        {[
+          { name: "Mara Chen", subject: "Re: Series A update", label: "VC", labelClass: "bg-violet-500/15 text-violet-300 border-violet-500/30" },
+          { name: "Marcus Lee", subject: "Diligence pack: Project Acorn", label: "PE", labelClass: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
+          { name: "Olsen & Co.", subject: "MSA markup attached", label: "Legal", labelClass: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+        ].map((row) => (
+          <div key={row.subject} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground truncate">{row.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{row.subject}</p>
+            </div>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${row.labelClass}`}>{row.label}</span>
           </div>
-          Drafted by Dharma Automations
-        </div>
+        ))}
       </div>
     ),
   },
   {
     number: "04",
-    title: "Review & Send",
-    description: "One click to review. One click to send. Done in seconds.",
-    Icon: SendIcon,
+    title: "Priority you can see",
+    description: "High / Med / Low surfaces what actually needs a reply today. Track response rates by vertical so you know which threads are landing.",
+    Icon: FlagIcon,
     mockup: (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center shrink-0">
-            <ZapIcon className="w-3 h-3 text-white" />
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground mb-4 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+          Sorting by priority...
+        </p>
+        {[
+          { name: "Term sheet: RoundCo", subject: "Reply needed today", priority: "High", dotClass: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" },
+          { name: "Vendor Q3 review", subject: "Wants 30 min this week", priority: "Med", dotClass: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" },
+          { name: "Newsletter digest", subject: "FYI only", priority: "Low", dotClass: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" },
+        ].map((row) => (
+          <div key={row.name} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${row.dotClass}`} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground truncate">{row.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{row.subject}</p>
+            </div>
+            <span className="text-xs text-muted-foreground font-medium shrink-0">{row.priority}</span>
           </div>
-          Review &amp; Send
-        </div>
-        <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4">
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            I&apos;m free Tuesday at 2pm or Wednesday at 11am. Let me know what works.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-primary font-medium">
-          <CheckCircleIcon className="w-5 h-5 shrink-0" />
-          Reply sent. Scheduling done.
-        </div>
+        ))}
       </div>
     ),
   },
 ];
 
 function HowItWorksTabs() {
-  const [active, setActive] = useState(3);
+  const [active, setActive] = useState(0);
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 items-start mt-12">
@@ -329,17 +350,17 @@ function HeroSection() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 font-display text-gradient leading-[1.1]">
-              The fastest way to reply to scheduling emails.
+              Your inbox, on autopilot, without giving up the wheel.
             </h1>
 
             <p className="text-lg sm:text-xl text-muted-foreground mb-8 leading-relaxed">
-              Turn scheduling emails into ready-to-send replies with suggested times. No booking links, no setup headache, no new workflow.
+              Dharma drafts replies in your voice, sorts what matters, and turns scheduling threads into ready-to-send responses. All inside Gmail. No new app. No setup marathon.
             </p>
 
             <div className="flex flex-col gap-4 mb-10">
               <WaitlistForm />
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                {["Free", "Gmail-native", "No links"].map((badge) => (
+                {["Free during beta", "Gmail-native", "You stay in control"].map((badge) => (
                   <span key={badge} className="flex items-center gap-1">
                     <CheckIcon className="w-4 h-4 text-primary" />
                     {badge}
@@ -374,11 +395,11 @@ function HeroSection() {
                     </p>
                   </div>
 
-                  <div className="flex justify-start pt-2">
-                    <button className="flex items-center gap-2 bg-primary/20 text-primary border border-primary/30 px-4 py-2 rounded-xl text-sm font-medium shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                      <SparklesIcon className="w-4 h-4" />
-                      <span>Suggest Times</span>
-                    </button>
+                  <div className="flex items-center gap-1.5 flex-wrap pt-2">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">My Tone</span>
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">Concise</span>
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.04] text-muted-foreground border border-white/[0.06]">Legal</span>
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/20 text-primary border border-primary/30 shadow-[0_0_12px_rgba(99,102,241,0.3)]">Scheduling</span>
                   </div>
 
                   <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-none p-4 relative mt-4">
@@ -409,16 +430,16 @@ function HeroSection() {
 function ProblemSection() {
   const problems = [
     {
-      title: "Too much back-and-forth",
-      body: "You send times, they pick one, they reschedule, you repeat. It's an endless ping-pong game.",
+      title: "Generic AI replies",
+      body: "People can spot an AI draft a mile away. Stiff openers, weird sign-offs, none of your voice.",
     },
     {
-      title: "Setup takes longer than the meeting",
-      body: "Configure rules, connect calendars, send test links. All of that just to book a 15-minute call.",
+      title: "Setup that never ends",
+      body: "Configure rules, train models, connect calendars. By the time it's ready, you've already replied.",
     },
     {
-      title: "Another tool. Another workflow.",
-      body: "Most tools require you to change how you work. You shouldn't have to learn a new system to schedule.",
+      title: "Tools that don't talk to each other",
+      body: "A scheduler here, a CRM tag there, a drafting tool somewhere else. Your inbox becomes a tab graveyard.",
     },
   ];
 
@@ -430,10 +451,10 @@ function ProblemSection() {
             <span className="text-xs font-medium text-muted-foreground">The Problem</span>
           </div>
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display tracking-tight text-gradient mb-4">
-            Scheduling tools still make you do the work.
+            Email tools either do too little, or too much.
           </h2>
           <p className="text-lg text-muted-foreground">
-            The tools designed to save us time have ironically created entirely new chores.
+            Booking links push the work onto your contacts. Autonomous AI agents send things you&apos;d never send. Neither feels like you.
           </p>
         </div>
 
@@ -461,7 +482,7 @@ function HowItWorksSection() {
               <span className="text-xs font-medium text-muted-foreground">How it works</span>
             </div>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display tracking-tight text-gradient">
-              A simpler way to schedule inside your inbox.
+              Four features. One inbox. Zero new workflows.
             </h2>
           </div>
         </div>
@@ -474,23 +495,23 @@ function HowItWorksSection() {
 function ComparisonSection() {
   const columns = [
     {
-      title: "Booking Links",
+      title: "Booking Links & Schedulers",
       positive: false,
       points: [
-        "Forces your contact to use a form",
-        "Feels transactional and cold",
-        "Requires both sides to leave email",
-        "No context about your preferences",
+        "Forces contacts onto a form",
+        "Only solves scheduling",
+        "Cold and transactional",
+        "No help with the other 90% of your inbox",
       ],
     },
     {
-      title: "Complex Assistants",
+      title: "Autonomous AI Assistants",
       positive: false,
       points: [
-        "Too much to configure",
-        "Too much trust to hand over",
-        "Emails on your behalf autonomously",
-        "Steep learning curve",
+        "Sends emails on your behalf",
+        "Steep setup, steep trust",
+        "Generic voice, obvious AI tone",
+        "You lose control of what goes out",
       ],
     },
     {
@@ -498,9 +519,10 @@ function ComparisonSection() {
       positive: true,
       badge: true,
       points: [
-        "Inbox-native, no new tools",
-        "Assistive, not autonomous",
-        "You stay in control always",
+        "Drafts, tags, schedules: all in Gmail",
+        "Writes in your voice, not a template",
+        "You approve every reply before it sends",
+        "Built for VC, PE, legal, and client workflows",
         "Free forever during beta",
       ],
     },
@@ -511,10 +533,10 @@ function ComparisonSection() {
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mb-12 lg:mb-16 mx-auto text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display tracking-tight text-gradient mb-4">
-            Built for how people actually schedule.
+            Built for how people actually email.
           </h2>
           <p className="text-lg text-muted-foreground">
-            We didn&apos;t invent a new way to schedule. We just removed the friction from the way you already do it.
+            We didn&apos;t reinvent email. We took the parts that already work and made them faster.
           </p>
         </div>
 
@@ -563,9 +585,9 @@ function ComparisonSection() {
 
 function TestimonialsSection() {
   const quotes = [
-    { text: "It's still making me do all the work.", role: "Product Manager" },
-    { text: "By the time I configure it, I could've booked the meetings manually.", role: "Startup Founder" },
-    { text: "I just want it to suggest times and let me send. That's it.", role: "Sales Director" },
+    { text: "My AI replies all sound like a LinkedIn post. I end up rewriting them anyway.", role: "VC Associate" },
+    { text: "I spend more time tagging deals in my inbox than closing them.", role: "PE Analyst" },
+    { text: "I just want it to draft the reply, suggest the times, and let me hit send.", role: "Founder" },
   ];
 
   return (
@@ -576,7 +598,7 @@ function TestimonialsSection() {
             Sound familiar?
           </h2>
           <p className="text-lg text-muted-foreground">
-            We talked to hundreds of professionals. The consensus was clear: existing tools are over-engineered.
+            We talked to hundreds of professionals across VC, PE, legal, and operations. The pattern was the same.
           </p>
         </div>
 
@@ -604,14 +626,14 @@ function CTASection() {
     <section className="py-20 lg:py-32">
       <div className="container max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display tracking-tight text-gradient mb-4">
-          Be first to try the scheduling assistant that works inside your email.
+          The email assistant that finally sounds like you.
         </h2>
         <p className="text-lg text-muted-foreground mb-8">
-          Skip the links. Skip the setup. Start scheduling naturally.
+          Draft, schedule, tag, prioritize: all inside Gmail. Skip the links, skip the setup, skip the rewrite.
         </p>
         <WaitlistForm className="flex justify-center" />
         <p className="text-xs text-muted-foreground mt-4">
-          Early access reserved for Gmail users. Free forever during beta.
+          Early access for Gmail users. Free forever during beta.
         </p>
       </div>
     </section>

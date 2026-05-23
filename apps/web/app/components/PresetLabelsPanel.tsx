@@ -322,7 +322,7 @@ export default function PresetLabelsPanel() {
 
       <div className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.05]">
         {previewLabels.length === 0 ? (
-          <p className="text-[11px] text-white/25 px-3.5 py-3">No labels yet — add some above.</p>
+          <p className="text-[11px] text-white/25 px-3.5 py-3">No labels yet. Add some above.</p>
         ) : (
           previewLabels.map((label) => (
             <div key={label.name} className="bg-white/[0.02] flex items-center gap-2.5 px-3.5 py-2.5">

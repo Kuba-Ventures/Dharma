@@ -16,8 +16,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Dharma Automations",
-  description: "Turn scheduling requests into ready-to-send replies.",
+  title: "Dharma Automations · Gmail-native AI email assistant",
+  description: "Gmail-native AI that drafts replies in your voice, schedules meetings, and sorts your inbox. No links, no setup, no new tools.",
   icons: { icon: "/logo.png" },
   verification: { google: "SUsOgV_GSE3i_oIVGZ_T27koRqa9PpfNU4S_wqtNO38" },
 };
