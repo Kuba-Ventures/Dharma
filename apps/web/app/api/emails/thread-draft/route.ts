@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
-import { makeAuthForUser, createDraft } from "../../../../lib/gmail";
+import { makeAuthForUser } from "../../../../lib/gmail";
 import { logUsage } from "../../../../lib/usage";
 import { google } from "googleapis";
 
@@ -13,6 +13,46 @@ const WRITING_RULES = `\
 - Never use em-dashes. Use a comma or period instead.
 - No generic openers like "Thanks for reaching out" or "Hope you're well".
 - No subject line.`;
+
+// Catches month names ("Sep 12", "September 12, 2026"), MM/DD or MM/DD/YYYY,
+// ISO YYYY-MM-DD, and relative phrases ("next Monday", "this week", "tomorrow").
+// Used to surface dates the email mentioned so the model can reason about
+// whether they are past, present, or future relative to today.
+const DATE_PATTERN = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember|t)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}\b|\b(?:today|tomorrow|yesterday|tonight|this\s+week|next\s+week|next\s+month|this\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/gi;
+
+function extractDates(text: string): string[] {
+  const matches = text.match(DATE_PATTERN) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of matches) {
+    const norm = m.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      out.push(m);
+      if (out.length >= 10) break;
+    }
+  }
+  return out;
+}
+
+function buildDateContext(emailBody: string): string {
+  const now = new Date();
+  const prettyToday = now.toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/New_York",
+  });
+  const isoToday = now.toISOString().slice(0, 10);
+  const referenced = extractDates(emailBody);
+  const lines = [`Today is ${prettyToday} (${isoToday}, America/New_York).`];
+  if (referenced.length > 0) {
+    lines.push(`Dates mentioned in this email: ${referenced.join(", ")}.`);
+    lines.push("If any of those dates have already passed, never propose them. Always reason from today's date forward.");
+  }
+  return lines.join("\n");
+}
 
 const TONE_INSTRUCTIONS: Record<string, string> = {
   "My Tone": "Write in a natural, professional but personal tone: direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
@@ -102,27 +142,52 @@ export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
+  // Identity for prompt substitution. fullName goes into "on behalf of X" lines.
+  // inferredSignOff/Intro come from tone analysis (Bug 3b) and are user-editable;
+  // firstName is the final fallback when no sign-off is set.
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      email: true,
+      tone: true,
+      toneProfile: true,
+      toneExample: true,
+      inferredIntro: true,
+      inferredSignOff: true,
+      schedulingPreferences: true,
+      schedulingEnabled: true,
+    },
+  });
+  const fullName = dbUser?.name?.trim() || dbUser?.email?.split("@")[0] || "the sender";
+  const firstName = fullName.split(/\s+/)[0];
+
+  // Sign-off the model should end with. Inferred wins; otherwise just the first name.
+  const signOffBlock = dbUser?.inferredSignOff?.trim()
+    ? `End the email with exactly this sign-off (including the line break before the name):\n${dbUser.inferredSignOff}`
+    : `End with just the name "${firstName}"; do not include a sign-off like "Best" or "Sincerely".`;
+  const introHint = dbUser?.inferredIntro?.trim()
+    ? `\nWhen an opening greeting fits, use this form: ${dbUser.inferredIntro}`
+    : "";
+
   let prompt: string;
 
   if (draftText) {
     // Polish mode — no thread needed
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { toneProfile: true, toneExample: true },
-    });
-
-    const toneBlock = user?.toneProfile
-      ? `Writing style to match exactly: ${user.toneProfile}${user.toneExample ? `\n\nExample:\n${user.toneExample.slice(0, 300)}` : ""}`
+    const toneBlock = dbUser?.toneProfile
+      ? `Writing style to match exactly: ${dbUser.toneProfile}${dbUser.toneExample ? `\n\nExample:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural, professional tone.";
 
-    prompt = `You are polishing a draft email on behalf of Finley Underwood. Rewrite their notes into a clean, complete email in their exact writing style.
+    prompt = `You are polishing a draft email on behalf of ${fullName}. Rewrite their notes into a clean, complete email in their exact writing style.
+
+${buildDateContext(draftText ?? "")}
 
 ${toneBlock}
 
 Rules:
 ${WRITING_RULES}
 - Keep all the same intent and key points; do not add information not implied by the notes.
-- No sign-off name at the end; the sender's signature handles that.
+- No sign-off name at the end; the sender's signature handles that.${introHint}
 - Keep it concise.
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
@@ -167,28 +232,28 @@ Polished email:`;
     }
 
     const emailBody = extractBody(msg.payload) || msg.snippet || "";
-    const toneKey = tone ?? "Concise";
+    // Tone preference resolution: explicit request body wins, then the user's
+    // saved preference, then Concise. This is how the inline button + compose
+    // FAB (which can't show a tone picker) produce drafts in the user's chosen
+    // tone instead of always defaulting to Concise.
+    const toneKey = tone ?? dbUser?.tone ?? "Concise";
 
     if (toneKey === "Scheduling") {
-    const schedulingUser = await prisma.user.findUnique({ where: { id: userId }, select: { schedulingEnabled: true } });
-    if (schedulingUser?.schedulingEnabled === false) {
+    if (dbUser?.schedulingEnabled === false) {
       return NextResponse.json({ error: "Scheduling is disabled. Enable it in your Dharma dashboard." }, { status: 403, headers: CORS });
     }
 
     const now = new Date();
     const { timeMin, timeMax } = getRelevantTimeWindow(emailBody, now);
 
-    const [calendarRes, user] = await Promise.all([
-      google.calendar({ version: "v3", auth: oauthClient }).events.list({
-        calendarId: "primary",
-        timeMin,
-        timeMax,
-        maxResults: 10,
-        singleEvents: true,
-        orderBy: "startTime",
-      }),
-      prisma.user.findUnique({ where: { id: userId }, select: { schedulingPreferences: true, toneProfile: true, toneExample: true } }),
-    ]);
+    const calendarRes = await google.calendar({ version: "v3", auth: oauthClient }).events.list({
+      calendarId: "primary",
+      timeMin,
+      timeMax,
+      maxResults: 10,
+      singleEvents: true,
+      orderBy: "startTime",
+    });
 
     const TZ = "America/New_York";
     const busyList = (calendarRes.data.items ?? [])
@@ -200,15 +265,17 @@ Polished email:`;
       })
       .join("\n") || "No events in this window";
 
-    const toneBlock = user?.toneProfile
-      ? `Writing style to match exactly: ${user.toneProfile}${user.toneExample ? `\n\nExample of how this person writes:\n${user.toneExample.slice(0, 300)}` : ""}`
+    const toneBlock = dbUser?.toneProfile
+      ? `Writing style to match exactly: ${dbUser.toneProfile}${dbUser.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural tone.";
 
-    const prefsLine = user?.schedulingPreferences
-      ? `\nScheduling preferences: ${user.schedulingPreferences}`
+    const prefsLine = dbUser?.schedulingPreferences
+      ? `\nScheduling preferences: ${dbUser.schedulingPreferences}`
       : "";
 
-    prompt = `You are drafting a scheduling reply on behalf of Finley Underwood. Your top priority is matching their writing style exactly.
+    prompt = `You are drafting a scheduling reply on behalf of ${fullName}. Your top priority is matching their writing style exactly.
+
+${buildDateContext(emailBody)}
 
 ${toneBlock}
 
@@ -219,7 +286,7 @@ ${WRITING_RULES}
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
 - Never name or describe what event is blocking the time; just say the time does not work.
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
-- Do not include any sign-off name at the end.
+- Do not include any sign-off name at the end.${introHint}
 - Keep it to 2-3 sentences.
 - Format: if there is an opening line, leave one blank line before the message body, and one blank line before the closing question.
 - Do not include a subject line.${prefsLine}
@@ -237,11 +304,13 @@ Reply draft:`;
       const toneInstruction = TONE_INSTRUCTIONS[toneKey] ?? TONE_INSTRUCTIONS.Concise;
       prompt = `${toneInstruction}
 
-You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft.
+${buildDateContext(emailBody)}
+
+You are drafting a reply on behalf of ${fullName}. Read the email below and write an appropriate reply draft.
 
 Rules:
 ${WRITING_RULES}
-- End with just the name "Finley"; do not include a sign-off like "Best" or "Sincerely".
+- ${signOffBlock}${introHint}
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Email from: ${from}

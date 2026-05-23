@@ -17,6 +17,39 @@ const TONE_INSTRUCTIONS: Record<string, string> = {
     "Write in a warm, conversational tone. It's okay to be a little informal, use contractions, keep it light and approachable.",
 };
 
+// Same date pattern + context builder as thread-draft. Kept in sync manually
+// (small enough that extracting to a shared module would be over-engineering).
+const DATE_PATTERN = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember|t)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}\b|\b(?:today|tomorrow|yesterday|tonight|this\s+week|next\s+week|next\s+month|this\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/gi;
+
+function buildDateContext(emailBody: string): string {
+  const now = new Date();
+  const prettyToday = now.toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/New_York",
+  });
+  const isoToday = now.toISOString().slice(0, 10);
+  const matches = emailBody.match(DATE_PATTERN) ?? [];
+  const seen = new Set<string>();
+  const referenced: string[] = [];
+  for (const m of matches) {
+    const norm = m.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      referenced.push(m);
+      if (referenced.length >= 10) break;
+    }
+  }
+  const lines = [`Today is ${prettyToday} (${isoToday}, America/New_York).`];
+  if (referenced.length > 0) {
+    lines.push(`Dates mentioned in this email: ${referenced.join(", ")}.`);
+    lines.push("If any of those dates have already passed, never propose them. Always reason from today's date forward.");
+  }
+  return lines.join("\n");
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: messageId } = await params;
   const { tone } = await req.json() as { tone?: string };
@@ -35,6 +68,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const googleCred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!googleCred) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true, tone: true, inferredIntro: true, inferredSignOff: true },
+  });
+  const fullName = dbUser?.name?.trim() || dbUser?.email?.split("@")[0] || "the sender";
+  const firstName = fullName.split(/\s+/)[0];
+  const signOffBlock = dbUser?.inferredSignOff?.trim()
+    ? `End the email with exactly this sign-off (including the line break before the name):\n${dbUser.inferredSignOff}`
+    : `End with just the name "${firstName}"; do not include a sign-off like "Best" or "Sincerely".`;
+  const introHint = dbUser?.inferredIntro?.trim()
+    ? ` When an opening greeting fits, use this form: ${dbUser.inferredIntro}`
+    : "";
 
   const { auth: oauthClient } = await makeAuthForUser(userId);
   const gmail = google.gmail({ version: "v1", auth: oauthClient });
@@ -68,7 +114,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const body = extractBody(msg.payload) || msg.snippet || "";
-  const toneKey = tone ?? "Concise";
+  // Tone preference resolution mirrors thread-draft: request body wins,
+  // then saved user preference, then Concise.
+  const toneKey = tone ?? dbUser?.tone ?? "Concise";
   const toneInstruction = TONE_INSTRUCTIONS[toneKey] ?? TONE_INSTRUCTIONS.Concise;
 
   // Generate reply with Claude
@@ -77,7 +125,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const prompt = `${toneInstruction}
 
-You are drafting a reply on behalf of Finley Underwood. Read the email below and write an appropriate reply draft. Do not include a subject line. End with just the name "Finley"; do not include a sign-off like "Best" or "Sincerely".
+${buildDateContext(body)}
+
+You are drafting a reply on behalf of ${fullName}. Read the email below and write an appropriate reply draft. Do not include a subject line. ${signOffBlock}${introHint}
 
 Email from: ${from}
 Subject: ${subject}

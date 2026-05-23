@@ -1,6 +1,3 @@
 {
-  "buildCommand": "prisma generate && next build",
-  "crons": [
-    { "path": "/api/gmail/poll", "schedule": "*/2 * * * *" }
-  ]
+  "buildCommand": "prisma generate && next build"
 }

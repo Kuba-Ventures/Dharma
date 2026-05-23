@@ -1,11 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
 import { google } from "googleapis";
 
-const SENT_SAMPLE_COUNT = 25;
+// Analyze the user's most recent 15 sent emails. Per the May 23 spec: fewer
+// emails, but extract intro greeting + sign-off as structured fields so the
+// sidebar can render them as editable inputs.
+const SENT_SAMPLE_COUNT = 15;
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}
 
 async function fetchSentEmailBodies(userId: string): Promise<string[]> {
   const { auth: oauthClient } = await makeAuthForUser(userId);
@@ -38,12 +51,19 @@ async function fetchSentEmailBodies(userId: string): Promise<string[]> {
     .map((r) => r.value as string);
 }
 
-async function analyzeTonesWithClaude(bodies: string[], userId: string): Promise<{ summary: string; example: string }> {
+type ToneAnalysis = {
+  summary: string;
+  example: string;
+  intro: string;
+  signOff: string;
+};
+
+async function analyzeTonesWithClaude(bodies: string[], userId: string): Promise<ToneAnalysis> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
   const combinedSamples = bodies
-    .slice(0, 20)
+    .slice(0, SENT_SAMPLE_COUNT)
     .map((b, i) => `--- Email ${i + 1} ---\n${b.trim()}`)
     .join("\n\n");
 
@@ -59,12 +79,13 @@ Analyze their tone and writing style carefully. Pay close attention to:
 - Email length and structure preferences
 - Vocabulary level and formality
 - Punctuation and formatting habits
-- Any personality traits that come through
 
-Return a JSON object with exactly two fields:
+Return a JSON object with exactly four fields:
 {
-  "summary": "A 1-2 sentence description of their writing style starting with 'Writes with...' Focus on tone, formality, and sentence structure only. Do not mention the person's name, do not mention specific greetings or sign-offs, do not say 'uses casual greetings like' or 'often ending with'.",
-  "example": "A short sample email (3-6 sentences) written in their exact style. Use a professional but realistic scenario like following up on a project or responding to a meeting request. Use their actual patterns. End the email at the closing word only (e.g. 'Thanks,' or 'Best,'). Do not include any name or title after it."
+  "summary": "A 1-2 sentence description of their writing style starting with 'Writes with...' Focus on tone, formality, and sentence structure only. Do not mention the person's name, do not mention specific greetings or sign-offs.",
+  "example": "A short sample email (3-6 sentences) written in their exact style. Use a professional but realistic scenario like following up on a project. Use their actual patterns. End the email at the closing word only (e.g. 'Thanks,' or 'Best,'). Do not include any name or title after it.",
+  "intro": "The exact text they most commonly use to open emails, including punctuation, but with the recipient's name replaced by a placeholder if present. Examples: 'Hi {{name}},', 'Hey,', 'Hello,', or '' if they typically skip greetings. One short string, no explanation.",
+  "signOff": "The exact text they most commonly use to close emails, including punctuation and a trailing newline + their first name if they sign with their name. Examples: 'Thanks,\\nMara', 'Best,\\nMarcus', '— Alex', or '' if they typically skip sign-offs. One short string, no explanation."
 }
 
 JSON only, no other text.`;
@@ -78,7 +99,7 @@ JSON only, no other text.`;
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 600,
+      max_tokens: 800,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -105,10 +126,17 @@ JSON only, no other text.`;
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("No JSON in Claude response");
 
-  const parsed = JSON.parse(match[0]) as { summary: string; example: string };
-  if (!parsed.summary || !parsed.example) throw new Error("Missing fields in Claude response");
+  const parsed = JSON.parse(match[0]) as Partial<ToneAnalysis>;
+  if (!parsed.summary || !parsed.example) {
+    throw new Error("Missing summary or example in Claude response");
+  }
 
-  return parsed;
+  return {
+    summary: parsed.summary,
+    example: parsed.example,
+    intro: parsed.intro ?? "",
+    signOff: parsed.signOff ?? "",
+  };
 }
 
 function googleErrMessage(err: unknown): string | null {
@@ -118,17 +146,36 @@ function googleErrMessage(err: unknown): string | null {
   return null;
 }
 
-export async function POST() {
+// Resolve the calling user from either a NextAuth session (dashboard) or a
+// GoogleBearer token (Apps Script add-on sidebar).
+async function resolveUserId(req: NextRequest): Promise<string | null> {
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session?.user?.id) return session.user.id;
 
-  const userId = session.user.id;
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("GoogleBearer ")) {
+    const googleToken = authHeader.slice("GoogleBearer ".length);
+    const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${googleToken}` },
+    });
+    if (userinfoRes.ok) {
+      const { email } = (await userinfoRes.json()) as { email: string };
+      const cred = await prisma.googleCredential.findUnique({ where: { email } });
+      if (cred) return cred.userId;
+    }
+  }
+  return null;
+}
+
+export async function POST(req: NextRequest) {
+  const userId = await resolveUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
 
   const cred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!cred) {
     return NextResponse.json(
       { error: "Google account not linked. Sign out and sign back in to reconnect." },
-      { status: 401 }
+      { status: 401, headers: CORS }
     );
   }
 
@@ -138,25 +185,39 @@ export async function POST() {
   } catch (err) {
     console.error("[tone/sync] Failed to fetch sent emails:", err);
     const msg = googleErrMessage(err) ?? "Failed to fetch sent emails";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: msg }, { status: 502, headers: CORS });
   }
 
   if (bodies.length < 3) {
-    return NextResponse.json({ error: "Not enough sent emails to analyze" }, { status: 422 });
+    return NextResponse.json({ error: "Not enough sent emails to analyze" }, { status: 422, headers: CORS });
   }
 
-  let result: { summary: string; example: string };
+  let result: ToneAnalysis;
   try {
     result = await analyzeTonesWithClaude(bodies, userId);
   } catch (err) {
     console.error("[tone/sync] Claude analysis failed:", err);
-    return NextResponse.json({ error: "Tone analysis failed" }, { status: 502 });
+    return NextResponse.json({ error: "Tone analysis failed" }, { status: 502, headers: CORS });
   }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { tone: "My Tone", toneProfile: result.summary, toneExample: result.example },
+    data: {
+      tone: "My Tone",
+      toneProfile: result.summary,
+      toneExample: result.example,
+      inferredIntro: result.intro || null,
+      inferredSignOff: result.signOff || null,
+    },
   });
 
-  return NextResponse.json({ summary: result.summary, example: result.example });
+  return NextResponse.json(
+    {
+      summary: result.summary,
+      example: result.example,
+      intro: result.intro,
+      signOff: result.signOff,
+    },
+    { headers: CORS }
+  );
 }

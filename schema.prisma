@@ -17,6 +17,8 @@ model User {
   tone                String               @default("Concise")
   toneProfile             String?
   toneExample             String?
+  inferredSignOff         String?
+  inferredIntro           String?
   schedulingPreferences   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt

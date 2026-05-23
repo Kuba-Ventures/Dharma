@@ -20,19 +20,19 @@ const PRESET_TONES: { id: Tone; description: string; example: string }[] = [
     id: "Concise",
     description: "Brief and direct, no filler",
     example:
-      "Hi Sarah,\n\nFollowing up on the proposal. Please advise on next steps by Thursday.\n\nThanks,\nFinley",
+      "Hi Sarah,\n\nFollowing up on the proposal. Please advise on next steps by Thursday.\n\nThanks,\nAlex",
   },
   {
     id: "Formal / Legal",
     description: "Structured, precise language for official correspondence",
     example:
-      "Dear Ms. Smith,\n\nI am writing to follow up regarding the proposal submitted for your review. Please do not hesitate to contact me should you require any additional information or clarification.\n\nSincerely,\nFinley Underwood",
+      "Dear Ms. Smith,\n\nI am writing to follow up regarding the proposal submitted for your review. Please do not hesitate to contact me should you require any additional information or clarification.\n\nSincerely,\nAlex Park",
   },
   {
     id: "Casual / Friendly",
     description: "Warm and conversational for informal threads",
     example:
-      "Hey Sarah!\n\nJust wanted to check in on the proposal, no rush, but let me know how it's looking when you get a chance!\n\nCheers,\nFinley",
+      "Hey Sarah!\n\nJust wanted to check in on the proposal, no rush, but let me know how it's looking when you get a chance!\n\nCheers,\nAlex",
   },
 ];
 
@@ -363,6 +363,9 @@ export default function DashboardWrapper({
             enabled={labelsEnabled}
             onToggle={handleLabelsToggle}
           />
+          <p className="text-xs text-white/40 mt-3 px-1">
+            Tagging is paused for accounts that connected after the May 23 scope update. Existing connections continue to work. Re-enabling tagging for new accounts is on the roadmap.
+          </p>
         </FeatureCard>
 
         {/* Labels detail panel */}

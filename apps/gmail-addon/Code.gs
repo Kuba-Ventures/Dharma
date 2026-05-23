@@ -5,7 +5,222 @@ function onHomepage(e) {
 }
 
 function onGmailMessage(e) {
+  // Classify the open message. Calendar invites get Accept/Decline/Reschedule;
+  // everything else gets the tone strip (existing behavior).
+  var classified = classifyMessage(e.gmail.messageId);
+  if (classified && classified.kind === 'invite') {
+    return buildInviteCard(e.gmail.messageId, classified.invite || {});
+  }
   return buildMainCard(e.gmail.messageId);
+}
+
+function classifyMessage(messageId) {
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/emails/' + encodeURIComponent(messageId) + '/classify', {
+      method: 'get',
+      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+      return JSON.parse(res.getContentText());
+    }
+  } catch (err) {
+    Logger.log('classifyMessage failed: ' + err.message);
+  }
+  return null;
+}
+
+function buildInviteCard(messageId, invite) {
+  var section = CardService.newCardSection();
+
+  var headline = invite.isCancellation
+    ? 'This meeting was canceled.'
+    : (invite.summary ? '<b>' + invite.summary + '</b>' : 'Calendar invite');
+  section.addWidget(CardService.newTextParagraph().setText(headline));
+
+  if (invite.start) {
+    section.addWidget(CardService.newTextParagraph()
+      .setText('<font color="#888">When: ' + invite.start + '</font>'));
+  }
+  if (invite.organizer) {
+    section.addWidget(CardService.newTextParagraph()
+      .setText('<font color="#888">From: ' + invite.organizer + '</font>'));
+  }
+
+  section.addWidget(CardService.newDivider());
+
+  // Cancellation: no RSVP needed; just let the user draft a reply if they want.
+  if (invite.isCancellation) {
+    section.addWidget(CardService.newTextButton()
+      .setText('Draft a reply')
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setBackgroundColor('#b57bff')
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('forceDraftReply')
+        .setParameters({ messageId: messageId })));
+    return CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+      .addSection(buildToneStatusSection())
+      .addSection(section)
+      .build();
+  }
+
+  // Live invite: Accept / Decline / Reschedule
+  var params = {
+    iCalUID: invite.iCalUID || '',
+    summary: invite.summary || '',
+    start: invite.start || '',
+    organizer: invite.organizer || '',
+    messageId: messageId,
+  };
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Accept')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor('#22c55e')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('rsvpAccept')
+      .setParameters(params)));
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Decline')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor('#ef4444')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('rsvpDecline')
+      .setParameters(params)));
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Reschedule')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor('#b57bff')
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('rsvpReschedule')
+      .setParameters(params)));
+
+  // Escape hatch in case detection was wrong (e.g. follow-up prose email
+  // that just happens to have an invite quoted in it).
+  section.addWidget(CardService.newDivider());
+  section.addWidget(CardService.newTextButton()
+    .setText('Draft a reply instead')
+    .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('forceDraftReply')
+      .setParameters({ messageId: messageId })));
+
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+    .addSection(buildToneStatusSection())
+    .addSection(section)
+    .build();
+}
+
+function forceDraftReply(e) {
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(buildMainCard(e.parameters.messageId)))
+    .build();
+}
+
+function rsvpAccept(e) { return doRsvp(e, 'accept'); }
+function rsvpDecline(e) { return doRsvp(e, 'decline'); }
+
+function doRsvp(e, action) {
+  var p = e.parameters || {};
+  if (!p.iCalUID) {
+    return notificationResponse('Could not RSVP: missing event ID. Try clicking Accept/Decline in Gmail directly.');
+  }
+
+  var payload = {
+    action: action,
+    iCalUID: p.iCalUID,
+    summary: p.summary || '',
+    start: p.start || '',
+    organizer: p.organizer || '',
+  };
+
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/calendar/rsvp', {
+      method: 'post',
+      headers: {
+        'Authorization': 'GoogleBearer ' + accessToken,
+        'Content-Type': 'application/json',
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      var errMsg = 'RSVP failed (' + code + ')';
+      try { errMsg = JSON.parse(res.getContentText()).error || errMsg; } catch (_) {}
+      return notificationResponse(errMsg);
+    }
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText(
+        action === 'accept' ? 'Accepted. Calendar updated.' :
+        action === 'decline' ? 'Declined. Calendar updated.' : 'Response sent.'
+      ))
+      .build();
+  } catch (err) {
+    return notificationResponse('RSVP failed: ' + err.message);
+  }
+}
+
+function rsvpReschedule(e) {
+  var p = e.parameters || {};
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/calendar/rsvp', {
+      method: 'post',
+      headers: {
+        'Authorization': 'GoogleBearer ' + accessToken,
+        'Content-Type': 'application/json',
+      },
+      payload: JSON.stringify({
+        action: 'reschedule',
+        summary: p.summary || '',
+        start: p.start || '',
+        organizer: p.organizer || '',
+      }),
+      muteHttpExceptions: true,
+    });
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      var errMsg = 'Reschedule draft failed (' + code + ')';
+      try { errMsg = JSON.parse(res.getContentText()).error || errMsg; } catch (_) {}
+      return notificationResponse(errMsg);
+    }
+    var data = JSON.parse(res.getContentText());
+    // Cache the generated text so saveDraft can pick it up. Mirror the existing
+    // generateDraft flow.
+    var cacheKey = 'draft_' + (p.messageId || 'reschedule_' + Date.now());
+    CacheService.getUserCache().put(cacheKey, data.text || '', 600);
+
+    var section = CardService.newCardSection()
+      .addWidget(CardService.newTextParagraph().setText(data.text || ''))
+      .addWidget(CardService.newTextButton()
+        .setText('Save as Draft in Gmail')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#b57bff')
+        .setOnClickAction(CardService.newAction()
+          .setFunctionName('saveRescheduleDraft')
+          .setParameters({
+            cacheKey: cacheKey,
+            organizer: p.organizer || '',
+            summary: p.summary || '',
+          })));
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(
+        CardService.newCardBuilder()
+          .setHeader(CardService.newCardHeader().setTitle('Reschedule draft'))
+          .addSection(section)
+          .build()
+      ))
+      .build();
+  } catch (err) {
+    return notificationResponse('Reschedule draft failed: ' + err.message);
+  }
 }
 
 function onComposeOpen(e) {
@@ -31,6 +246,7 @@ function buildWelcomeCard() {
     .setHeader(CardService.newCardHeader()
       .setTitle('Dharma')
       .setSubtitle('AI Email Assistant'))
+    .addSection(buildToneStatusSection())
     .addSection(
       CardService.newCardSection()
         .addWidget(CardService.newTextParagraph()
@@ -40,7 +256,26 @@ function buildWelcomeCard() {
 }
 
 function buildMainCard(messageId) {
-  return buildToneMenuCard('generateDraft', { messageId: messageId });
+  var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
+  var section = CardService.newCardSection();
+  for (var i = 0; i < tones.length; i++) {
+    section.addWidget(
+      CardService.newTextButton()
+        .setText(tones[i])
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#b57bff')
+        .setOnClickAction(
+          CardService.newAction()
+            .setFunctionName('generateDraft')
+            .setParameters({ messageId: messageId, tone: tones[i] })
+        )
+    );
+  }
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+    .addSection(buildToneStatusSection())
+    .addSection(section)
+    .build();
 }
 
 // ── Compose-specific card: includes Polish Draft ──────────────────────────────
@@ -565,6 +800,35 @@ function saveDraft(e) {
     .build();
 }
 
+function saveRescheduleDraft(e) {
+  var p = e.parameters || {};
+  var text = CacheService.getUserCache().get(p.cacheKey);
+  if (!text) return notificationResponse('Draft expired - please generate again.');
+  if (!p.organizer) return notificationResponse('No organizer email available; reply manually in Gmail.');
+
+  var subject = 'Re: ' + (p.summary || 'Meeting');
+  var emailLines = [
+    'From: ' + Session.getActiveUser().getEmail(),
+    'To: ' + p.organizer,
+    'Subject: ' + subject,
+    'Content-Type: text/plain; charset=utf-8',
+  ];
+  var raw = emailLines.join('\r\n') + '\r\n\r\n' + text;
+  var encoded = Utilities.base64EncodeWebSafe(raw);
+
+  try {
+    Gmail.Users.Drafts.create({ message: { raw: encoded } }, 'me');
+  } catch (err) {
+    return notificationResponse('Could not save draft: ' + err.message);
+  }
+
+  CacheService.getUserCache().remove(p.cacheKey);
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('Reschedule draft saved to Gmail'))
+    .setNavigation(CardService.newNavigation().popCard())
+    .build();
+}
+
 function popCard(e) {
   return CardService.newActionResponseBuilder()
     .setNavigation(CardService.newNavigation().popCard())
@@ -575,4 +839,180 @@ function notificationResponse(message) {
   return CardService.newActionResponseBuilder()
     .setNotification(CardService.newNotification().setText(message))
     .build();
+}
+
+// ── My Tone setup ─────────────────────────────────────────────────────────────
+// The tone profile is per-user (keyed by Google account). Analysis runs only
+// when the user clicks Set up / Refresh — never automatically on OAuth.
+
+function fetchToneProfile() {
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/preferences/tone', {
+      method: 'get',
+      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
+      muteHttpExceptions: true,
+    });
+    if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+      return JSON.parse(res.getContentText());
+    }
+  } catch (err) {
+    Logger.log('fetchToneProfile failed: ' + err.message);
+  }
+  return null;
+}
+
+function buildToneStatusSection() {
+  var profile = fetchToneProfile();
+  var section = CardService.newCardSection().setHeader('My Tone');
+
+  if (!profile || !profile.toneProfile) {
+    section.addWidget(CardService.newTextParagraph()
+      .setText('Dharma can analyze your last 15 sent emails and draft replies in your voice. No setup happens until you click below.'));
+    section.addWidget(CardService.newTextButton()
+      .setText('Set up My Tone')
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setBackgroundColor('#b57bff')
+      .setOnClickAction(CardService.newAction().setFunctionName('setupTone')));
+  } else {
+    var summary = profile.toneProfile.length > 110
+      ? profile.toneProfile.substring(0, 110) + '...'
+      : profile.toneProfile;
+    section.addWidget(CardService.newTextParagraph().setText(summary));
+    section.addWidget(CardService.newTextButton()
+      .setText('Edit tone')
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(CardService.newAction().setFunctionName('editTone')));
+    section.addWidget(CardService.newTextButton()
+      .setText('Refresh my tone')
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(CardService.newAction().setFunctionName('setupTone')));
+  }
+
+  return section;
+}
+
+function setupTone(e) {
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/preferences/tone/sync', {
+      method: 'post',
+      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
+      muteHttpExceptions: true,
+    });
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      var errMsg = 'Tone setup failed (' + code + ')';
+      try { errMsg = JSON.parse(res.getContentText()).error || errMsg; } catch (_) {}
+      return notificationResponse(errMsg);
+    }
+    var profile = JSON.parse(res.getContentText());
+    // The sync response uses fields {summary, example, intro, signOff}; the
+    // edit card expects {toneProfile, inferredIntro, inferredSignOff}. Normalize.
+    var normalized = {
+      toneProfile: profile.summary || profile.toneProfile || '',
+      toneExample: profile.example || profile.toneExample || '',
+      inferredIntro: profile.intro || profile.inferredIntro || '',
+      inferredSignOff: profile.signOff || profile.inferredSignOff || '',
+    };
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().pushCard(buildToneEditCard(normalized)))
+      .build();
+  } catch (err) {
+    return notificationResponse('Tone setup failed: ' + err.message);
+  }
+}
+
+function editTone(e) {
+  var profile = fetchToneProfile() || {};
+  return CardService.newActionResponseBuilder()
+    .setNavigation(CardService.newNavigation().pushCard(buildToneEditCard(profile)))
+    .build();
+}
+
+function buildToneEditCard(profile) {
+  var section = CardService.newCardSection();
+
+  section.addWidget(CardService.newTextParagraph()
+    .setText('<b>Your style</b> — how Dharma describes your writing. Edit freely.'));
+  section.addWidget(CardService.newTextInput()
+    .setFieldName('toneProfile')
+    .setTitle('Style summary')
+    .setValue(profile.toneProfile || '')
+    .setMultiline(true));
+
+  section.addWidget(CardService.newDivider());
+
+  section.addWidget(CardService.newTextParagraph()
+    .setText('<b>Greeting</b> — how you typically open emails. Leave blank to skip greetings.'));
+  section.addWidget(CardService.newTextInput()
+    .setFieldName('inferredIntro')
+    .setTitle('e.g. Hi, or Hey {name},')
+    .setValue(profile.inferredIntro || ''));
+
+  section.addWidget(CardService.newDivider());
+
+  section.addWidget(CardService.newTextParagraph()
+    .setText('<b>Sign-off</b> — how you typically close emails. Use \\n for a line break before your name.'));
+  section.addWidget(CardService.newTextInput()
+    .setFieldName('inferredSignOff')
+    .setTitle('e.g. Thanks,\\nAlex')
+    .setValue(profile.inferredSignOff || '')
+    .setMultiline(true));
+
+  section.addWidget(CardService.newDivider());
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Save')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor('#b57bff')
+    .setOnClickAction(CardService.newAction().setFunctionName('saveToneEdits')));
+
+  return CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader().setTitle('My Tone'))
+    .addSection(section)
+    .build();
+}
+
+function saveToneEdits(e) {
+  var formInputs = (e && e.formInputs) || {};
+  var get = function(key) {
+    var v = formInputs[key];
+    if (!v) return '';
+    // Apps Script form inputs come back as { key: [value] } or { key: { stringInputs: { value: [...] } } }
+    if (Array.isArray(v)) return v[0] || '';
+    if (v.stringInputs && Array.isArray(v.stringInputs.value)) return v.stringInputs.value[0] || '';
+    return '';
+  };
+
+  var payload = {
+    toneProfile: get('toneProfile'),
+    inferredIntro: get('inferredIntro'),
+    inferredSignOff: get('inferredSignOff'),
+  };
+
+  var accessToken = ScriptApp.getOAuthToken();
+  try {
+    var res = UrlFetchApp.fetch(DHARMA_API + '/api/preferences/tone', {
+      method: 'post',
+      headers: {
+        'Authorization': 'GoogleBearer ' + accessToken,
+        'Content-Type': 'application/json',
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var code = res.getResponseCode();
+    if (code < 200 || code >= 300) {
+      var errMsg = 'Save failed (' + code + ')';
+      try { errMsg = JSON.parse(res.getContentText()).error || errMsg; } catch (_) {}
+      return notificationResponse(errMsg);
+    }
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().popCard())
+      .setNotification(CardService.newNotification().setText('Tone saved'))
+      .build();
+  } catch (err) {
+    return notificationResponse('Save failed: ' + err.message);
+  }
 }
