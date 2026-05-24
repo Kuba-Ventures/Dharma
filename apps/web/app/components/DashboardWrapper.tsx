@@ -363,9 +363,6 @@ export default function DashboardWrapper({
             enabled={labelsEnabled}
             onToggle={handleLabelsToggle}
           />
-          <p className="text-xs text-white/40 mt-3 px-1">
-            Tagging is paused for accounts that connected after the May 23 scope update. Existing connections continue to work. Re-enabling tagging for new accounts is on the roadmap.
-          </p>
         </FeatureCard>
 
         {/* Labels detail panel */}
