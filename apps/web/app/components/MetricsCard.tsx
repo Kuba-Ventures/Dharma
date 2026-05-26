@@ -7,6 +7,8 @@ interface Metrics {
   avgCostPerDraft: number;
   emailsTagged: number;
   totalSpend30d: number;
+  timeSavedSecondsThisWeek: number;
+  replyRate7d: number | null;
 }
 
 export default function MetricsCard() {
@@ -40,16 +42,43 @@ export default function MetricsCard() {
           label="Total spend (30d)"
           value={loading ? "…" : formatUsd(data?.totalSpend30d ?? 0)}
         />
-        <Cell label="Time saved" value="Coming soon" muted />
-        <Cell label="Reply rate" value="Coming soon" muted />
+        <Cell
+          label="Time saved (week)"
+          value={loading ? "…" : formatDuration(data?.timeSavedSecondsThisWeek ?? 0)}
+          title="Estimated: 3 min per draft + 30 sec per auto-tagged email"
+        />
+        <Cell
+          label="Reply rate (7d)"
+          value={
+            loading
+              ? "…"
+              : data?.replyRate7d == null
+                ? "—"
+                : `${Math.round(data.replyRate7d * 100)}%`
+          }
+          title="Sent emails in the last 7 days ÷ drafts we generated. Capped at 100%."
+        />
       </div>
     </div>
   );
 }
 
-function Cell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Cell({
+  label,
+  value,
+  muted,
+  title,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  title?: string;
+}) {
   return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3">
+    <div
+      className="rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3"
+      title={title}
+    >
       <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{label}</p>
       {muted ? (
         <div className="flex items-center gap-2">
@@ -70,4 +99,13 @@ function formatUsd(n: number): string {
   if (n < 0.01) return `$${n.toFixed(4)}`;
   if (n < 1) return `$${n.toFixed(3)}`;
   return `$${n.toFixed(2)}`;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "0m";
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.round((seconds % 3600) / 60);
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
 }

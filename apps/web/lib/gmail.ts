@@ -405,3 +405,25 @@ export async function createDraft(
     requestBody: { message: { raw, threadId: opts.threadId } },
   });
 }
+
+// Approximate count of messages the user sent within the last N days. Used as
+// a denominator-free proxy for Reply Rate on the Metrics page. Returns null if
+// the Gmail call fails so the UI can show "—" instead of misleading zeros.
+export async function countSentInWindow(
+  userId: string,
+  daysAgo: number
+): Promise<number | null> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.messages.list({
+      userId: "me",
+      q: `in:sent newer_than:${daysAgo}d`,
+      maxResults: 1,
+    });
+    return res.data.resultSizeEstimate ?? 0;
+  } catch (err) {
+    console.error("[gmail] countSentInWindow failed:", err);
+    return null;
+  }
+}
