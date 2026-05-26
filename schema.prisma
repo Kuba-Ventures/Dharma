@@ -8,31 +8,61 @@ datasource db {
 }
 
 model User {
-  id                  String               @id @default(cuid())
-  email               String               @unique
-  emailVerified       DateTime?
-  name                String?
-  image               String?
-  schedulingEnabled   Boolean              @default(true)
-  tone                String               @default("Concise")
-  toneProfile             String?
-  toneExample             String?
-  inferredSignOff         String?
-  inferredIntro           String?
-  schedulingPreferences   String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  googleCredential    GoogleCredential?
-  microsoftCredential MicrosoftCredential?
-  appleCredential     AppleCredential?
+  id                       String               @id @default(cuid())
+  email                    String               @unique
+  emailVerified            DateTime?
+  name                     String?
+  firstName                String?
+  image                    String?
 
-  accounts            Account[]
-  sessions            Session[]
-  labels              Label[]
-  labelPreset         LabelPreset?
-  labelMappings       LabelMapping[]
-  classifiedThreads   ClassifiedThread[]
-  usageEvents         UsageEvent[]
+  // Location (set during onboarding; seeds milestone library)
+  homeCity                 String?
+  homeCityLat              Float?
+  homeCityLng              Float?
+  timezone                 String?
+
+  // Tone
+  tone                     String               @default("Concise")
+  toneProfile              String?
+  toneExample              String?
+  toneSummary              String?
+  inferredSignOff          String?
+  inferredIntro            String?
+
+  // Scheduling
+  schedulingEnabled        Boolean              @default(true)
+  schedulingPreferences    String?
+
+  // Onboarding + UI state
+  onboardingStep           Int                  @default(0)
+  onboardingCompletedAt    DateTime?
+  dismissedTiles           String[]             @default([])
+
+  // Progression
+  tier                     String               @default("Apprentice")
+  cumulativeSecondsSaved   Int                  @default(0)
+  nextNpsPromptAt          DateTime?
+
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  googleCredential         GoogleCredential?
+  microsoftCredential      MicrosoftCredential?
+  appleCredential          AppleCredential?
+
+  accounts                 Account[]
+  sessions                 Session[]
+  labels                   Label[]
+  labelPreset              LabelPreset?
+  labelMappings            LabelMapping[]
+  classifiedThreads        ClassifiedThread[]
+  usageEvents              UsageEvent[]
+
+  meetingHours             MeetingHour[]
+  userMilestones           UserMilestone[]
+  userBadges               UserBadge[]
+  signals                  Signal[]
+  feedback                 Feedback[]
 }
 
 model GoogleCredential {
@@ -184,6 +214,102 @@ model UsageEvent {
   outputTokens Int
   costUsd      Float
   createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ── Meeting hours (Configuration → Scheduling card) ────────────────────────
+
+model MeetingHour {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek Int      // 0 = Sunday, 6 = Saturday
+  hourStart Int      // 0–23 inclusive
+  hourEnd   Int      // 1–24, exclusive upper bound
+  createdAt DateTime @default(now())
+
+  @@index([userId, dayOfWeek])
+}
+
+// ── Milestones (gamified progression tied to user's home city) ─────────────
+
+model MilestoneDef {
+  id           String   @id  // slug, e.g. "summit-mt-mitchell"
+  category     String   // "peak" | "trail" | "city_to_city" | "cultural" | "regional" | "intro"
+  title        String
+  description  String
+  threshold    Int?     // seconds saved required; null = always-on
+  copyTemplate String   // user-facing copy with {city}/{firstName} placeholders
+  gradient     String   // CSS gradient stops for share-card background
+  createdAt    DateTime @default(now())
+
+  userMilestones UserMilestone[]
+}
+
+model UserMilestone {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestoneId String
+  milestone   MilestoneDef @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  achievedAt  DateTime     @default(now())
+  sharedAt    DateTime?
+
+  @@unique([userId, milestoneId])
+  @@index([userId, achievedAt])
+}
+
+// ── Badges (identity allowlist + earned achievements) ──────────────────────
+
+model BadgeDef {
+  id          String   @id  // slug, e.g. "welcome-aboard"
+  title       String
+  description String
+  kind        String   // "tier" | "achievement" | "allowlist"
+  criteria    Json     // declarative rule consumed by badgeRules.ts
+  createdAt   DateTime @default(now())
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String
+  badge     BadgeDef @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@index([userId, awardedAt])
+}
+
+// ── Signals (scaffold for deal/term-sheet detection) ───────────────────────
+
+model Signal {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String    // "deal_flow" | "term_sheet" | etc.
+  payload   Json
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@index([userId, readAt])
+}
+
+// ── Feedback (inline button + NPS) ─────────────────────────────────────────
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String   // "feedback" | "nps"
+  score     Int?     // 0–10 for NPS, null for free-form
+  message   String?
+  page      String?  // path that triggered the feedback
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
 }
