@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  /* Legacy tokens — kept this commit, removed in commit 2. */
   --background: 240 10% 4%;
   --foreground: 0 0% 98%;
   --card: 240 10% 6%;
@@ -14,6 +15,47 @@
   --muted: 240 10% 12%;
   --muted-foreground: 240 5% 65%;
   --border: 240 10% 15%;
+
+  /* Brand purple ramp */
+  --brand-50: #EEEDFE;
+  --brand-100: #CECBF6;
+  --brand-200: #AFA9EC;
+  --brand-400: #7F77DD;
+  --brand-600: #534AB7;
+  --brand-800: #3C3489;
+  --brand-900: #26215C;
+
+  /* Surface tokens */
+  --bg-app: #0f0f10;
+  --bg-sidebar: #0a0a0b;
+  --bg-card: rgba(255, 255, 255, 0.02);
+  --bg-card-elevated: rgba(127, 119, 221, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-brand: rgba(127, 119, 221, 0.25);
+
+  /* Text tokens */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+  --text-brand: #AFA9EC;
+  --text-brand-strong: #CECBF6;
+
+  /* Label palette (semantic, distinct from brand) */
+  --label-1: #378ADD; /* blue — deal-flow, signals */
+  --label-2: #1D9E75; /* teal — portfolio, growth */
+  --label-3: #D85A30; /* coral — LP-relations, capital */
+  --label-4: #EF9F27; /* amber — high-priority */
+  --label-5: #D4537E; /* pink — legal */
+  --label-6: #888780; /* gray — internal */
+  --label-7: #B45ED4; /* violet — reserve */
+  --label-8: #D43F3F; /* red — reserve */
+  --label-9: #C0A03F; /* mustard — reserve */
+  --label-10: #5A6B7E; /* slate — reserve */
+
+  /* Radii */
+  --radius-card: 10px;
+  --radius-hero: 12px;
+  --radius-btn: 6px;
 }
 
 @layer components {
