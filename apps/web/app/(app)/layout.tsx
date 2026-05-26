@@ -1,49 +1,53 @@
 import { auth } from "../../lib/auth";
 import { redirect } from "next/navigation";
-import { signOut } from "../../lib/auth";
 import Image from "next/image";
 import Link from "next/link";
+import { prisma } from "../../lib/prisma";
 import Sidebar from "../components/Sidebar";
+import ProfileChip from "../components/ProfileChip";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      firstName: true,
+      name: true,
+      email: true,
+      image: true,
+      tier: true,
+      onboardingCompletedAt: true,
+    },
+  });
+  if (!user) redirect("/login");
+
+  const signalCount = 0; // wired in commit 8
+  // Locking is enforced in commit 6 once the onboarding flow exists and
+  // existing users have been backfilled with onboardingCompletedAt. Until then,
+  // pass false so we don't brick anyone who pre-dates onboarding.
+  const locked = false;
+  void user.onboardingCompletedAt;
+
   return (
-    <div className="min-h-screen bg-[#0c0c0e] flex">
-      {/* Sidebar */}
-      <aside className="w-52 shrink-0 border-r border-white/[0.06] flex flex-col py-7 px-3">
-        <Link href="/" className="flex items-center gap-2.5 px-3 mb-8 hover:opacity-80 transition-opacity">
+    <div className="flex min-h-screen bg-[color:var(--bg-app)]">
+      <aside className="flex w-52 shrink-0 flex-col border-r border-[color:var(--border-subtle)] bg-[color:var(--bg-sidebar)] px-3 py-7">
+        <Link
+          href="/"
+          className="mb-8 flex items-center gap-2.5 px-3 transition-opacity hover:opacity-80"
+        >
           <Image src="/logo.png" alt="Dharma" width={26} height={26} priority />
-          <span className="text-white font-bold text-sm">Dharma</span>
+          <span className="text-sm font-bold text-white">Dharma</span>
         </Link>
-        <Sidebar />
+        <Sidebar locked={locked} signalCount={signalCount} />
+        <div className="mt-auto">
+          <ProfileChip user={user} />
+        </div>
       </aside>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="flex items-center justify-between px-10 py-5 border-b border-white/[0.06]">
-          <span className="text-sm text-white/40">{session.user?.email}</span>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
-          >
-            <button
-              type="submit"
-              className="text-xs text-white/30 hover:text-white/60 transition-colors"
-            >
-              Sign out
-            </button>
-          </form>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 px-10 py-8">
-          {children}
-        </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="flex-1 px-10 py-8">{children}</main>
       </div>
     </div>
   );
