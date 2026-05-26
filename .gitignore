@@ -33,3 +33,7 @@ dist/
 build/
 .vercel
 .env*.local
+*.tsbuildinfo
+
+# ── Local tool cruft ──────────────────────────────────────────────────────────
+.playwright-mcp/

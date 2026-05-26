@@ -122,7 +122,7 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 | Chrome Web Store | Distribution for the extension | one-time $5 developer fee | submission in review (filed 2026-04-30) |
 | Google Workspace Marketplace | Distribution for the Gmail add-on | TBD | not yet listed (deployed via clasp only) |
 
-*Source: no MCP configs found in repo; this table is generated from `.env`/`.env.local` references, the system diagram (`dharma_system_diagram.md`), and Chrome Web Store screenshots at the repo root.*
+*Source: no MCP configs found in repo; this table is generated from `.env`/`.env.local` references, the system diagram (`docs/architecture/dharma_system_diagram.md`), and Chrome Web Store screenshots in `docs/screenshots/cws/`.*
 
 *Note: CLAUDE.md recommends Vercel AI Gateway with `AI_GATEWAY_API_KEY`. Current code calls Anthropic directly (raw `fetch` to `api.anthropic.com`). Migrating to AI Gateway is a candidate cleanup — not yet done.*
 
@@ -137,7 +137,7 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 - **2026-05-19 — Industry-preset labels added (VC / PE / Legal / General)** — Replaces generic defaults so the classifier has meaningful categories out of the box.
 - **2026-05-18 — Use Arial site-wide, scope Plus Jakarta Sans to landing page** — Originally Jakarta everywhere; readability suffered in dashboard tables.
 - **2026-05-18 — Remove em-dashes from all user-facing copy and AI prompts** — Em-dashes read as "written by AI." Stripped server-side from AI replies too.
-- **2026-04-30 — Submit Chrome extension to Chrome Web Store** — Filed publisher account + listing. Screenshots of the submission flow saved at repo root (`cws-*.png`) for future reference.
+- **2026-04-30 — Submit Chrome extension to Chrome Web Store** — Filed publisher account + listing. Screenshots of the submission flow saved at `docs/screenshots/cws/` for future reference.
 - **2026-04 — Apple Calendar uses app-specific password, not OAuth** — Apple does not offer OAuth for CalDAV. App-specific password is stored AES-256-GCM encrypted using `APPLE_CREDENTIAL_ENCRYPTION_KEY`.
 - **2026-04 — Anthropic API called directly via `fetch`, no SDK** — Keeps the dependency surface small; trivial to swap models. Tradeoff: not using AI Gateway yet (see Risks).
 
@@ -151,7 +151,7 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 - [ ] Verify Pub/Sub push path end-to-end (current default appears to be the poller script)
 - [ ] First external user test of preset-label + Sync Inbox flow
 - [ ] `apps/web/next-env.d.ts` is uncommitted; decide whether to ignore or commit
-- [ ] Many uncommitted screenshots (`cws-*.png`, `dharma-*.png`) and `dharma_arch.py` / `dharma_system_diagram.md` are at repo root — decide if these belong in `/docs` or `.gitignore`
+- [x] Loose root-level screenshots and architecture files moved to `docs/screenshots/` and `docs/architecture/` (2026-05-26)
 
 ---
 
@@ -173,7 +173,7 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 - **Settings (extension token):** https://dharma-lake.vercel.app/settings
 - **Staging:** not configured (or not documented in repo)
 - **Chrome Web Store listing:** pending review (submitted 2026-04-30)
-- **System diagram:** `/Users/finley/Code/Dharma Code/dharma_system_diagram.md`
+- **System diagram:** `docs/architecture/dharma_system_diagram.md`
 - **DB schema:** `/Users/finley/Code/Dharma Code/schema.prisma`
 
 ---
