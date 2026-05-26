@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
-  const { name, description = "", color = "#c8f5a0", colorKey = "gray" } =
+  const { name, description = "", color = "#1D9E75", colorKey = "green" } =
     await req.json() as { name: string; description?: string; color?: string; colorKey?: string };
 
   if (!name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 });

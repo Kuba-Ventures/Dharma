@@ -54,7 +54,7 @@ export default function TermsPage() {
 
         <Section title="Data and Privacy">
           Your use of Dharma is also governed by our{" "}
-          <a href="/privacy" className="text-[#c8f5a0]/80 underline">
+          <a href="/privacy" className="text-brand-200/80 underline">
             Privacy Policy
           </a>
           , which is incorporated into these Terms by reference.
@@ -90,7 +90,7 @@ export default function TermsPage() {
 
         <Section title="Contact">
           Questions about these Terms? Contact us at{" "}
-          <a href="mailto:finley@qsbsrollover.com" className="text-[#c8f5a0]/80 underline">
+          <a href="mailto:finley@qsbsrollover.com" className="text-brand-200/80 underline">
             finley@qsbsrollover.com
           </a>
           .

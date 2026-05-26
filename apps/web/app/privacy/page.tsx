@@ -93,7 +93,7 @@ export default function PrivacyPage() {
           You can revoke access at any time via your{" "}
           <a
             href="https://myaccount.google.com/permissions"
-            className="text-[#c8f5a0]/80 underline"
+            className="text-brand-200/80 underline"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
 
         <Section title="Contact">
           For privacy questions or data deletion requests, contact us at{" "}
-          <a href="mailto:finley@qsbsrollover.com" className="text-[#c8f5a0]/80 underline">
+          <a href="mailto:finley@qsbsrollover.com" className="text-brand-200/80 underline">
             finley@qsbsrollover.com
           </a>
           .

@@ -232,7 +232,7 @@ export default function DashboardWrapper({
   return (
     <div>
       {toast && (
-        <div className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center mb-3">
+        <div className="text-xs text-brand-400 bg-brand-400/10 border border-brand-400/20 rounded-xl px-4 py-2 text-center mb-3">
           {toast}
         </div>
       )}
@@ -256,7 +256,7 @@ export default function DashboardWrapper({
               href={ADDON_INSTALL_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/15 border border-[#b57bff]/40 text-[#b57bff] hover:bg-[#b57bff]/20 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-full bg-brand-400/15 border border-brand-400/40 text-brand-400 hover:bg-brand-400/20 transition-colors"
             >
               Install Add-on
             </a>
@@ -330,7 +330,7 @@ export default function DashboardWrapper({
                       <button
                         onClick={handleSaveProfile}
                         disabled={profileSaving}
-                        className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/10 border border-[#b57bff]/30 text-[#b57bff]/80 hover:bg-[#b57bff]/15 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                        className="text-xs px-3 py-1.5 rounded-full bg-brand-400/10 border border-brand-400/30 text-brand-400/80 hover:bg-brand-400/15 hover:text-brand-400 transition-colors disabled:opacity-40"
                       >
                         {profileSaving ? "Saving…" : "Save"}
                       </button>
@@ -447,7 +447,7 @@ export default function DashboardWrapper({
                         <button
                           onClick={handleSaveSchedulingPrefs}
                           disabled={prefsSaving}
-                          className="text-xs px-3 py-1.5 rounded-full bg-[#b57bff]/10 border border-[#b57bff]/30 text-[#b57bff]/80 hover:bg-[#b57bff]/15 hover:text-[#b57bff] transition-colors disabled:opacity-40"
+                          className="text-xs px-3 py-1.5 rounded-full bg-brand-400/10 border border-brand-400/30 text-brand-400/80 hover:bg-brand-400/15 hover:text-brand-400 transition-colors disabled:opacity-40"
                         >
                           {prefsSaving ? "Saving…" : "Save"}
                         </button>
@@ -535,7 +535,7 @@ function Tag({ label, active, onClick }: { label: string; active: boolean; onCli
       onClick={onClick}
       className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
         active
-          ? "bg-[#b57bff]/15 border-[#b57bff]/40 text-[#b57bff]"
+          ? "bg-brand-400/15 border-brand-400/40 text-brand-400"
           : "bg-white/[0.05] border-white/[0.1] text-white/40 hover:text-white/60 hover:bg-white/[0.08]"
       }`}
     >
@@ -551,7 +551,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={enabled}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-        enabled ? "bg-[#b57bff]/70" : "bg-white/[0.12]"
+        enabled ? "bg-brand-400/70" : "bg-white/[0.12]"
       }`}
     >
       <span

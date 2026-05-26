@@ -109,7 +109,7 @@ model Label {
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
   description  String      @default("")
-  color        String      @default("#c8f5a0")   // UI chip color
+  color        String      @default("#1D9E75")   // UI chip color — label-palette teal
   gmailLabelId String?                            // Gmail label resource ID
   enabled      Boolean     @default(true)
   order        Int         @default(0)

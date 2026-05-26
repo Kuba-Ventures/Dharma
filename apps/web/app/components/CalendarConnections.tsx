@@ -86,7 +86,7 @@ export default function CalendarConnections({
   return (
     <div className="space-y-3">
       {toast && (
-        <div className="text-xs text-[#c8f5a0] bg-[#c8f5a0]/10 border border-[#c8f5a0]/20 rounded-xl px-4 py-2 text-center">
+        <div className="text-xs text-label-2 bg-label-2/10 border border-label-2/20 rounded-xl px-4 py-2 text-center">
           {toast}
         </div>
       )}

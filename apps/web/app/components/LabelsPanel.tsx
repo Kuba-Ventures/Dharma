@@ -292,7 +292,7 @@ export default function LabelsPanel() {
       </div>
 
       {scanResult && (
-        <p className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2 text-center">
+        <p className="text-xs text-brand-400 bg-brand-400/10 border border-brand-400/20 rounded-xl px-4 py-2 text-center">
           Scanned {scanResult.scanned} emails, labeled {scanResult.labeled}
         </p>
       )}
@@ -373,7 +373,7 @@ export default function LabelsPanel() {
         <button
           onClick={applyAll}
           disabled={applying || !industry}
-          className="w-full py-2.5 text-xs font-medium rounded-xl bg-[#b57bff]/15 border border-[#b57bff]/30 text-[#b57bff] hover:bg-[#b57bff]/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-full py-2.5 text-xs font-medium rounded-xl bg-brand-400/15 border border-brand-400/30 text-brand-400 hover:bg-brand-400/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {applying
             ? "Applying labels…"
@@ -485,9 +485,9 @@ function LabelRow({
                         if (e.key === "Escape") { setShowInput(false); setInput(""); }
                       }}
                       placeholder="keyword…"
-                      className="text-[11px] bg-white/[0.06] border border-[#b57bff]/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
+                      className="text-[11px] bg-white/[0.06] border border-brand-400/30 rounded-full px-2.5 py-0.5 text-white/70 placeholder-white/25 focus:outline-none w-28"
                     />
-                    <button onClick={submit} disabled={adding || !input.trim()} className="text-[11px] text-[#b57bff]/70 hover:text-[#b57bff] transition-colors disabled:opacity-40">
+                    <button onClick={submit} disabled={adding || !input.trim()} className="text-[11px] text-brand-400/70 hover:text-brand-400 transition-colors disabled:opacity-40">
                       {adding ? "…" : "Add"}
                     </button>
                     <button onClick={() => { setShowInput(false); setInput(""); }} className="text-[11px] text-white/25 hover:text-white/50 transition-colors">✕</button>

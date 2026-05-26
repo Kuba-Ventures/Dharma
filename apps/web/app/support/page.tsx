@@ -21,7 +21,7 @@ export default function SupportPage() {
           <ol className="list-decimal list-inside space-y-3">
             <li>
               <strong className="text-white/80">Create your account</strong> : visit{" "}
-              <a href="https://dharma-lake.vercel.app" className="text-[#c8f5a0]/80 underline">
+              <a href="https://dharma-lake.vercel.app" className="text-brand-200/80 underline">
                 dharma-lake.vercel.app
               </a>{" "}
               and sign in with your Google account.
@@ -30,7 +30,7 @@ export default function SupportPage() {
               <strong className="text-white/80">Install Dharma in Gmail</strong> : open the{" "}
               <a
                 href="https://workspace.google.com/marketplace/app/dharma/63757021962"
-                className="text-[#c8f5a0]/80 underline"
+                className="text-brand-200/80 underline"
               >
                 Google Workspace Marketplace listing
               </a>{" "}
@@ -38,7 +38,7 @@ export default function SupportPage() {
             </li>
             <li>
               <strong className="text-white/80">Reload Gmail</strong> : refresh{" "}
-              <a href="https://mail.google.com" className="text-[#c8f5a0]/80 underline">
+              <a href="https://mail.google.com" className="text-brand-200/80 underline">
                 mail.google.com
               </a>{" "}
               so the add-on appears in the right sidebar.
@@ -50,7 +50,7 @@ export default function SupportPage() {
             </li>
             <li>
               <strong className="text-white/80">Set your preferences</strong> : visit your{" "}
-              <a href="https://dharma-lake.vercel.app" className="text-[#c8f5a0]/80 underline">
+              <a href="https://dharma-lake.vercel.app" className="text-brand-200/80 underline">
                 dashboard
               </a>{" "}
               to choose tone, enable scheduling, and set up industry-preset labels.
@@ -100,7 +100,7 @@ export default function SupportPage() {
           <div className="mt-4 space-y-2">
             <p>
               <strong className="text-white/80">Email:</strong>{" "}
-              <a href="mailto:finley@qsbsrollover.com" className="text-[#c8f5a0]/80 underline">
+              <a href="mailto:finley@qsbsrollover.com" className="text-brand-200/80 underline">
                 finley@qsbsrollover.com
               </a>
             </p>

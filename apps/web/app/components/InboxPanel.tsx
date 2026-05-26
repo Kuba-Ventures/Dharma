@@ -111,7 +111,7 @@ export default function InboxPanel({ selectedTone }: Props) {
             {/* Right: draft button */}
             <div className="shrink-0">
               {isDrafted ? (
-                <span className="text-[10px] text-[#c8f5a0]/60 bg-[#c8f5a0]/10 px-2 py-1 rounded-lg">
+                <span className="text-[10px] text-label-2/80 bg-label-2/10 px-2 py-1 rounded-lg">
                   Draft saved ✓
                 </span>
               ) : (

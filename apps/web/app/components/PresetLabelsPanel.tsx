@@ -339,7 +339,7 @@ export default function PresetLabelsPanel() {
       </div>
 
       {result && (
-        <p className="text-xs text-[#b57bff] bg-[#b57bff]/10 border border-[#b57bff]/20 rounded-xl px-4 py-2">
+        <p className="text-xs text-brand-400 bg-brand-400/10 border border-brand-400/20 rounded-xl px-4 py-2">
           {result}
         </p>
       )}
@@ -354,7 +354,7 @@ export default function PresetLabelsPanel() {
         <button
           onClick={applyToGmail}
           disabled={applying || syncing}
-          className="w-full py-2.5 text-xs font-medium rounded-xl bg-[#b57bff]/15 border border-[#b57bff]/30 text-[#b57bff] hover:bg-[#b57bff]/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-full py-2.5 text-xs font-medium rounded-xl bg-brand-400/15 border border-brand-400/30 text-brand-400 hover:bg-brand-400/22 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {applying
             ? "Creating labels in Gmail…"
