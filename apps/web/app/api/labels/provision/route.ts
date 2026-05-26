@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   });
   if (!spec || spec.labels.length === 0) {
     return NextResponse.json(
-      { error: "Custom preset needs a name and at least one label" },
+      { error: "Custom preset needs at least one label" },
       { status: 400 }
     );
   }

@@ -95,8 +95,9 @@ function sanitizeLabelSegment(input: string): string {
 /**
  * Resolve a preset to its full spec. For built-ins, returns the hardcoded
  * `LABEL_PRESETS` data. For "Custom", builds the spec from the user-supplied
- * name + labels, prefixing each Gmail label with the preset name so they nest
- * cleanly in Gmail's sidebar.
+ * labels. If the user provided a preset name, each Gmail label is prefixed
+ * with it (so labels nest under a parent folder); if blank, labels are
+ * created flat at the top level of the Gmail sidebar.
  */
 export function resolvePresetSpec(args: {
   preset: string;
@@ -114,7 +115,6 @@ export function resolvePresetSpec(args: {
   if (args.preset !== "Custom") return null;
 
   const name = sanitizeLabelSegment(args.customName ?? "");
-  if (!name) return null;
 
   const raw = Array.isArray(args.customLabels) ? args.customLabels : [];
   const labels: PresetLabel[] = raw
@@ -125,7 +125,7 @@ export function resolvePresetSpec(args: {
       const colorKey: GmailColorKey = (o.colorKey ?? "gray") as GmailColorKey;
       const displayHex = o.displayHex ?? "#999999";
       return {
-        name: `${name}/${shortName}`,
+        name: name ? `${name}/${shortName}` : shortName,
         shortName,
         colorKey,
         displayHex,
@@ -133,5 +133,5 @@ export function resolvePresetSpec(args: {
     })
     .filter((x): x is PresetLabel => x !== null);
 
-  return { displayName: name, labelPrefix: name, labels };
+  return { displayName: name || "Custom", labelPrefix: name, labels };
 }

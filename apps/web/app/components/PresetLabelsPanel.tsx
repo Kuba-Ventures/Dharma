@@ -134,11 +134,6 @@ export default function PresetLabelsPanel() {
         const cleaned = customLabels
           .map((l) => ({ ...l, shortName: l.shortName.trim() }))
           .filter((l) => l.shortName);
-        if (!customName.trim()) {
-          setResult("Add a preset name (e.g. \"Kuba Ventures\").");
-          setApplying(false);
-          return;
-        }
         if (cleaned.length === 0) {
           setResult("Add at least one label.");
           setApplying(false);
@@ -182,8 +177,8 @@ export default function PresetLabelsPanel() {
         const cleaned = customLabels
           .map((l) => ({ ...l, shortName: l.shortName.trim() }))
           .filter((l) => l.shortName);
-        if (!customName.trim() || cleaned.length === 0) {
-          setResult("Add a preset name and at least one label first.");
+        if (cleaned.length === 0) {
+          setResult("Add at least one label first.");
           setSyncing(false);
           return;
         }
@@ -244,11 +239,12 @@ export default function PresetLabelsPanel() {
   }
 
   const presetIsCustom = preset === "Custom";
+  const customPrefix = customName.trim();
   const previewLabels: PresetLabel[] = presetIsCustom
     ? customLabels
         .filter((l) => l.shortName.trim())
         .map((l) => ({
-          name: `${customName.trim() || "Custom"}/${l.shortName.trim()}`,
+          name: customPrefix ? `${customPrefix}/${l.shortName.trim()}` : l.shortName.trim(),
           displayHex: l.displayHex,
         }))
     : BUILT_IN_LABELS[preset as Exclude<PresetKey, "Custom">];
@@ -273,16 +269,22 @@ export default function PresetLabelsPanel() {
       {presetIsCustom && (
         <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 space-y-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] text-white/30 uppercase tracking-widest">Preset name</label>
+            <label className="text-[10px] text-white/30 uppercase tracking-widest">
+              Preset name <span className="text-white/20 normal-case tracking-normal">(optional)</span>
+            </label>
             <input
               type="text"
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              placeholder="e.g. Kuba Ventures"
+              placeholder="e.g. Kuba Ventures — leave blank for top-level labels"
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-white/25"
             />
             <p className="text-[10px] text-white/25">
-              Used as the Gmail folder prefix: <code className="text-white/40">{(customName.trim() || "Name")}/Label-Name</code>
+              {customName.trim() ? (
+                <>Used as the Gmail folder prefix: <code className="text-white/40">{customName.trim()}/Label-Name</code></>
+              ) : (
+                <>No prefix — labels are created at the top level of your Gmail sidebar.</>
+              )}
             </p>
           </div>
 
@@ -356,7 +358,7 @@ export default function PresetLabelsPanel() {
         >
           {applying
             ? "Creating labels in Gmail…"
-            : `Apply ${presetIsCustom ? (customName.trim() || "Custom") : preset} labels to Gmail`}
+            : `Apply ${presetIsCustom ? (customPrefix || "custom") : preset} labels to Gmail`}
         </button>
         <button
           onClick={syncInbox}
