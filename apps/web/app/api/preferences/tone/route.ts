@@ -67,14 +67,16 @@ export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     tone?: string;
     toneProfile?: string;
+    toneSummary?: string;
     toneExample?: string;
     inferredIntro?: string | null;
     inferredSignOff?: string | null;
   };
 
   if (
-    !body.tone &&
+    body.tone === undefined &&
     body.toneProfile === undefined &&
+    body.toneSummary === undefined &&
     body.toneExample === undefined &&
     body.inferredIntro === undefined &&
     body.inferredSignOff === undefined
@@ -85,12 +87,14 @@ export async function POST(req: NextRequest) {
   const data: {
     tone?: string;
     toneProfile?: string;
+    toneSummary?: string;
     toneExample?: string;
     inferredIntro?: string | null;
     inferredSignOff?: string | null;
   } = {};
-  if (body.tone) data.tone = body.tone;
+  if (body.tone !== undefined) data.tone = body.tone;
   if (body.toneProfile !== undefined) data.toneProfile = body.toneProfile;
+  if (body.toneSummary !== undefined) data.toneSummary = body.toneSummary;
   if (body.toneExample !== undefined) data.toneExample = body.toneExample;
   if (body.inferredIntro !== undefined) data.inferredIntro = body.inferredIntro || null;
   if (body.inferredSignOff !== undefined) data.inferredSignOff = body.inferredSignOff || null;
@@ -101,6 +105,7 @@ export async function POST(req: NextRequest) {
     select: {
       tone: true,
       toneProfile: true,
+      toneSummary: true,
       toneExample: true,
       inferredIntro: true,
       inferredSignOff: true,
