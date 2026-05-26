@@ -24,15 +24,16 @@ export interface CustomPresetLabel {
 export interface PresetSpec {
   /** Human-friendly name for the preset (e.g. "VC" or "Kuba Ventures"). */
   displayName: string;
-  /** Prefix prepended to every Gmail label (e.g. "Dharma" → "Dharma/Portfolio"). */
+  /** Prefix prepended to every Gmail label. Empty for built-in presets (flat
+   *  top-level labels); set to the user's typed name for Custom presets. */
   labelPrefix: string;
   labels: PresetLabel[];
 }
 
 export interface PresetLabel {
-  /** Full label name as it will appear in Gmail (e.g. "Dharma/Portfolio"). */
+  /** Full label name as it will appear in Gmail (e.g. "Portfolio"). */
   name: string;
-  /** Short label key used for classification prompts (the part after "Dharma/"). */
+  /** Short label key used for classification prompts. */
   shortName: string;
   /** Gmail palette color key — must match a key in lib/gmail.ts GMAIL_COLORS. */
   colorKey: GmailColorKey;
@@ -40,34 +41,34 @@ export interface PresetLabel {
   displayHex: string;
 }
 
-export const HIGH_PRIORITY_NAME = "Dharma/High-Priority";
+export const HIGH_PRIORITY_NAME = "High-Priority";
 
 export const LABEL_PRESETS: Record<BuiltInPresetKey, PresetLabel[]> = {
   VC: [
-    { name: "Dharma/Portfolio",     shortName: "Portfolio",     colorKey: "green",  displayHex: "#16a765" },
-    { name: "Dharma/Deal-Flow",     shortName: "Deal-Flow",     colorKey: "red",    displayHex: "#fb4c2f" },
-    { name: "Dharma/LP-Relations",  shortName: "LP-Relations",  colorKey: "blue",   displayHex: "#4a86e8" },
-    { name: "Dharma/Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
+    { name: "Portfolio",     shortName: "Portfolio",     colorKey: "green",  displayHex: "#16a765" },
+    { name: "Deal-Flow",     shortName: "Deal-Flow",     colorKey: "red",    displayHex: "#fb4c2f" },
+    { name: "LP-Relations",  shortName: "LP-Relations",  colorKey: "blue",   displayHex: "#4a86e8" },
+    { name: "Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
+    { name: "High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
   ],
   PE: [
-    { name: "Dharma/Portfolio-Co",  shortName: "Portfolio-Co",  colorKey: "green",  displayHex: "#16a765" },
-    { name: "Dharma/Deal",          shortName: "Deal",          colorKey: "red",    displayHex: "#fb4c2f" },
-    { name: "Dharma/Diligence",     shortName: "Diligence",     colorKey: "blue",   displayHex: "#4a86e8" },
-    { name: "Dharma/Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
+    { name: "Portfolio-Co",  shortName: "Portfolio-Co",  colorKey: "green",  displayHex: "#16a765" },
+    { name: "Deal",          shortName: "Deal",          colorKey: "red",    displayHex: "#fb4c2f" },
+    { name: "Diligence",     shortName: "Diligence",     colorKey: "blue",   displayHex: "#4a86e8" },
+    { name: "Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
+    { name: "High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
   ],
   Legal: [
-    { name: "Dharma/Contracts",     shortName: "Contracts",     colorKey: "red",    displayHex: "#fb4c2f" },
-    { name: "Dharma/Client",        shortName: "Client",        colorKey: "green",  displayHex: "#16a765" },
-    { name: "Dharma/Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
+    { name: "Contracts",     shortName: "Contracts",     colorKey: "red",    displayHex: "#fb4c2f" },
+    { name: "Client",        shortName: "Client",        colorKey: "green",  displayHex: "#16a765" },
+    { name: "Internal",      shortName: "Internal",      colorKey: "purple", displayHex: "#8e63ce" },
+    { name: "High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
   ],
   General: [
-    { name: "Dharma/Respond",       shortName: "Respond",       colorKey: "red",    displayHex: "#fb4c2f" },
-    { name: "Dharma/Meeting",       shortName: "Meeting",       colorKey: "blue",   displayHex: "#4a86e8" },
-    { name: "Dharma/Informational", shortName: "Informational", colorKey: "purple", displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
+    { name: "Respond",       shortName: "Respond",       colorKey: "red",    displayHex: "#fb4c2f" },
+    { name: "Meeting",       shortName: "Meeting",       colorKey: "blue",   displayHex: "#4a86e8" },
+    { name: "Informational", shortName: "Informational", colorKey: "purple", displayHex: "#8e63ce" },
+    { name: "High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
   ],
 };
 
@@ -105,7 +106,7 @@ export function resolvePresetSpec(args: {
   if (isBuiltInPresetKey(args.preset)) {
     return {
       displayName: args.preset,
-      labelPrefix: "Dharma",
+      labelPrefix: "",
       labels: LABEL_PRESETS[args.preset],
     };
   }

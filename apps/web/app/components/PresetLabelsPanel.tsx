@@ -30,30 +30,30 @@ const DEFAULT_COLOR_HEX = "#4a86e8"; // vibrant blue (row 1)
 
 const BUILT_IN_LABELS: Record<Exclude<PresetKey, "Custom">, PresetLabel[]> = {
   VC: [
-    { name: "Dharma/Portfolio",     displayHex: "#16a765" },
-    { name: "Dharma/Deal-Flow",     displayHex: "#fb4c2f" },
-    { name: "Dharma/LP-Relations",  displayHex: "#4a86e8" },
-    { name: "Dharma/Internal",      displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", displayHex: "#ffad47" },
+    { name: "Portfolio",     displayHex: "#16a765" },
+    { name: "Deal-Flow",     displayHex: "#fb4c2f" },
+    { name: "LP-Relations",  displayHex: "#4a86e8" },
+    { name: "Internal",      displayHex: "#8e63ce" },
+    { name: "High-Priority", displayHex: "#ffad47" },
   ],
   PE: [
-    { name: "Dharma/Portfolio-Co",  displayHex: "#16a765" },
-    { name: "Dharma/Deal",          displayHex: "#fb4c2f" },
-    { name: "Dharma/Diligence",     displayHex: "#4a86e8" },
-    { name: "Dharma/Internal",      displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", displayHex: "#ffad47" },
+    { name: "Portfolio-Co",  displayHex: "#16a765" },
+    { name: "Deal",          displayHex: "#fb4c2f" },
+    { name: "Diligence",     displayHex: "#4a86e8" },
+    { name: "Internal",      displayHex: "#8e63ce" },
+    { name: "High-Priority", displayHex: "#ffad47" },
   ],
   Legal: [
-    { name: "Dharma/Contracts",     displayHex: "#fb4c2f" },
-    { name: "Dharma/Client",        displayHex: "#16a765" },
-    { name: "Dharma/Internal",      displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", displayHex: "#ffad47" },
+    { name: "Contracts",     displayHex: "#fb4c2f" },
+    { name: "Client",        displayHex: "#16a765" },
+    { name: "Internal",      displayHex: "#8e63ce" },
+    { name: "High-Priority", displayHex: "#ffad47" },
   ],
   General: [
-    { name: "Dharma/Respond",       displayHex: "#fb4c2f" },
-    { name: "Dharma/Meeting",       displayHex: "#4a86e8" },
-    { name: "Dharma/Informational", displayHex: "#8e63ce" },
-    { name: "Dharma/High-Priority", displayHex: "#ffad47" },
+    { name: "Respond",       displayHex: "#fb4c2f" },
+    { name: "Meeting",       displayHex: "#4a86e8" },
+    { name: "Informational", displayHex: "#8e63ce" },
+    { name: "High-Priority", displayHex: "#ffad47" },
   ],
 };
 
