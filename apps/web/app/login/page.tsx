@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import Image from "next/image";
@@ -12,7 +12,11 @@ function LoginContent() {
   const hint = params.get("hint") ?? "";
   const [forcedEmail, setForcedEmail] = useState(hint);
 
-  function handleSignIn() {
+  async function handleSignIn() {
+    // Clear any stale session cookie first. Auth.js's OAuth callback
+    // otherwise silently links the new Google grant to the JWT cookie's
+    // user — even if the user picks a different Google account.
+    await signOut({ redirect: false });
     const trimmed = forcedEmail.trim();
     if (trimmed) {
       signIn("google", { callbackUrl }, { login_hint: trimmed });
