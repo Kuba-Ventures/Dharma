@@ -2,13 +2,24 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
 function LoginContent() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/";
+  const hint = params.get("hint") ?? "";
+  const [forcedEmail, setForcedEmail] = useState(hint);
+
+  function handleSignIn() {
+    const trimmed = forcedEmail.trim();
+    if (trimmed) {
+      signIn("google", { callbackUrl }, { login_hint: trimmed });
+    } else {
+      signIn("google", { callbackUrl });
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#0c0c0e] flex items-center justify-center px-6">
@@ -33,8 +44,16 @@ function LoginContent() {
             </p>
           </div>
 
+          <input
+            type="email"
+            value={forcedEmail}
+            onChange={(e) => setForcedEmail(e.target.value)}
+            placeholder="Specific Google account (optional)"
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+          />
+
           <button
-            onClick={() => signIn("google", { callbackUrl })}
+            onClick={handleSignIn}
             className="w-full flex items-center justify-center gap-3 bg-white text-[#1a1a1a] font-medium text-sm py-3 px-4 rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all duration-150"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -45,6 +64,10 @@ function LoginContent() {
             </svg>
             Continue with Google
           </button>
+
+          <p className="text-[11px] text-white/30 leading-relaxed">
+            Fill in the email above to skip the Google chooser and sign in with that specific account directly.
+          </p>
 
           <p className="text-[11px] text-white/20 text-center leading-relaxed">
             Gmail + Calendar access required. You control what's automated.
