@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor } from "../../../../lib/tiers";
 import { BADGES, getBadge } from "../../../../lib/badges";
-import { ensureHeaders, readRows } from "../../../../lib/adminSheet";
+import { appendRow, ensureHeaders, readRows } from "../../../../lib/adminSheet";
 
 // Seconds-saved constants — same as /api/metrics + /api/metrics/timeseries.
 const SECONDS_SAVED_PER_DRAFT = 180;
@@ -35,7 +35,9 @@ export async function GET(req: Request) {
   ]);
 
   // --- Pass 1: cumulative seconds + tier ---
-  const users = await prisma.user.findMany({ select: { id: true, email: true } });
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, createdAt: true },
+  });
   for (const u of users) {
     const [draftCount, tagCount] = await Promise.all([
       prisma.usageEvent.count({ where: { userId: u.id, eventType: "draft" } }),
@@ -71,8 +73,34 @@ export async function GET(req: Request) {
     });
   }
 
+  // --- Pass 2.5: ensure every User has a Subscribers row ---
+  // The Subscribers tab is "all tracked users" — so every DB user should be
+  // there. Append-only: existing rows are left untouched so admin edits to
+  // tier / badges / notes survive across runs.
+  const existingSubscribersRows = await readRows("Subscribers");
+  const existingEmails = new Set(
+    existingSubscribersRows
+      .map((r) => (r[0] ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  let backfilled = 0;
+  for (const u of users) {
+    if (!u.email) continue;
+    if (existingEmails.has(u.email.toLowerCase())) continue;
+    await appendRow("Subscribers", [
+      u.email,
+      "", // tier — admin fills in (subscriber/advisor/beta-tester/founder/investor)
+      u.createdAt.toISOString(),
+      "", // stripe_customer_id
+      "", // badges
+      "", // notes
+    ]);
+    backfilled += 1;
+  }
+
   // --- Pass 3: sync identity badges from Subscribers sheet ---
   // Sheet columns: email | tier | started_at | stripe_customer_id | badges | notes
+  // Re-read after backfill so the new rows are included in the badge pass.
   const rows = await readRows("Subscribers");
   const emailToBadgeIds = new Map<string, string[]>();
   for (const r of rows) {
@@ -107,6 +135,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ranAt: new Date().toISOString(),
     usersScanned: users.length,
+    subscribersBackfilled: backfilled,
     sheetRows: rows.length,
     badgesGranted: grantedCount,
   });
