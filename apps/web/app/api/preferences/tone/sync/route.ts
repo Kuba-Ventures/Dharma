@@ -200,11 +200,67 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tone analysis failed" }, { status: 502, headers: CORS });
   }
 
+  // Optional Sonnet 4 second pass: produces a single voice-only sentence
+  // suitable for the "Your voice, summarized" card. Gated by env var so we
+  // can flip it on per environment without code changes. Sonnet costs ~5x
+  // Haiku — gate stays off during alpha.
+  let toneSummary: string | null = null;
+  if (process.env.ENABLE_SONNET_COPY === "true" && process.env.ANTHROPIC_API_KEY) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, name: true },
+      });
+      const firstName =
+        user?.firstName ?? user?.name?.split(" ")[0] ?? "they";
+      const sonnetPrompt = `You are a writing-style observer. Given the style profile and the user's first name, produce ONE sentence that completes: "Dharma writes like ${firstName}: ___".
+
+Style profile: ${result.summary}
+
+Rules: max 18 words. No adverbs like "professionally" or "effectively". No mention of name. Voice description only — concrete, not generic.
+
+Return just the completing phrase. No quotes, no preamble.`;
+
+      const sonnetRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 60,
+          messages: [{ role: "user", content: sonnetPrompt }],
+        }),
+      });
+      if (sonnetRes.ok) {
+        const data = (await sonnetRes.json()) as {
+          content: Array<{ text: string }>;
+          usage?: { input_tokens: number; output_tokens: number };
+        };
+        toneSummary = data.content[0]?.text?.trim()?.replace(/^["']|["']$/g, "") ?? null;
+        if (data.usage) {
+          await logUsage({
+            userId,
+            eventType: "tone_sync",
+            model: "claude-sonnet-4-20250514",
+            usage: data.usage,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[tone/sync] Sonnet summary pass failed:", err);
+      // Non-fatal — fall through to saving Haiku output only.
+    }
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: {
       tone: "My Tone",
       toneProfile: result.summary,
+      toneSummary: toneSummary,
       toneExample: result.example,
       inferredIntro: result.intro || null,
       inferredSignOff: result.signOff || null,
@@ -214,6 +270,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(
     {
       summary: result.summary,
+      toneSummary,
       example: result.example,
       intro: result.intro,
       signOff: result.signOff,
