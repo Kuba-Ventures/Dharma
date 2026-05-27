@@ -8,7 +8,21 @@ export type Badge = {
   title: string;
   description: string;
   kind: "identity" | "achievement";
-  icon: "crown" | "shield" | "flask" | "compass" | "briefcase" | "sparkles" | "waveform" | "tags" | "bolt" | "mountain" | "running" | "radar";
+  icon:
+    | "crown"
+    | "shield"
+    | "flask"
+    | "briefcase"
+    | "users"
+    | "target"
+    | "handshake"
+    | "sparkles"
+    | "waveform"
+    | "tags"
+    | "bolt"
+    | "mountain"
+    | "running"
+    | "radar";
   color: "amber" | "violet" | "blue" | "teal" | "brand";
 };
 
@@ -16,9 +30,11 @@ export const BADGES: Badge[] = [
   // Identity
   { id: "founder", title: "Founder", description: "Builds Dharma.", kind: "identity", icon: "crown", color: "amber" },
   { id: "admin", title: "Admin", description: "Operates the system.", kind: "identity", icon: "shield", color: "violet" },
-  { id: "beta", title: "Beta tester", description: "Joined while the door was still closed.", kind: "identity", icon: "flask", color: "violet" },
-  { id: "advisor", title: "Advisor", description: "Pushes the strategy.", kind: "identity", icon: "compass", color: "blue" },
-  { id: "investor", title: "Investor", description: "Believes in the bet.", kind: "identity", icon: "briefcase", color: "teal" },
+  { id: "beta", title: "Beta tester", description: "Joined while the door was still closed.", kind: "identity", icon: "flask", color: "blue" },
+  { id: "client", title: "Client", description: "Paying customer.", kind: "identity", icon: "briefcase", color: "teal" },
+  { id: "team", title: "Team", description: "Internal staff.", kind: "identity", icon: "users", color: "brand" },
+  { id: "prospect", title: "Prospect", description: "Qualified lead in the pipeline.", kind: "identity", icon: "target", color: "violet" },
+  { id: "partner", title: "Partner", description: "Referral or distribution partner.", kind: "identity", icon: "handshake", color: "amber" },
   // Achievement
   { id: "welcome-aboard", title: "Welcome aboard", description: "Finished onboarding.", kind: "achievement", icon: "sparkles", color: "brand" },
   { id: "tone-deaf-no-more", title: "Tone-deaf no more", description: "Trained Dharma on your sent mail.", kind: "achievement", icon: "waveform", color: "brand" },
@@ -45,8 +61,10 @@ export function identityBadgesForEmail(email: string | null): string[] {
     ["founder", process.env.FOUNDER_EMAILS],
     ["admin", process.env.ADMIN_EMAILS],
     ["beta", process.env.BETA_EMAILS],
-    ["advisor", process.env.ADVISOR_EMAILS],
-    ["investor", process.env.INVESTOR_EMAILS],
+    ["client", process.env.CLIENT_EMAILS],
+    ["team", process.env.TEAM_EMAILS],
+    ["prospect", process.env.PROSPECT_EMAILS],
+    ["partner", process.env.PARTNER_EMAILS],
   ];
   for (const [badge, raw] of lists) {
     if (!raw) continue;

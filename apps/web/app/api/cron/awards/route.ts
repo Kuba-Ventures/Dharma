@@ -98,7 +98,7 @@ export async function GET(req: Request) {
     if (existingEmails.has(u.email.toLowerCase())) continue;
     await appendRow("Subscribers", [
       u.email,
-      "", // tier — admin fills in (subscriber/advisor/beta/founder/investor)
+      "", // tier — admin fills in (client/team/prospect/partner/etc)
       u.createdAt.toISOString(),
       "", // stripe_customer_id
       "", // badges
