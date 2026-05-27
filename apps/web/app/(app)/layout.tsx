@@ -36,7 +36,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
   }
 
-  const signalCount = 0; // wired in commit 8
+  const signalCount = await prisma.signal.count({
+    where: { userId: session.user.id, readAt: null },
+  });
   const locked = false;
 
   return (
