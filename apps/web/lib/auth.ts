@@ -1,9 +1,9 @@
 import NextAuth from "next-auth";
 import { waitUntil } from "@vercel/functions";
 import Google from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { authConfig } from "./auth.config";
 import { prisma } from "./prisma";
+import { makeResilientAdapter } from "./adapter";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -11,7 +11,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error(code, ...message) { console.error("[nextauth error]", code, JSON.stringify(message)); },
     warn(code) { console.warn("[nextauth warn]", code); },
   },
-  adapter: PrismaAdapter(prisma),
+  adapter: makeResilientAdapter(prisma),
 
   providers: [
     Google({
