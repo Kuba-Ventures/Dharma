@@ -5,6 +5,7 @@ import Link from "next/link";
 import { prisma } from "../../lib/prisma";
 import Sidebar from "../components/Sidebar";
 import ProfileChip from "../components/ProfileChip";
+import FeedbackButton from "../components/ui/FeedbackButton";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -52,7 +53,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="text-sm font-bold text-white">Dharma</span>
         </Link>
         <Sidebar locked={locked} signalCount={signalCount} />
-        <div className="mt-auto">
+        <div className="mt-auto space-y-1">
+          <FeedbackButton />
           <ProfileChip user={user} />
         </div>
       </aside>
