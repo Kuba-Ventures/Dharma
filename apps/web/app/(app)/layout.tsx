@@ -19,16 +19,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       image: true,
       tier: true,
       onboardingCompletedAt: true,
+      onboardingStep: true,
     },
   });
   if (!user) redirect("/login");
 
+  // Bounce new users into the onboarding flow. Existing users were backfilled
+  // with onboardingCompletedAt by scripts/backfill-onboarding.mjs.
+  if (!user.onboardingCompletedAt) {
+    const stepUrls = [
+      "/onboarding/step-1-connect",
+      "/onboarding/step-2-city",
+      "/onboarding/step-3-tone",
+      "/onboarding/step-4-labels",
+    ];
+    redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
+  }
+
   const signalCount = 0; // wired in commit 8
-  // Locking is enforced in commit 6 once the onboarding flow exists and
-  // existing users have been backfilled with onboardingCompletedAt. Until then,
-  // pass false so we don't brick anyone who pre-dates onboarding.
   const locked = false;
-  void user.onboardingCompletedAt;
 
   return (
     <div className="flex min-h-screen bg-[color:var(--bg-app)]">
