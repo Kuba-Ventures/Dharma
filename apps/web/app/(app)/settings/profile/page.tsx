@@ -16,7 +16,7 @@ export default async function ProfilePage() {
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
-  const [user, emailsTagged] = await Promise.all([
+  const [user, emailsTagged, userBadges] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -35,6 +35,10 @@ export default async function ProfilePage() {
       },
     }),
     prisma.classifiedThread.count({ where: { userId } }),
+    prisma.userBadge.findMany({
+      where: { userId },
+      select: { badgeId: true },
+    }),
   ]);
 
   if (!user) redirect("/login");
@@ -45,16 +49,21 @@ export default async function ProfilePage() {
     return !!m?.requiredCity;
   });
 
-  const earnedBadges = [
-    ...identityBadgesForEmail(user.email),
-    ...earnedAchievementBadges({
-      onboardingComplete: !!user.onboardingCompletedAt,
-      hasToneSummary: !!(user.toneSummary || user.toneProfile),
-      emailsTaggedTotal: emailsTagged,
-      cumulativeSecondsSaved: user.cumulativeSecondsSaved,
-      achievedGeographicMilestone: geoMilestoneAchieved,
-    }),
-  ];
+  // Three sources, deduped: sheet-granted (UserBadge), env allowlist
+  // (legacy fallback), and derived-from-state.
+  const earnedBadges = Array.from(
+    new Set([
+      ...userBadges.map((b) => b.badgeId),
+      ...identityBadgesForEmail(user.email),
+      ...earnedAchievementBadges({
+        onboardingComplete: !!user.onboardingCompletedAt,
+        hasToneSummary: !!(user.toneSummary || user.toneProfile),
+        emailsTaggedTotal: emailsTagged,
+        cumulativeSecondsSaved: user.cumulativeSecondsSaved,
+        achievedGeographicMilestone: geoMilestoneAchieved,
+      }),
+    ]),
+  );
 
   const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
 

@@ -95,11 +95,26 @@ const AvatarPlaceholder = () => (
 
 function WaitlistForm({ className = "" }: { className?: string }) {
   const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
+    if (!email || submitting) return;
+    setSubmitting(true);
+    try {
+      await fetch("/api/waitlist/join", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email,
+          sourcePage: typeof window !== "undefined" ? window.location.pathname : "/",
+        }),
+      });
+    } catch {
+      // Best-effort. We still show success below; signup is captured in the
+      // request log even if the sheet append fails.
+    }
     setSubmitted(true);
   }
 
@@ -128,9 +143,10 @@ function WaitlistForm({ className = "" }: { className?: string }) {
           />
           <button
             type="submit"
-            className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 bg-foreground text-background hover:bg-white px-6 py-3 rounded-xl font-semibold transition-all"
+            disabled={submitting}
+            className="w-full sm:w-auto flex-shrink-0 flex items-center justify-center gap-2 bg-foreground text-background hover:bg-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-60"
           >
-            <span>Join the Waitlist</span>
+            <span>{submitting ? "Joining…" : "Join the Waitlist"}</span>
             <ArrowRightIcon className="w-4 h-4" />
           </button>
         </div>
