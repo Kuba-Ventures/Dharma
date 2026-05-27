@@ -64,7 +64,7 @@ function sheetId(): string | null {
 // Ensure row 1 of the given tab matches our header expectations. If row 1 is
 // empty, write the headers. If row 1 has content (user already populated it),
 // leave it alone — we trust whoever set it up.
-async function ensureHeaders(tab: TabName): Promise<void> {
+export async function ensureHeaders(tab: TabName): Promise<void> {
   const sheets = client();
   const id = sheetId();
   if (!sheets || !id) return;

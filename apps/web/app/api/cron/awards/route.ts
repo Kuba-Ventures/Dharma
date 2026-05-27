@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor } from "../../../../lib/tiers";
 import { BADGES, getBadge } from "../../../../lib/badges";
-import { readRows } from "../../../../lib/adminSheet";
+import { ensureHeaders, readRows } from "../../../../lib/adminSheet";
 
 // Seconds-saved constants — same as /api/metrics + /api/metrics/timeseries.
 const SECONDS_SAVED_PER_DRAFT = 180;
@@ -25,6 +25,14 @@ export async function GET(req: Request) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // --- Pass 0: stamp tab headers so the sheet shows expected columns even
+  // before any traffic. Idempotent — only writes if row 1 is empty. ---
+  await Promise.all([
+    ensureHeaders("Waitlist"),
+    ensureHeaders("Subscribers"),
+    ensureHeaders("Debugging"),
+  ]);
 
   // --- Pass 1: cumulative seconds + tier ---
   const users = await prisma.user.findMany({ select: { id: true, email: true } });
