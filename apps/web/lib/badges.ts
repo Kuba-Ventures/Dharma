@@ -8,14 +8,15 @@ export type Badge = {
   title: string;
   description: string;
   kind: "identity" | "achievement";
-  icon: "crown" | "flask" | "compass" | "briefcase" | "sparkles" | "waveform" | "tags" | "bolt" | "mountain" | "running" | "radar";
+  icon: "crown" | "shield" | "flask" | "compass" | "briefcase" | "sparkles" | "waveform" | "tags" | "bolt" | "mountain" | "running" | "radar";
   color: "amber" | "violet" | "blue" | "teal" | "brand";
 };
 
 export const BADGES: Badge[] = [
   // Identity
   { id: "founder", title: "Founder", description: "Builds Dharma.", kind: "identity", icon: "crown", color: "amber" },
-  { id: "beta-tester", title: "Beta tester", description: "Joined while the door was still closed.", kind: "identity", icon: "flask", color: "violet" },
+  { id: "admin", title: "Admin", description: "Operates the system.", kind: "identity", icon: "shield", color: "violet" },
+  { id: "beta", title: "Beta tester", description: "Joined while the door was still closed.", kind: "identity", icon: "flask", color: "violet" },
   { id: "advisor", title: "Advisor", description: "Pushes the strategy.", kind: "identity", icon: "compass", color: "blue" },
   { id: "investor", title: "Investor", description: "Believes in the bet.", kind: "identity", icon: "briefcase", color: "teal" },
   // Achievement
@@ -25,6 +26,10 @@ export const BADGES: Badge[] = [
   { id: "marathoner", title: "Marathoner", description: "4+ cumulative hours saved.", kind: "achievement", icon: "running", color: "brand" },
   { id: "mountain-mover", title: "Mountain mover", description: "Unlocked your first geographic milestone.", kind: "achievement", icon: "mountain", color: "brand" },
 ];
+
+// Identity badge IDs only — used to populate the Subscribers sheet dropdown.
+// Achievement badges are derived from user state, never manually granted.
+export const IDENTITY_BADGE_IDS: string[] = BADGES.filter((b) => b.kind === "identity").map((b) => b.id);
 
 export function getBadge(id: string): Badge | undefined {
   return BADGES.find((b) => b.id === id);
@@ -38,7 +43,8 @@ export function identityBadgesForEmail(email: string | null): string[] {
   const ids: string[] = [];
   const lists: Array<[string, string | undefined]> = [
     ["founder", process.env.FOUNDER_EMAILS],
-    ["beta-tester", process.env.BETA_EMAILS],
+    ["admin", process.env.ADMIN_EMAILS],
+    ["beta", process.env.BETA_EMAILS],
     ["advisor", process.env.ADVISOR_EMAILS],
     ["investor", process.env.INVESTOR_EMAILS],
   ];

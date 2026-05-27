@@ -129,6 +129,57 @@ export async function readRows(tab: TabName): Promise<string[][]> {
   }
 }
 
+// Apply a dropdown (data validation) to a column. Uses non-strict mode so
+// the admin can still type comma-separated overrides like "founder,advisor".
+// Idempotent — safe to call every cron run.
+export async function setColumnDropdown(
+  tab: TabName,
+  column: string, // e.g. "E"
+  allowedValues: string[],
+): Promise<void> {
+  const sheets = client();
+  const id = sheetId();
+  if (!sheets || !id) return;
+
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+    const sheet = meta.data.sheets?.find((s) => s.properties?.title === tab);
+    const internalSheetId = sheet?.properties?.sheetId;
+    if (internalSheetId === null || internalSheetId === undefined) return;
+
+    const colIdx = column.toUpperCase().charCodeAt(0) - "A".charCodeAt(0);
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: id,
+      requestBody: {
+        requests: [
+          {
+            setDataValidation: {
+              range: {
+                sheetId: internalSheetId,
+                startRowIndex: 1, // skip header row
+                endRowIndex: 10000,
+                startColumnIndex: colIdx,
+                endColumnIndex: colIdx + 1,
+              },
+              rule: {
+                condition: {
+                  type: "ONE_OF_LIST",
+                  values: allowedValues.map((v) => ({ userEnteredValue: v })),
+                },
+                showCustomUi: true,
+                strict: false, // warn on bad values, don't block comma-separated input
+              },
+            },
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error(`[adminSheet] setColumnDropdown on ${tab}!${column} failed:`, err);
+  }
+}
+
 // Mark a Waitlist row as converted (sets column E to the timestamp). Used
 // when a waitlist email gets promoted to a Subscribers row. No-op if the
 // email isn't on the waitlist.

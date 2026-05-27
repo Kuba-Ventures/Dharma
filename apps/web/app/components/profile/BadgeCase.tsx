@@ -6,6 +6,7 @@ type Props = {
 
 const ICON_PATHS: Record<Badge["icon"], string> = {
   crown: "M2 11l1-5 3 3 2-5 2 5 3-3 1 5z",
+  shield: "M7 1L2 3v4c0 3 2 5 5 6 3-1 5-3 5-6V3L7 1z",
   flask: "M5 2v3L3 11a1.5 1.5 0 0 0 1.5 2h5A1.5 1.5 0 0 0 11 11L9 5V2",
   compass: "M2 7a5 5 0 1 0 10 0 5 5 0 0 0-10 0zM5 9l4-4-1 4-4 1z",
   briefcase: "M2 5h10v7H2zM5 5V3h4v2",

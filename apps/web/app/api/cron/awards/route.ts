@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor } from "../../../../lib/tiers";
-import { BADGES, getBadge } from "../../../../lib/badges";
-import { appendRow, ensureHeaders, readRows } from "../../../../lib/adminSheet";
+import { BADGES, IDENTITY_BADGE_IDS, getBadge } from "../../../../lib/badges";
+import {
+  appendRow,
+  ensureHeaders,
+  readRows,
+  setColumnDropdown,
+} from "../../../../lib/adminSheet";
 
 // Seconds-saved constants — same as /api/metrics + /api/metrics/timeseries.
 const SECONDS_SAVED_PER_DRAFT = 180;
@@ -27,12 +32,16 @@ export async function GET(req: Request) {
   }
 
   // --- Pass 0: stamp tab headers so the sheet shows expected columns even
-  // before any traffic. Idempotent — only writes if row 1 is empty. ---
+  // before any traffic. Idempotent — only writes if row 1 is empty.
+  // Also apply the identity-badge dropdown to Subscribers!E so admins pick
+  // from a valid list instead of free-typing. Non-strict mode allows
+  // comma-separated overrides like "founder,advisor". ---
   await Promise.all([
     ensureHeaders("Waitlist"),
     ensureHeaders("Subscribers"),
     ensureHeaders("Debugging"),
   ]);
+  await setColumnDropdown("Subscribers", "E", IDENTITY_BADGE_IDS);
 
   // --- Pass 1: cumulative seconds + tier ---
   const users = await prisma.user.findMany({
@@ -89,7 +98,7 @@ export async function GET(req: Request) {
     if (existingEmails.has(u.email.toLowerCase())) continue;
     await appendRow("Subscribers", [
       u.email,
-      "", // tier — admin fills in (subscriber/advisor/beta-tester/founder/investor)
+      "", // tier — admin fills in (subscriber/advisor/beta/founder/investor)
       u.createdAt.toISOString(),
       "", // stripe_customer_id
       "", // badges
