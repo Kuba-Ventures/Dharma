@@ -1,0 +1,162 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import Button from "../ui/Button";
+
+type City = { name: string; state: string };
+
+type Props = {
+  user: {
+    image: string | null;
+    name: string | null;
+    firstName: string | null;
+    email: string | null;
+    homeCity: string | null;
+    timezone: string | null;
+    tier: string;
+    createdAt: string;
+  };
+};
+
+export default function IdentityCard({ user }: Props) {
+  const router = useRouter();
+  const [firstName, setFirstName] = useState(user.firstName ?? user.name?.split(" ")[0] ?? "");
+  const [cityQuery, setCityQuery] = useState(user.homeCity ?? "");
+  const [cityMatches, setCityMatches] = useState<Array<City & { timezone: string }>>([]);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  async function searchCity(q: string) {
+    setCityQuery(q);
+    if (!q.trim()) {
+      setCityMatches([]);
+      return;
+    }
+    const res = await fetch(`/api/geo/cities?q=${encodeURIComponent(q)}`);
+    if (res.ok) {
+      const d = (await res.json()) as { matches: Array<City & { timezone: string }> };
+      setCityMatches(d.matches);
+    }
+  }
+
+  async function selectCity(c: City) {
+    setCityQuery(`${c.name}, ${c.state}`);
+    setCityMatches([]);
+    setSaving(true);
+    await fetch("/api/profile/update", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ homeCity: c }),
+    });
+    setSaving(false);
+    setSavedAt(Date.now());
+    router.refresh();
+  }
+
+  async function saveName() {
+    setSaving(true);
+    await fetch("/api/profile/update", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ firstName }),
+    });
+    setSaving(false);
+    setSavedAt(Date.now());
+    router.refresh();
+  }
+
+  const initials = (user.firstName ?? user.name ?? user.email ?? "?").charAt(0).toUpperCase();
+
+  return (
+    <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
+      <div className="flex items-start gap-4">
+        {user.image ? (
+          <Image
+            src={user.image}
+            alt={user.name ?? "You"}
+            width={64}
+            height={64}
+            className="rounded-full"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-400/30 text-2xl font-medium text-brand-100">
+            {initials}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1 space-y-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+              First name
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                onBlur={saveName}
+                className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <p className="mt-0.5 text-[11px] text-white/40">{user.email}</p>
+          </div>
+
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+              Home city
+            </p>
+            <input
+              value={cityQuery}
+              onChange={(e) => searchCity(e.target.value)}
+              placeholder="e.g. San Francisco, CA"
+              className="w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white"
+            />
+            {cityMatches.length > 0 && (
+              <ul className="mt-1 max-h-40 overflow-y-auto rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)]">
+                {cityMatches.map((c) => (
+                  <li key={`${c.name}-${c.state}`}>
+                    <button
+                      type="button"
+                      onClick={() => selectCity(c)}
+                      className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/[0.05]"
+                    >
+                      <span>
+                        {c.name}, {c.state}
+                      </span>
+                      <span className="text-[11px] text-white/40">{c.timezone}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {user.timezone && (
+              <p className="mt-1 text-[11px] text-white/40">
+                Timezone: <span className="text-brand-200">{user.timezone}</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="text-right">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">Tier</p>
+          <p className="font-display text-lg text-brand-200">{user.tier}</p>
+          <p className="mt-1 text-[10px] text-white/30">
+            Joined {new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+          </p>
+        </div>
+      </div>
+
+      {savedAt && (
+        <p className="mt-3 text-[11px] text-[color:var(--label-2)]">Saved.</p>
+      )}
+      {saving && (
+        <p className="mt-3 text-[11px] text-white/40">Saving…</p>
+      )}
+
+      <p className="mt-4 rounded-btn border border-[color:var(--border-brand)] bg-brand-400/8 px-3 py-2 text-[11px] text-white/60">
+        Dharma never shares your name, email, or city. Local data only — used to personalize milestones.
+      </p>
+    </div>
+  );
+}
