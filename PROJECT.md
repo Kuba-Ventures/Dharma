@@ -152,6 +152,7 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 - [ ] First external user test of preset-label + Sync Inbox flow
 - [ ] `apps/web/next-env.d.ts` is uncommitted; decide whether to ignore or commit
 - [x] Loose root-level screenshots and architecture files moved to `docs/screenshots/` and `docs/architecture/` (2026-05-26)
+- [ ] Multi-account switching (GitHub-style) — let one browser session hold multiple signed-in Dharma accounts and swap via the ProfileChip dropdown. Requires custom NextAuth session-token cookie handling (per-account tokens + active-index pointer) and ProfileChip UX. Defer until more users need it; Chrome profiles cover the gap.
 
 ---
 
