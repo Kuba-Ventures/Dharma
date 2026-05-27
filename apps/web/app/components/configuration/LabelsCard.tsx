@@ -173,6 +173,11 @@ export default function LabelsCard({ initial }: Props) {
                 Provisions the preset's labels in your Gmail and starts classifying new mail.
               </p>
             </div>
+
+            <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
+              Labels live in your own Gmail account. Dharma never reads
+              messages outside the threads it's classifying.
+            </p>
           </div>
         )}
       </Card>

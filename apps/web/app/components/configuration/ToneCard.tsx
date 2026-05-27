@@ -248,6 +248,11 @@ export default function ToneCard({ initial }: Props) {
                 {retraining ? "Retraining…" : "Retrain on recent emails"}
               </Button>
             </div>
+
+            <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
+              Dharma reads only your sent mail to learn your voice. Nothing is
+              stored beyond the summary; nothing is shared.
+            </p>
           </div>
         )}
       </Card>
