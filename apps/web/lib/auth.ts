@@ -47,11 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Defensive guard against Account-row corruption: Auth.js resolves the
       // signing-in User by looking up Account.providerAccountId first. If a
       // stale or wrong Account row points the resolved User at a different
-      // email than Google just returned, we abort. This is the corruption
-      // that put finley@qsb's Google sub on the mrfinleyunderwood Account
-      // row — once that bad row was deleted, the fallback to email-based
-      // User lookup did the right thing, and this guard ensures we never
-      // silently link to a wrong-email User again.
+      // email than Google just returned, we abort.
       if (
         account?.provider === "google" &&
         profile?.email &&
