@@ -6,6 +6,8 @@ import {
   BADGE_ICON_PATHS,
   BASQUIAT_OUTLINE,
   BASQUIAT_YELLOW,
+  JEWEL_FILL,
+  JEWEL_STROKE,
 } from "../../lib/badgeIcons";
 
 type Props = {
@@ -54,12 +56,12 @@ export default function ProfileChip({ user, displayBadge }: Props) {
               <svg width="22" height="22" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[displayBadge.icon]}
-                  stroke={displayBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
+                  stroke={JEWEL_STROKE[displayBadge.color]}
                   strokeWidth={displayBadge.color === "yellow" ? 1.8 : 1.4}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  fill={displayBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
-                  fillOpacity={displayBadge.color === "yellow" ? 1 : 0.6}
+                  fill={JEWEL_FILL[displayBadge.color]}
+                  fillOpacity={1}
                 />
               </svg>
             </span>

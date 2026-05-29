@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import type { Badge } from "../../../lib/badges";
@@ -9,6 +9,8 @@ import {
   BADGE_COLOR_BG,
   BASQUIAT_OUTLINE,
   BASQUIAT_YELLOW,
+  JEWEL_FILL,
+  JEWEL_STROKE,
 } from "../../../lib/badgeIcons";
 
 type City = { name: string; state: string };
@@ -42,6 +44,14 @@ export default function IdentityCard({
   const [imageBroken, setImageBroken] = useState(false);
   const [showBadgePicker, setShowBadgePicker] = useState(false);
   const [chosenBadge, setChosenBadge] = useState<Badge | null>(displayBadge);
+
+  // Re-sync local state with the prop after parent re-renders (e.g. after
+  // BadgeCase's setDisplay → router.refresh()). Without this, picking a
+  // badge from the BadgeCase grid wouldn't update the avatar overlay
+  // until a manual page reload.
+  useEffect(() => {
+    setChosenBadge(displayBadge);
+  }, [displayBadge]);
 
   async function pickDisplayBadge(b: Badge | null) {
     setChosenBadge(b);
@@ -153,12 +163,12 @@ export default function IdentityCard({
               <svg width="42" height="42" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[chosenBadge.icon]}
-                  stroke={chosenBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
-                  strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.2}
+                  stroke={JEWEL_STROKE[chosenBadge.color]}
+                  strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.3}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  fill={chosenBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
-                  fillOpacity={chosenBadge.color === "yellow" ? 1 : 0.6}
+                  fill={JEWEL_FILL[chosenBadge.color]}
+                  fillOpacity={1}
                 />
               </svg>
             </button>
@@ -197,12 +207,12 @@ export default function IdentityCard({
                       <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
                         <path
                           d={BADGE_ICON_PATHS[b.icon]}
-                          stroke={b.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
-                          strokeWidth={b.color === "yellow" ? 1.6 : 1.2}
+                          stroke={JEWEL_STROKE[b.color]}
+                          strokeWidth={1.3}
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          fill={b.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
-                          fillOpacity={b.color === "yellow" ? 1 : 0.2}
+                          fill={JEWEL_FILL[b.color]}
+                          fillOpacity={1}
                         />
                       </svg>
                     </span>
