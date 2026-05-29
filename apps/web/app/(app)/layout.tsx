@@ -3,6 +3,12 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "../../lib/prisma";
+import {
+  BADGES,
+  getBadge,
+  identityBadgesForEmail,
+  earnedAchievementBadges,
+} from "../../lib/badges";
 import Sidebar from "../components/Sidebar";
 import ProfileChip from "../components/ProfileChip";
 import FeedbackButton from "../components/ui/FeedbackButton";
@@ -19,6 +25,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       email: true,
       image: true,
       tier: true,
+      displayBadgeId: true,
+      cumulativeSecondsSaved: true,
+      toneSummary: true,
+      toneProfile: true,
+      homeCity: true,
       onboardingCompletedAt: true,
       onboardingStep: true,
     },
@@ -37,9 +48,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
   }
 
-  const signalCount = await prisma.signal.count({
-    where: { userId: session.user.id, readAt: null },
-  });
+  const [signalCount, emailsTagged, userBadges] = await Promise.all([
+    prisma.signal.count({
+      where: { userId: session.user.id, readAt: null },
+    }),
+    prisma.classifiedThread.count({ where: { userId: session.user.id } }),
+    prisma.userBadge.findMany({
+      where: { userId: session.user.id },
+      select: { badgeId: true },
+    }),
+  ]);
+
+  // Compute the display badge for the sidebar avatar. Same logic as the
+  // Profile page so what the user picks there reflects in the chip too.
+  const earnedIds = new Set([
+    ...userBadges.map((b) => b.badgeId),
+    ...identityBadgesForEmail(user.email),
+    ...earnedAchievementBadges({
+      onboardingComplete: !!user.onboardingCompletedAt,
+      hasToneSummary: !!(user.toneSummary || user.toneProfile),
+      emailsTaggedTotal: emailsTagged,
+      cumulativeSecondsSaved: user.cumulativeSecondsSaved,
+      // homeCity drives geographic milestone derivation; we don't run that
+      // full resolution here, so this approximation is conservative.
+      achievedGeographicMilestone: false,
+    }),
+  ]);
+  const displayBadge =
+    (user.displayBadgeId &&
+    getBadge(user.displayBadgeId) &&
+    earnedIds.has(user.displayBadgeId)
+      ? getBadge(user.displayBadgeId)
+      : null) ??
+    BADGES.find((b) => b.kind === "identity" && earnedIds.has(b.id)) ??
+    null;
   const locked = false;
 
   return (
@@ -55,7 +97,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar locked={locked} signalCount={signalCount} />
         <div className="mt-auto space-y-1">
           <FeedbackButton />
-          <ProfileChip user={user} />
+          <ProfileChip user={user} displayBadge={displayBadge} />
         </div>
       </aside>
 

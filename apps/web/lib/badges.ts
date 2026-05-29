@@ -23,12 +23,12 @@ export type Badge = {
     | "mountain"
     | "running"
     | "radar";
-  color: "amber" | "violet" | "blue" | "teal" | "brand";
+  color: "amber" | "violet" | "blue" | "teal" | "brand" | "yellow";
 };
 
 export const BADGES: Badge[] = [
   // Identity
-  { id: "founder", title: "Founder", description: "Builds Dharma.", kind: "identity", icon: "crown", color: "amber" },
+  { id: "founder", title: "Founder", description: "Builds Dharma.", kind: "identity", icon: "crown", color: "yellow" },
   { id: "admin", title: "Admin", description: "Operates the system.", kind: "identity", icon: "shield", color: "violet" },
   { id: "beta", title: "Beta tester", description: "Joined while the door was still closed.", kind: "identity", icon: "flask", color: "blue" },
   { id: "client", title: "Client", description: "Paying customer.", kind: "identity", icon: "briefcase", color: "teal" },

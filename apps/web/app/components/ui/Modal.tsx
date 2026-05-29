@@ -6,9 +6,16 @@ type Props = {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  size?: "md" | "lg" | "xl";
 };
 
-export default function Modal({ open, onClose, children }: Props) {
+const SIZE_CLASS: Record<NonNullable<Props["size"]>, string> = {
+  md: "max-w-md",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+};
+
+export default function Modal({ open, onClose, children, size = "md" }: Props) {
   const ref = useRef<HTMLDialogElement | null>(null);
 
   useEffect(() => {
@@ -34,7 +41,7 @@ export default function Modal({ open, onClose, children }: Props) {
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className="w-full max-w-md rounded-hero border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)] p-6 text-white backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+      className={`w-full ${SIZE_CLASS[size]} max-h-[85vh] overflow-hidden rounded-hero border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)] p-6 text-white backdrop:bg-black/60 backdrop:backdrop-blur-sm`}
     >
       {children}
     </dialog>
