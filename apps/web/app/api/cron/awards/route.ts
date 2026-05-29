@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor } from "../../../../lib/tiers";
 import { BADGES, IDENTITY_BADGE_IDS, getBadge } from "../../../../lib/badges";
+import { MILESTONES, unlockedMilestoneIds } from "../../../../lib/milestones";
 import {
   appendRow,
   ensureHeaders,
@@ -43,10 +44,11 @@ export async function GET(req: Request) {
   ]);
   await setColumnDropdown("Subscribers", "E", IDENTITY_BADGE_IDS);
 
-  // --- Pass 1: cumulative seconds + tier ---
+  // --- Pass 1: cumulative seconds + tier + milestone persistence ---
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, createdAt: true },
+    select: { id: true, email: true, createdAt: true, homeCity: true },
   });
+  let milestonesAwarded = 0;
   for (const u of users) {
     const [draftCount, tagCount] = await Promise.all([
       prisma.usageEvent.count({ where: { userId: u.id, eventType: "draft" } }),
@@ -59,6 +61,48 @@ export async function GET(req: Request) {
       where: { id: u.id },
       data: { cumulativeSecondsSaved, tier },
     });
+
+    // Persist milestone unlocks. MilestoneDef rows are upserted lazily — the
+    // in-memory library at lib/milestones.ts is the source of truth; this
+    // mirrors what's been unlocked so the UI can highlight fresh ones.
+    const unlockedIds = unlockedMilestoneIds(
+      cumulativeSecondsSaved,
+      u.homeCity,
+    );
+    for (const milestoneId of unlockedIds) {
+      const def = MILESTONES.find((m) => m.id === milestoneId);
+      if (!def) continue;
+      await prisma.milestoneDef.upsert({
+        where: { id: def.id },
+        create: {
+          id: def.id,
+          category: def.category,
+          title: def.title,
+          description: def.description,
+          threshold: def.threshold,
+          copyTemplate: def.title,
+          gradient: def.gradient,
+        },
+        update: {
+          category: def.category,
+          title: def.title,
+          description: def.description,
+          threshold: def.threshold,
+          gradient: def.gradient,
+        },
+      });
+      const created = await prisma.userMilestone.upsert({
+        where: {
+          userId_milestoneId: { userId: u.id, milestoneId: def.id },
+        },
+        create: { userId: u.id, milestoneId: def.id },
+        update: {},
+        select: { id: true, achievedAt: true },
+      });
+      // Count only fresh awards (achievedAt within last 24h of cron run).
+      const ageMs = Date.now() - created.achievedAt.getTime();
+      if (ageMs < 24 * 60 * 60 * 1000) milestonesAwarded += 1;
+    }
   }
 
   // --- Pass 2: ensure BadgeDef rows exist for everything in lib/badges.ts ---
@@ -147,5 +191,6 @@ export async function GET(req: Request) {
     subscribersBackfilled: backfilled,
     sheetRows: rows.length,
     badgesGranted: grantedCount,
+    milestonesAwarded,
   });
 }

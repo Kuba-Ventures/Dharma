@@ -24,10 +24,17 @@ export async function GET() {
       homeCity: true,
       firstName: true,
       name: true,
+      tier: true,
+      lastSeenTier: true,
     },
   });
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const tierUp =
+    user.tier && user.tier !== (user.lastSeenTier ?? "Apprentice")
+      ? { from: user.lastSeenTier, to: user.tier }
+      : null;
 
   const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
   const unlocked = unlockedMilestoneIds(
@@ -76,5 +83,7 @@ export async function GET() {
     cumulativeSecondsSaved: user.cumulativeSecondsSaved,
     homeCity: user.homeCity,
     firstName,
+    tier: user.tier,
+    tierUp,
   });
 }
