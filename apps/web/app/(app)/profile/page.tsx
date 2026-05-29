@@ -113,7 +113,10 @@ export default async function ProfilePage() {
 
       <TierLadder secondsSaved={user.cumulativeSecondsSaved} />
 
-      <BadgeCase earnedIds={earnedBadges} />
+      <BadgeCase
+        earnedIds={earnedBadges}
+        displayBadgeId={user.displayBadgeId}
+      />
 
       <MilestoneLibrary
         secondsSaved={user.cumulativeSecondsSaved}
