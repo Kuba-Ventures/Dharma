@@ -8,6 +8,8 @@ import {
   BADGE_ICON_PATHS,
   BASQUIAT_OUTLINE,
   BASQUIAT_YELLOW,
+  JEWEL_FILL,
+  JEWEL_STROKE,
 } from "../../../lib/badgeIcons";
 import Modal from "../ui/Modal";
 
@@ -128,12 +130,12 @@ function BadgeChip({
       <svg width="40" height="40" viewBox="0 0 14 14" fill="none">
         <path
           d={BADGE_ICON_PATHS[badge.icon]}
-          stroke={basquiat ? BASQUIAT_OUTLINE : "currentColor"}
-          strokeWidth={basquiat ? 1.6 : 1.2}
+          stroke={earned ? JEWEL_STROKE[badge.color] : "currentColor"}
+          strokeWidth={basquiat ? 1.6 : earned ? 1.3 : 1.2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          fill={basquiat ? BASQUIAT_YELLOW : earned ? "currentColor" : "none"}
-          fillOpacity={basquiat ? 1 : earned ? 0.7 : 0}
+          fill={earned ? JEWEL_FILL[badge.color] : "none"}
+          fillOpacity={earned ? 1 : 0}
         />
       </svg>
       <p className={`mt-2 text-center text-[11px] ${earned ? "" : "text-white/40"}`}>

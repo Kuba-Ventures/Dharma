@@ -40,3 +40,24 @@ export const BADGE_COLOR_BG: Record<Badge["color"], string> = {
 // can't leave the crown drawing black.
 export const BASQUIAT_YELLOW = "#FBD23D";
 export const BASQUIAT_OUTLINE = "#1A1A1A";
+
+// Jewel-tone fills used directly on the SVG path for earned badges, so the
+// silhouettes pop as vivid gems instead of faint tinted outlines. Each color
+// gets a saturated mid-deep hue + a slightly darker stroke for definition.
+export const JEWEL_FILL: Record<Badge["color"], string> = {
+  amber: "#F97316", // topaz
+  violet: "#8B5CF6", // amethyst
+  blue: "#2563EB", // sapphire
+  teal: "#10B981", // emerald
+  brand: "#6366F1", // tanzanite
+  yellow: BASQUIAT_YELLOW,
+};
+
+export const JEWEL_STROKE: Record<Badge["color"], string> = {
+  amber: "#9A3412", // dark topaz
+  violet: "#5B21B6", // dark amethyst
+  blue: "#1E3A8A", // dark sapphire
+  teal: "#065F46", // dark emerald
+  brand: "#3730A3", // dark tanzanite
+  yellow: BASQUIAT_OUTLINE,
+};
