@@ -4,7 +4,8 @@
 import type { Badge } from "./badges";
 
 export const BADGE_ICON_PATHS: Record<Badge["icon"], string> = {
-  crown: "M2 11l1-5 3 3 2-5 2 5 3-3 1 5z",
+  // Basquiat-style three-peak crown — irregular heights, slight tilt.
+  crown: "M2.5 11 L4 3 L6 9 L8 1.5 L10 9 L12 4 L13.5 11.5 Z",
   shield: "M7 1L2 3v4c0 3 2 5 5 6 3-1 5-3 5-6V3L7 1z",
   flask: "M5 2v3L3 11a1.5 1.5 0 0 0 1.5 2h5A1.5 1.5 0 0 0 11 11L9 5V2",
   briefcase: "M2 5h10v7H2zM5 5V3h4v2",
