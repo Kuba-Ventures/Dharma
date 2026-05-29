@@ -72,6 +72,23 @@ const NAV: Item[] = [
     ),
   },
   {
+    label: "Profile",
+    href: "/profile",
+    lockable: true,
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="7.5" cy="5" r="2.6" fill="currentColor" fillOpacity="0.85" />
+        <path
+          d="M2.2 13.5 C2.2 10.3 4.7 8.5 7.5 8.5 C10.3 8.5 12.8 10.3 12.8 13.5"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          fill="none"
+          opacity="0.85"
+        />
+      </svg>
+    ),
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: (

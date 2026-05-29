@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "../../lib/auth";
 
@@ -20,16 +19,18 @@ export default function ProfileChip({ user }: Props) {
   return (
     <div className="mt-3 flex items-center gap-1.5 border-t border-[color:var(--border-subtle)] pt-3">
       <Link
-        href="/settings/profile"
+        href="/profile"
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-card p-1.5 transition-colors hover:bg-white/[0.04]"
       >
         {user.image ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={user.image}
             alt={displayName}
             width={28}
             height={28}
-            className="rounded-full"
+            className="h-7 w-7 rounded-full object-cover"
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-400/30 text-[11px] font-medium text-brand-100">

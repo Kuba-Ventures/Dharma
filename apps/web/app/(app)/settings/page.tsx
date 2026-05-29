@@ -2,11 +2,6 @@ import Link from "next/link";
 
 const SECTIONS = [
   {
-    href: "/settings/profile",
-    title: "Profile",
-    description: "Your name, home city, tier, badges, and milestones.",
-  },
-  {
     href: "/configuration",
     title: "Tone, labels, scheduling",
     description: "Configure the three features Dharma runs on your behalf.",

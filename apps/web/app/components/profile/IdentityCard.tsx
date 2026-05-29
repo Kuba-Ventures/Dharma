@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 
@@ -27,6 +26,7 @@ export default function IdentityCard({ user }: Props) {
   const [cityMatches, setCityMatches] = useState<Array<City & { timezone: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [imageBroken, setImageBroken] = useState(false);
 
   async function searchCity(q: string) {
     setCityQuery(q);
@@ -94,13 +94,19 @@ export default function IdentityCard({ user }: Props) {
   return (
     <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
       <div className="flex items-start gap-4">
-        {user.image ? (
-          <Image
+        {user.image && !imageBroken ? (
+          // Plain <img> bypasses Next.js Image's domain rules. Google avatar
+          // URLs occasionally fail (CORS, expired token); onError falls back
+          // to the initials circle.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={user.image}
             alt={user.name ?? "You"}
             width={64}
             height={64}
-            className="rounded-full"
+            className="h-16 w-16 rounded-full object-cover"
+            onError={() => setImageBroken(true)}
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-400/30 text-2xl font-medium text-brand-100">
