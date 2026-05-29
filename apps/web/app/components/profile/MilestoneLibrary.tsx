@@ -3,11 +3,13 @@ import {
   applyTemplate,
   unlockedMilestoneIds,
 } from "../../../lib/milestones";
+import ShareCardButton from "./ShareCardButton";
 
 type Props = {
   secondsSaved: number;
   homeCity: string | null;
   firstName: string | null;
+  tier: string;
 };
 
 function formatSeconds(s: number): string {
@@ -21,6 +23,7 @@ export default function MilestoneLibrary({
   secondsSaved,
   homeCity,
   firstName,
+  tier,
 }: Props) {
   const unlockedSet = new Set(unlockedMilestoneIds(secondsSaved, homeCity));
 
@@ -56,9 +59,18 @@ export default function MilestoneLibrary({
             className="rounded-card border border-[color:var(--border-subtle)] p-3"
             style={{ background: m.gradient }}
           >
-            <p className="text-sm font-medium text-white">
-              {applyTemplate(m.title, { firstName, city: homeCity })}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium text-white">
+                {applyTemplate(m.title, { firstName, city: homeCity })}
+              </p>
+              <ShareCardButton
+                milestoneId={m.id}
+                firstName={firstName}
+                city={homeCity}
+                tier={tier}
+                secondsSaved={secondsSaved}
+              />
+            </div>
             <p className="mt-1 text-[12px] text-white/70">
               {applyTemplate(m.description, { firstName, city: homeCity })}
             </p>

@@ -97,6 +97,7 @@ export default async function ProfilePage() {
         secondsSaved={user.cumulativeSecondsSaved}
         homeCity={user.homeCity}
         firstName={firstName}
+        tier={user.tier}
       />
     </div>
   );

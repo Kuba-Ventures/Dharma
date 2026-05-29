@@ -26,6 +26,7 @@
     "@dharma/types": "*",
     "@prisma/client": "^5.22.0",
     "@vercel/functions": "^3.4.3",
+    "@vercel/og": "^0.11.1",
     "next": "^16.2.1",
     "next-auth": "^5.0.0-beta.25",
     "react": "^18.3.1",

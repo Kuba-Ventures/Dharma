@@ -21,7 +21,9 @@ export default auth((req) => {
     pathname.startsWith("/api/user/preferences") ||
     pathname.startsWith("/api/waitlist/") ||
     pathname.startsWith("/api/geo/") ||
-    pathname.startsWith("/api/cron/");
+    pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/share/") ||
+    pathname.startsWith("/share/");
 
   if (!isLoggedIn && !isPublic) {
     const loginUrl = new URL("/login", req.url);
