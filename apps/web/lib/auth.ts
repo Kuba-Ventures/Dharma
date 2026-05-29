@@ -44,18 +44,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async signIn({ user, account, profile }) {
-      // [AUTH-DEBUG] capture exactly what Google returned and which Dharma
-      // User Auth.js resolved to. Inspect via Vercel runtime logs.
-      console.warn(
-        "[auth-debug] signIn fired",
-        JSON.stringify({
-          provider: account?.provider,
-          providerAccountId: account?.providerAccountId,
-          profileEmail: profile?.email,
-          userEmail: user?.email,
-          userId: user?.id,
-        }),
-      );
+      // Defensive guard against Account-row corruption: Auth.js resolves the
+      // signing-in User by looking up Account.providerAccountId first. If a
+      // stale or wrong Account row points the resolved User at a different
+      // email than Google just returned, we abort. This is the corruption
+      // that put finley@qsb's Google sub on the mrfinleyunderwood Account
+      // row — once that bad row was deleted, the fallback to email-based
+      // User lookup did the right thing, and this guard ensures we never
+      // silently link to a wrong-email User again.
+      if (
+        account?.provider === "google" &&
+        profile?.email &&
+        user?.email &&
+        user.email.toLowerCase() !== profile.email.toLowerCase()
+      ) {
+        console.warn(
+          "[auth] Rejecting OAuth sign-in: resolved user",
+          user.email,
+          "≠ OAuth profile",
+          profile.email,
+          "— probable Account row corruption",
+        );
+        return false;
+      }
 
       // Guard against Auth.js's JWT-carryover bug: if a stale session cookie
       // is present for a *different* user than the one Google just
