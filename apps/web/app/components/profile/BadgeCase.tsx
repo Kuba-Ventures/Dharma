@@ -68,12 +68,16 @@ function BadgeChip({ badge, earned }: { badge: Badge; earned: boolean }) {
       <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
         <path
           d={BADGE_ICON_PATHS[badge.icon]}
-          stroke="currentColor"
-          strokeWidth="1.2"
+          stroke={
+            earned && badge.color === "yellow" ? "#1A1A1A" : "currentColor"
+          }
+          strokeWidth={earned && badge.color === "yellow" ? 1.6 : 1.2}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill={earned ? "currentColor" : "none"}
-          fillOpacity={earned ? "0.2" : "0"}
+          fillOpacity={
+            earned && badge.color === "yellow" ? 1 : earned ? 0.2 : 0
+          }
         />
       </svg>
       <p
