@@ -148,9 +148,9 @@ export default function IdentityCard({
               type="button"
               onClick={() => setShowBadgePicker((v) => !v)}
               aria-label={`Change display badge — currently ${chosenBadge.title}`}
-              className={`absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[color:var(--bg-card)] transition-transform hover:scale-110 ${BADGE_COLOR_BG[chosenBadge.color]}`}
+              className={`absolute -bottom-3 -right-3 transition-transform hover:scale-110 ${chosenBadge.color === "yellow" ? "" : BADGE_COLOR_BG[chosenBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <svg width="42" height="42" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[chosenBadge.icon]}
                   stroke={chosenBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
@@ -158,7 +158,7 @@ export default function IdentityCard({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill={chosenBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
-                  fillOpacity={chosenBadge.color === "yellow" ? 1 : 0.25}
+                  fillOpacity={chosenBadge.color === "yellow" ? 1 : 0.6}
                 />
               </svg>
             </button>
@@ -167,7 +167,7 @@ export default function IdentityCard({
             <button
               type="button"
               onClick={() => setShowBadgePicker(true)}
-              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[color:var(--bg-card)] bg-white/[0.06] text-[11px] text-white/40 transition-colors hover:text-white/80"
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-white/20 text-[11px] text-white/40 transition-colors hover:text-white/80"
               aria-label="Display a badge"
             >
               +

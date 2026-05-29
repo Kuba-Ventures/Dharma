@@ -47,11 +47,11 @@ export default function ProfileChip({ user, displayBadge }: Props) {
             </div>
           )}
           {displayBadge && (
-            <div
-              className={`absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[color:var(--bg-sidebar)] ${BADGE_COLOR_BG[displayBadge.color]}`}
+            <span
+              className={`absolute -bottom-2 -right-2 ${displayBadge.color === "yellow" ? "" : BADGE_COLOR_BG[displayBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
               aria-label={displayBadge.title}
             >
-              <svg width="8" height="8" viewBox="0 0 14 14" fill="none">
+              <svg width="22" height="22" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[displayBadge.icon]}
                   stroke={displayBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
@@ -59,10 +59,10 @@ export default function ProfileChip({ user, displayBadge }: Props) {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill={displayBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
-                  fillOpacity={displayBadge.color === "yellow" ? 1 : 0.3}
+                  fillOpacity={displayBadge.color === "yellow" ? 1 : 0.6}
                 />
               </svg>
-            </div>
+            </span>
           )}
         </div>
         <div className="min-w-0 flex-1">
