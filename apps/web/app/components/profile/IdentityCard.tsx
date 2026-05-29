@@ -55,6 +55,28 @@ export default function IdentityCard({ user }: Props) {
     router.refresh();
   }
 
+  // Fallback when the typed city isn't in the autocomplete list — small
+  // towns and non-US cities. Parses "City, State" if the comma is present;
+  // otherwise saves the whole string as the name. /api/profile/update keeps
+  // it as free text (no lat/lng/timezone seeding).
+  async function saveTypedCity() {
+    const value = cityQuery.trim();
+    if (!value || value === user.homeCity) return;
+    // Skip if the typed value matches a dropdown option exactly — selectCity
+    // will fire on click.
+    if (cityMatches.some((c) => `${c.name}, ${c.state}` === value)) return;
+    const [name, state] = value.split(",").map((s) => s.trim());
+    setSaving(true);
+    await fetch("/api/profile/update", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ homeCity: { name, state: state || "" } }),
+    });
+    setSaving(false);
+    setSavedAt(Date.now());
+    router.refresh();
+  }
+
   async function saveName() {
     setSaving(true);
     await fetch("/api/profile/update", {
@@ -109,6 +131,13 @@ export default function IdentityCard({ user }: Props) {
             <input
               value={cityQuery}
               onChange={(e) => searchCity(e.target.value)}
+              onBlur={saveTypedCity}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveTypedCity();
+                }
+              }}
               placeholder="e.g. San Francisco, CA"
               className="w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white"
             />
@@ -129,6 +158,12 @@ export default function IdentityCard({ user }: Props) {
                   </li>
                 ))}
               </ul>
+            )}
+            {cityQuery.trim() && cityMatches.length === 0 && cityQuery !== user.homeCity && (
+              <p className="mt-1 text-[11px] text-white/50">
+                Not in our list — press Enter or tab away to save{" "}
+                <span className="text-brand-200">{cityQuery}</span> as typed.
+              </p>
             )}
             {user.timezone && (
               <p className="mt-1 text-[11px] text-white/40">
