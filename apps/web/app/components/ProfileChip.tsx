@@ -69,7 +69,20 @@ export default function ProfileChip({ user, displayBadge }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] text-white">{displayName}</p>
-          <p className="text-[10px] uppercase tracking-wide text-brand-200">{tier}</p>
+          {displayBadge ? (
+            <>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-brand-200">
+                {displayBadge.title}
+              </p>
+              <p className="text-[9px] uppercase tracking-wide text-white/35">
+                {tier}
+              </p>
+            </>
+          ) : (
+            <p className="text-[10px] uppercase tracking-wide text-brand-200">
+              {tier}
+            </p>
+          )}
         </div>
       </Link>
       <form
