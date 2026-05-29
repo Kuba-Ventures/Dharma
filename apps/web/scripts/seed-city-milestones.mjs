@@ -2,7 +2,12 @@
 // MilestoneDef. Mirrors lib/milestoneGenerator.ts so we can backfill cities
 // whose users saved their homeCity before the on-demand generator shipped.
 //
-// Usage: cd apps/web && node scripts/seed-city-milestones.mjs "City, ST"
+// Usage:
+//   cd apps/web && node scripts/seed-city-milestones.mjs "City, ST"
+//   cd apps/web && node scripts/seed-city-milestones.mjs "City, ST" --force
+//
+// --force clears any existing milestones for that city before regenerating.
+// Use when iterating on the prompt and want fresh output.
 
 import { PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
@@ -20,8 +25,9 @@ try {
 } catch {}
 
 const city = process.argv[2];
+const force = process.argv.includes("--force");
 if (!city) {
-  console.error('Usage: node scripts/seed-city-milestones.mjs "City, ST"');
+  console.error('Usage: node scripts/seed-city-milestones.mjs "City, ST" [--force]');
   process.exit(1);
 }
 
@@ -43,17 +49,30 @@ const PROMPT = `You are designing milestones for an AI email assistant's gamific
 
 Generate exactly 6 milestones tied to the city: ${city}
 
-Each milestone references a REAL local landmark, peak, trail, park, neighborhood, cultural site, or cross-town distance. Do not invent fictional places. If the city is small or unfamiliar, fall back to regional landmarks within ~50 miles.
+Each milestone references a REAL local landmark, peak, trail, park, neighborhood, cultural site, or cross-town distance within ~100 miles. Do not invent fictional places — if you're unsure a landmark exists, choose a different one or fall back to a regional one (state park, scenic byway, well-known historic site).
 
-Constraints:
-- Thresholds in seconds, between 3600 and 144000 (1 hour to 40 hours of saved time)
-- Spread thresholds across the range — early ones at ~5400-10800 (90 min to 3h), later ones at 30000-100000+
+**Threshold calibration — most important constraint:**
+The threshold (in seconds) should approximate the REAL-WORLD time investment to complete the activity from this city, including round-trip drive time. Be honest.
+
+Anchors:
+- 30-minute walk through a downtown district → 1800s
+- 1-hour park visit → 3600s
+- 2-hour local hike or bike ride → 7200s
+- Drive 45min away + 2h on-site + drive back → ~14400s
+- Half-day trip (~4 hours total) → 14400s
+- Full-day excursion (drive + activity, ~8h) → 28800s
+- Major peak: 2h drive each way + 5h hike + meal → ~36000s
+- Long road trip or multi-day landmark visit → 50000-80000s
+- Cap at 86400s (24 hours)
+
+Other constraints:
 - Categories: "peak" / "trail" / "cultural" / "regional" / "city_to_city"
-- Titles in lowercase sentence form, completing "{firstName}, you saved enough time to ___" — but write JUST the action (e.g. "summit Mt. Mitchell" or "walk the Brooklyn Bridge round trip"), NOT the full sentence
-- Descriptions: 1-2 sentences with a specific fact about the landmark + how the saved time relates
+- Spread the 6 milestones across the threshold range — at least one short (under 5400s) and one long (over 40000s)
+- Titles in lowercase sentence form, JUST the action ("summit Mt. Mitchell", "walk the Brooklyn Bridge round trip"), no preamble
+- Descriptions: 1-2 sentences with a specific fact + how the saved time relates
 
 Output JSON array of 6 entries, exact shape:
-[{ "id": "kebab-case-slug", "category": "peak", "title": "summit Mt. Mitchell", "description": "...", "threshold": 18000 }, ...]
+[{ "id": "kebab-case-slug", "category": "peak", "title": "summit Mt. Mitchell", "description": "...", "threshold": 27000 }, ...]
 
 Output only the JSON array. No commentary, no markdown fences.`;
 
@@ -92,6 +111,14 @@ for (const m of parsed) console.log(`  • [${m.threshold}s] ${m.title} (${m.cat
 
 const citySlug = city.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const prisma = new PrismaClient();
+
+if (force) {
+  const deleted = await prisma.milestoneDef.deleteMany({
+    where: { requiredCity: city },
+  });
+  console.log(`\n--force: deleted ${deleted.count} existing milestone(s) for "${city}".`);
+}
+
 let created = 0;
 for (const m of parsed) {
   if (!m.id || typeof m.threshold !== "number" || !m.title || !m.description || !m.category) continue;

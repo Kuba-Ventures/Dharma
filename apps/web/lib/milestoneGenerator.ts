@@ -31,13 +31,26 @@ const PROMPT = `You are designing milestones for an AI email assistant's gamific
 
 Generate exactly 6 milestones tied to the city: {CITY}
 
-Each milestone references a REAL local landmark, peak, trail, park, neighborhood, cultural site, or cross-town distance. Do not invent fictional places. If the city is small or unfamiliar, fall back to regional landmarks within ~50 miles.
+Each milestone references a REAL local landmark, peak, trail, park, neighborhood, cultural site, or cross-town distance within ~100 miles. Do not invent fictional places — if you're unsure a landmark exists, choose a different one or fall back to a regional one (state park, scenic byway, well-known historic site). Stanley Park, for example, is in Vancouver, not Virginia — be specific to the actual region.
 
-Constraints:
-- Thresholds in seconds, between 3600 and 144000 (1 hour to 40 hours of saved time)
-- Spread thresholds across the range — early ones at ~5400-10800 (90 min to 3h), later ones at 30000-100000+
+**Threshold calibration — this is the most important constraint:**
+The threshold (in seconds) should approximate the REAL-WORLD time investment to complete the activity from this city, including round-trip drive time. Be honest. If a landmark is 30 minutes away, the threshold reflects that, not an arbitrary larger number.
+
+Anchors:
+- 30-minute walk through a downtown district → 1800s
+- 1-hour park visit → 3600s
+- 2-hour local hike or bike ride → 7200s
+- Drive somewhere 45 minutes away + 2 hours on-site + drive back → ~14400s
+- Half-day trip (~4 hours total) → 14400s
+- Full-day excursion (drive + activity, ~8 hours) → 28800s
+- Major peak: 2-hour drive each way + 5-hour hike + meal → ~36000s
+- Long road trip or multi-day landmark visit → 50000-80000s
+- Cap at 86400s (24 hours)
+
+Other constraints:
 - Categories: "peak" / "trail" / "cultural" / "regional" / "city_to_city"
-- Titles in lowercase sentence form, completing "{firstName}, you saved enough time to ___" — but write JUST the action (e.g. "summit Mt. Mitchell" or "walk the Brooklyn Bridge round trip"), NOT the full sentence
+- Spread the 6 milestones across the threshold range — at least one short (under 5400s) and one long (over 40000s)
+- Titles in lowercase sentence form, JUST the action (e.g. "summit Mt. Mitchell" or "walk the Brooklyn Bridge round trip"), no leading "{firstName}, you saved enough time to..."
 - Descriptions: 1-2 sentences with a specific fact about the landmark + how the saved time relates
 
 Output JSON array of 6 entries, exact shape:
@@ -46,8 +59,8 @@ Output JSON array of 6 entries, exact shape:
     "id": "kebab-case-slug-unique-to-this-milestone",
     "category": "peak",
     "title": "summit Mt. Mitchell",
-    "description": "Eastern US's tallest peak at 6,684 ft. A full round-trip takes about 5 hours.",
-    "threshold": 18000
+    "description": "Eastern US's tallest peak at 6,684 ft. About 90 minutes from here, plus a 4-hour round-trip hike.",
+    "threshold": 27000
   },
   ...
 ]
