@@ -49,59 +49,79 @@ export async function GET(req: Request) {
     select: { id: true, email: true, createdAt: true, homeCity: true },
   });
   let milestonesAwarded = 0;
+  const errors: Array<{ email: string | null; step: string; message: string }> = [];
   for (const u of users) {
-    const [draftCount, tagCount] = await Promise.all([
-      prisma.usageEvent.count({ where: { userId: u.id, eventType: "draft" } }),
-      prisma.classifiedThread.count({ where: { userId: u.id } }),
-    ]);
-    const cumulativeSecondsSaved =
-      draftCount * SECONDS_SAVED_PER_DRAFT + tagCount * SECONDS_SAVED_PER_TAG;
-    const tier = tierFor(cumulativeSecondsSaved);
-    await prisma.user.update({
-      where: { id: u.id },
-      data: { cumulativeSecondsSaved, tier },
-    });
+    try {
+      const [draftCount, tagCount] = await Promise.all([
+        prisma.usageEvent.count({ where: { userId: u.id, eventType: "draft" } }),
+        prisma.classifiedThread.count({ where: { userId: u.id } }),
+      ]);
+      const cumulativeSecondsSaved =
+        draftCount * SECONDS_SAVED_PER_DRAFT + tagCount * SECONDS_SAVED_PER_TAG;
+      const tier = tierFor(cumulativeSecondsSaved);
+      await prisma.user.update({
+        where: { id: u.id },
+        data: { cumulativeSecondsSaved, tier },
+      });
 
-    // Persist milestone unlocks. MilestoneDef rows are upserted lazily — the
-    // in-memory library at lib/milestones.ts is the source of truth; this
-    // mirrors what's been unlocked so the UI can highlight fresh ones.
-    const unlockedIds = unlockedMilestoneIds(
-      cumulativeSecondsSaved,
-      u.homeCity,
-    );
-    for (const milestoneId of unlockedIds) {
-      const def = MILESTONES.find((m) => m.id === milestoneId);
-      if (!def) continue;
-      await prisma.milestoneDef.upsert({
-        where: { id: def.id },
-        create: {
-          id: def.id,
-          category: def.category,
-          title: def.title,
-          description: def.description,
-          threshold: def.threshold,
-          copyTemplate: def.title,
-          gradient: def.gradient,
-        },
-        update: {
-          category: def.category,
-          title: def.title,
-          description: def.description,
-          threshold: def.threshold,
-          gradient: def.gradient,
-        },
+      const unlockedIds = unlockedMilestoneIds(
+        cumulativeSecondsSaved,
+        u.homeCity,
+      );
+      for (const milestoneId of unlockedIds) {
+        const def = MILESTONES.find((m) => m.id === milestoneId);
+        if (!def) continue;
+        try {
+          await prisma.milestoneDef.upsert({
+            where: { id: def.id },
+            create: {
+              id: def.id,
+              category: def.category,
+              title: def.title,
+              description: def.description,
+              threshold: def.threshold,
+              copyTemplate: def.title,
+              gradient: def.gradient,
+            },
+            update: {
+              category: def.category,
+              title: def.title,
+              description: def.description,
+              threshold: def.threshold,
+              gradient: def.gradient,
+            },
+          });
+          const before = await prisma.userMilestone.findUnique({
+            where: {
+              userId_milestoneId: { userId: u.id, milestoneId: def.id },
+            },
+            select: { id: true },
+          });
+          if (!before) {
+            await prisma.userMilestone.create({
+              data: { userId: u.id, milestoneId: def.id },
+            });
+            milestonesAwarded += 1;
+          }
+        } catch (err) {
+          errors.push({
+            email: u.email,
+            step: `milestone:${def.id}`,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          console.error(
+            `[cron] milestone ${def.id} failed for ${u.email}:`,
+            err,
+          );
+        }
+      }
+    } catch (err) {
+      errors.push({
+        email: u.email,
+        step: "user-pass",
+        message: err instanceof Error ? err.message : String(err),
       });
-      const created = await prisma.userMilestone.upsert({
-        where: {
-          userId_milestoneId: { userId: u.id, milestoneId: def.id },
-        },
-        create: { userId: u.id, milestoneId: def.id },
-        update: {},
-        select: { id: true, achievedAt: true },
-      });
-      // Count only fresh awards (achievedAt within last 24h of cron run).
-      const ageMs = Date.now() - created.achievedAt.getTime();
-      if (ageMs < 24 * 60 * 60 * 1000) milestonesAwarded += 1;
+      console.error(`[cron] user pass failed for ${u.email}:`, err);
     }
   }
 
@@ -192,5 +212,6 @@ export async function GET(req: Request) {
     sheetRows: rows.length,
     badgesGranted: grantedCount,
     milestonesAwarded,
+    errors: errors.length > 0 ? errors : undefined,
   });
 }
