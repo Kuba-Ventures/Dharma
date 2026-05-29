@@ -44,6 +44,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async signIn({ user, account, profile }) {
+      // [AUTH-DEBUG] capture exactly what Google returned and which Dharma
+      // User Auth.js resolved to. Inspect via Vercel runtime logs.
+      console.warn(
+        "[auth-debug] signIn fired",
+        JSON.stringify({
+          provider: account?.provider,
+          providerAccountId: account?.providerAccountId,
+          profileEmail: profile?.email,
+          userEmail: user?.email,
+          userId: user?.id,
+        }),
+      );
+
       // Guard against Auth.js's JWT-carryover bug: if a stale session cookie
       // is present for a *different* user than the one Google just
       // authenticated, the upstream handler in @auth/core silently links the
