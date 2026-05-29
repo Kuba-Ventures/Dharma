@@ -148,12 +148,12 @@ export default function IdentityCard({
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[chosenBadge.icon]}
-                  stroke="currentColor"
-                  strokeWidth="1.2"
+                  stroke={chosenBadge.color === "yellow" ? "#1A1A1A" : "currentColor"}
+                  strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill="currentColor"
-                  fillOpacity="0.25"
+                  fillOpacity={chosenBadge.color === "yellow" ? 1 : 0.25}
                 />
               </svg>
             </button>
@@ -192,12 +192,12 @@ export default function IdentityCard({
                       <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
                         <path
                           d={BADGE_ICON_PATHS[b.icon]}
-                          stroke="currentColor"
-                          strokeWidth="1.2"
+                          stroke={b.color === "yellow" ? "#1A1A1A" : "currentColor"}
+                          strokeWidth={b.color === "yellow" ? 1.6 : 1.2}
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           fill="currentColor"
-                          fillOpacity="0.2"
+                          fillOpacity={b.color === "yellow" ? 1 : 0.2}
                         />
                       </svg>
                     </span>
