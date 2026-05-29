@@ -236,16 +236,19 @@ model MeetingHour {
 // ── Milestones (gamified progression tied to user's home city) ─────────────
 
 model MilestoneDef {
-  id           String   @id  // slug, e.g. "summit-mt-mitchell"
-  category     String   // "peak" | "trail" | "city_to_city" | "cultural" | "regional" | "intro"
-  title        String
-  description  String
-  threshold    Int?     // seconds saved required; null = always-on
-  copyTemplate String   // user-facing copy with {city}/{firstName} placeholders
-  gradient     String   // CSS gradient stops for share-card background
-  createdAt    DateTime @default(now())
+  id            String   @id  // slug, e.g. "summit-mt-mitchell"
+  category      String   // "peak" | "trail" | "city_to_city" | "cultural" | "regional" | "intro"
+  title         String
+  description   String
+  threshold     Int?     // seconds saved required; null = always-on
+  copyTemplate  String   // user-facing copy with {city}/{firstName} placeholders
+  gradient      String   // CSS gradient stops for share-card background
+  requiredCity  String?  // "Charlotte, NC" — null = universal, applies to all users
+  createdAt     DateTime @default(now())
 
   userMilestones UserMilestone[]
+
+  @@index([requiredCity])
 }
 
 model UserMilestone {

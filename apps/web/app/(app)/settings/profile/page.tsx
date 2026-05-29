@@ -3,9 +3,9 @@ import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { identityBadgesForEmail, earnedAchievementBadges } from "../../../../lib/badges";
 import {
-  unlockedMilestoneIds,
-  MILESTONES,
-} from "../../../../lib/milestones";
+  effectiveMilestones,
+  effectiveUnlockedMilestoneIds,
+} from "../../../../lib/milestoneResolution";
 import IdentityCard from "../../../components/profile/IdentityCard";
 import TierLadder from "../../../components/profile/TierLadder";
 import BadgeCase from "../../../components/profile/BadgeCase";
@@ -43,9 +43,12 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const unlocked = unlockedMilestoneIds(user.cumulativeSecondsSaved, user.homeCity);
+  const [unlocked, allMilestones] = await Promise.all([
+    effectiveUnlockedMilestoneIds(user.cumulativeSecondsSaved, user.homeCity),
+    effectiveMilestones(user.homeCity),
+  ]);
   const geoMilestoneAchieved = unlocked.some((id) => {
-    const m = MILESTONES.find((m) => m.id === id);
+    const m = allMilestones.find((m) => m.id === id);
     return !!m?.requiredCity;
   });
 
@@ -98,6 +101,7 @@ export default async function ProfilePage() {
         homeCity={user.homeCity}
         firstName={firstName}
         tier={user.tier}
+        milestones={allMilestones}
       />
     </div>
   );

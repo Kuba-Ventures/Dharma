@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor } from "../../../../lib/tiers";
 import { BADGES, IDENTITY_BADGE_IDS, getBadge } from "../../../../lib/badges";
-import { MILESTONES, unlockedMilestoneIds } from "../../../../lib/milestones";
+import {
+  effectiveMilestones,
+  effectiveUnlockedMilestoneIds,
+} from "../../../../lib/milestoneResolution";
 import {
   appendRow,
   ensureHeaders,
@@ -64,12 +67,13 @@ export async function GET(req: Request) {
         data: { cumulativeSecondsSaved, tier },
       });
 
-      const unlockedIds = unlockedMilestoneIds(
+      const unlockedIds = await effectiveUnlockedMilestoneIds(
         cumulativeSecondsSaved,
         u.homeCity,
       );
+      const userMilestones = await effectiveMilestones(u.homeCity);
       for (const milestoneId of unlockedIds) {
-        const def = MILESTONES.find((m) => m.id === milestoneId);
+        const def = userMilestones.find((m) => m.id === milestoneId);
         if (!def) continue;
         try {
           await prisma.milestoneDef.upsert({

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
+import { applyTemplate } from "../../../../lib/milestones";
 import {
-  MILESTONES,
-  applyTemplate,
-  nextLockedMilestone,
-  unlockedMilestoneIds,
-} from "../../../../lib/milestones";
+  effectiveMilestones,
+  effectiveNextLockedMilestone,
+  effectiveUnlockedMilestoneIds,
+} from "../../../../lib/milestoneResolution";
 
 // GET → most recently unlocked milestone, next locked milestone, and the
 // user's cumulative seconds saved. Derives directly from the in-memory
@@ -37,7 +37,8 @@ export async function GET() {
       : null;
 
   const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
-  const unlocked = unlockedMilestoneIds(
+  const allMilestones = await effectiveMilestones(user.homeCity);
+  const unlocked = await effectiveUnlockedMilestoneIds(
     user.cumulativeSecondsSaved,
     user.homeCity,
   );
@@ -45,11 +46,14 @@ export async function GET() {
   // Most recent unlock = highest-threshold unlocked milestone.
   const activeId =
     unlocked
-      .map((id) => MILESTONES.find((m) => m.id === id)!)
+      .map((id) => allMilestones.find((m) => m.id === id)!)
+      .filter(Boolean)
       .sort((a, b) => b.threshold - a.threshold)[0]?.id ?? null;
-  const active = activeId ? MILESTONES.find((m) => m.id === activeId)! : null;
+  const active = activeId
+    ? allMilestones.find((m) => m.id === activeId)!
+    : null;
 
-  const next = nextLockedMilestone(
+  const next = await effectiveNextLockedMilestone(
     user.cumulativeSecondsSaved,
     user.homeCity,
   );

@@ -1,7 +1,6 @@
 import {
-  MILESTONES,
   applyTemplate,
-  unlockedMilestoneIds,
+  type Milestone,
 } from "../../../lib/milestones";
 import ShareCardButton from "./ShareCardButton";
 
@@ -10,6 +9,7 @@ type Props = {
   homeCity: string | null;
   firstName: string | null;
   tier: string;
+  milestones: Milestone[];
 };
 
 function formatSeconds(s: number): string {
@@ -24,16 +24,18 @@ export default function MilestoneLibrary({
   homeCity,
   firstName,
   tier,
+  milestones,
 }: Props) {
-  const unlockedSet = new Set(unlockedMilestoneIds(secondsSaved, homeCity));
-
-  // Show city-relevant + universal milestones; hide other cities' entries.
-  const relevant = MILESTONES.filter(
-    (m) => !m.requiredCity || m.requiredCity === homeCity,
-  );
-
-  const unlocked = relevant.filter((m) => unlockedSet.has(m.id));
-  const locked = relevant.filter((m) => !unlockedSet.has(m.id));
+  const unlocked = milestones.filter((m) => {
+    if (secondsSaved < m.threshold) return false;
+    if (m.requiredCity && m.requiredCity !== homeCity) return false;
+    return true;
+  });
+  const locked = milestones.filter((m) => {
+    if (secondsSaved >= m.threshold) return false;
+    if (m.requiredCity && m.requiredCity !== homeCity) return false;
+    return true;
+  });
 
   return (
     <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
