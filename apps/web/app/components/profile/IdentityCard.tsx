@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
 import type { Badge } from "../../../lib/badges";
-import { BADGE_ICON_PATHS, BADGE_COLOR_BG } from "../../../lib/badgeIcons";
+import {
+  BADGE_ICON_PATHS,
+  BADGE_COLOR_BG,
+  BASQUIAT_OUTLINE,
+  BASQUIAT_YELLOW,
+} from "../../../lib/badgeIcons";
 
 type City = { name: string; state: string };
 
@@ -148,11 +153,11 @@ export default function IdentityCard({
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[chosenBadge.icon]}
-                  stroke={chosenBadge.color === "yellow" ? "#1A1A1A" : "currentColor"}
+                  stroke={chosenBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
                   strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  fill="currentColor"
+                  fill={chosenBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
                   fillOpacity={chosenBadge.color === "yellow" ? 1 : 0.25}
                 />
               </svg>
@@ -192,11 +197,11 @@ export default function IdentityCard({
                       <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
                         <path
                           d={BADGE_ICON_PATHS[b.icon]}
-                          stroke={b.color === "yellow" ? "#1A1A1A" : "currentColor"}
+                          stroke={b.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
                           strokeWidth={b.color === "yellow" ? 1.6 : 1.2}
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          fill="currentColor"
+                          fill={b.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
                           fillOpacity={b.color === "yellow" ? 1 : 0.2}
                         />
                       </svg>

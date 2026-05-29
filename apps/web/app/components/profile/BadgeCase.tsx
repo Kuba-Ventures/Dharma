@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { BADGES, type Badge } from "../../../lib/badges";
-import { BADGE_COLOR_BG, BADGE_ICON_PATHS } from "../../../lib/badgeIcons";
+import {
+  BADGE_COLOR_BG,
+  BADGE_ICON_PATHS,
+  BASQUIAT_OUTLINE,
+  BASQUIAT_YELLOW,
+} from "../../../lib/badgeIcons";
 
 type Props = {
   earnedIds: string[];
@@ -69,15 +74,19 @@ function BadgeChip({ badge, earned }: { badge: Badge; earned: boolean }) {
         <path
           d={BADGE_ICON_PATHS[badge.icon]}
           stroke={
-            earned && badge.color === "yellow" ? "#1A1A1A" : "currentColor"
+            earned && badge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"
           }
           strokeWidth={earned && badge.color === "yellow" ? 1.6 : 1.2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          fill={earned ? "currentColor" : "none"}
-          fillOpacity={
-            earned && badge.color === "yellow" ? 1 : earned ? 0.2 : 0
+          fill={
+            earned && badge.color === "yellow"
+              ? BASQUIAT_YELLOW
+              : earned
+                ? "currentColor"
+                : "none"
           }
+          fillOpacity={earned && badge.color === "yellow" ? 1 : earned ? 0.2 : 0}
         />
       </svg>
       <p

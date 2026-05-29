@@ -31,8 +31,12 @@ export const BADGE_COLOR_BG: Record<Badge["color"], string> = {
   blue: "bg-[color:var(--label-1)]/12 border-[color:var(--label-1)]/30 text-[color:var(--label-1)]",
   teal: "bg-[color:var(--label-2)]/12 border-[color:var(--label-2)]/30 text-[color:var(--label-2)]",
   brand: "bg-brand-400/12 border-brand-400/30 text-brand-200",
-  // Basquiat yellow — hex arbitrary value avoids any Tailwind CSS-var
-  // opacity-modifier edge cases. Background is solid-ish so the crown reads
-  // as bright yellow on its chip.
-  yellow: "bg-[#FBD23D]/35 border-[#1A1A1A]/40 text-[#FBD23D]",
+  // Built-in yellow-400 class — guaranteed to compile, no arbitrary-value
+  // edge cases. Solid yellow background with a black border.
+  yellow: "bg-yellow-400/40 border-black/50 text-yellow-400",
 };
+
+// Hardcoded yellow used for the SVG fill so currentColor resolution
+// can't leave the crown drawing black.
+export const BASQUIAT_YELLOW = "#FBD23D";
+export const BASQUIAT_OUTLINE = "#1A1A1A";

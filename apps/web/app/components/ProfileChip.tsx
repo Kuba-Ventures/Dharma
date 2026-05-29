@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { signOut } from "../../lib/auth";
 import { type Badge } from "../../lib/badges";
-import { BADGE_COLOR_BG, BADGE_ICON_PATHS } from "../../lib/badgeIcons";
+import {
+  BADGE_COLOR_BG,
+  BADGE_ICON_PATHS,
+  BASQUIAT_OUTLINE,
+  BASQUIAT_YELLOW,
+} from "../../lib/badgeIcons";
 
 type Props = {
   user: {
@@ -49,11 +54,11 @@ export default function ProfileChip({ user, displayBadge }: Props) {
               <svg width="8" height="8" viewBox="0 0 14 14" fill="none">
                 <path
                   d={BADGE_ICON_PATHS[displayBadge.icon]}
-                  stroke={displayBadge.color === "yellow" ? "#1A1A1A" : "currentColor"}
+                  stroke={displayBadge.color === "yellow" ? BASQUIAT_OUTLINE : "currentColor"}
                   strokeWidth={displayBadge.color === "yellow" ? 1.8 : 1.4}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  fill="currentColor"
+                  fill={displayBadge.color === "yellow" ? BASQUIAT_YELLOW : "currentColor"}
                   fillOpacity={displayBadge.color === "yellow" ? 1 : 0.3}
                 />
               </svg>
