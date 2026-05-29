@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
-import { identityBadgesForEmail, earnedAchievementBadges } from "../../../lib/badges";
+import {
+  BADGES,
+  getBadge,
+  identityBadgesForEmail,
+  earnedAchievementBadges,
+} from "../../../lib/badges";
 import {
   effectiveMilestones,
   effectiveUnlockedMilestoneIds,
@@ -27,6 +32,7 @@ export default async function ProfilePage() {
         homeCity: true,
         timezone: true,
         tier: true,
+        displayBadgeId: true,
         cumulativeSecondsSaved: true,
         toneSummary: true,
         toneProfile: true,
@@ -68,6 +74,19 @@ export default async function ProfilePage() {
 
   const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
 
+  // Resolve which badge to highlight on the avatar.
+  const earnedSet = new Set(earnedBadges);
+  const earnedBadgeObjects = BADGES.filter((b) => earnedSet.has(b.id));
+  const displayBadge =
+    (user.displayBadgeId &&
+    getBadge(user.displayBadgeId) &&
+    earnedSet.has(user.displayBadgeId)
+      ? getBadge(user.displayBadgeId)
+      : null) ??
+    // Default: highest-priority earned identity badge
+    BADGES.find((b) => b.kind === "identity" && earnedSet.has(b.id)) ??
+    null;
+
   return (
     <div className="max-w-3xl space-y-5">
       <header className="mb-2">
@@ -88,6 +107,8 @@ export default async function ProfilePage() {
           tier: user.tier,
           createdAt: user.createdAt.toISOString(),
         }}
+        earnedBadges={earnedBadgeObjects}
+        displayBadge={displayBadge}
       />
 
       <TierLadder secondsSaved={user.cumulativeSecondsSaved} />

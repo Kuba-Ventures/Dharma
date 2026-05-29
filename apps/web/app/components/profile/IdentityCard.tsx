@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "../ui/Button";
+import type { Badge } from "../../../lib/badges";
+import { BADGE_ICON_PATHS, BADGE_COLOR_BG } from "../../../lib/badgeIcons";
 
 type City = { name: string; state: string };
 
@@ -17,9 +19,15 @@ type Props = {
     tier: string;
     createdAt: string;
   };
+  earnedBadges: Badge[];
+  displayBadge: Badge | null;
 };
 
-export default function IdentityCard({ user }: Props) {
+export default function IdentityCard({
+  user,
+  earnedBadges,
+  displayBadge,
+}: Props) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(user.firstName ?? user.name?.split(" ")[0] ?? "");
   const [cityQuery, setCityQuery] = useState(user.homeCity ?? "");
@@ -27,6 +35,22 @@ export default function IdentityCard({ user }: Props) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
+  const [showBadgePicker, setShowBadgePicker] = useState(false);
+  const [chosenBadge, setChosenBadge] = useState<Badge | null>(displayBadge);
+
+  async function pickDisplayBadge(b: Badge | null) {
+    setChosenBadge(b);
+    setShowBadgePicker(false);
+    setSaving(true);
+    await fetch("/api/profile/update", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ displayBadgeId: b?.id ?? null }),
+    });
+    setSaving(false);
+    setSavedAt(Date.now());
+    router.refresh();
+  }
 
   async function searchCity(q: string) {
     setCityQuery(q);
@@ -94,25 +118,105 @@ export default function IdentityCard({ user }: Props) {
   return (
     <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
       <div className="flex items-start gap-4">
-        {user.image && !imageBroken ? (
-          // Plain <img> bypasses Next.js Image's domain rules. Google avatar
-          // URLs occasionally fail (CORS, expired token); onError falls back
-          // to the initials circle.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.image}
-            alt={user.name ?? "You"}
-            width={64}
-            height={64}
-            className="h-16 w-16 rounded-full object-cover"
-            onError={() => setImageBroken(true)}
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-400/30 text-2xl font-medium text-brand-100">
-            {initials}
-          </div>
-        )}
+        <div className="relative shrink-0">
+          {user.image && !imageBroken ? (
+            // Plain <img> bypasses Next.js Image's domain rules. Google avatar
+            // URLs occasionally fail (CORS, expired token); onError falls back
+            // to the initials circle.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.image}
+              alt={user.name ?? "You"}
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-full object-cover"
+              onError={() => setImageBroken(true)}
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-400/30 text-2xl font-medium text-brand-100">
+              {initials}
+            </div>
+          )}
+          {chosenBadge && (
+            <button
+              type="button"
+              onClick={() => setShowBadgePicker((v) => !v)}
+              aria-label={`Change display badge — currently ${chosenBadge.title}`}
+              className={`absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[color:var(--bg-card)] transition-transform hover:scale-110 ${BADGE_COLOR_BG[chosenBadge.color]}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path
+                  d={BADGE_ICON_PATHS[chosenBadge.icon]}
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="currentColor"
+                  fillOpacity="0.25"
+                />
+              </svg>
+            </button>
+          )}
+          {!chosenBadge && earnedBadges.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowBadgePicker(true)}
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-[color:var(--bg-card)] bg-white/[0.06] text-[11px] text-white/40 transition-colors hover:text-white/80"
+              aria-label="Display a badge"
+            >
+              +
+            </button>
+          )}
+
+          {showBadgePicker && (
+            <div className="absolute left-0 top-[72px] z-20 w-56 rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)] p-2 shadow-xl">
+              <p className="mb-1 px-2 text-[10px] uppercase tracking-[0.08em] text-white/40">
+                Display on profile
+              </p>
+              <div className="grid grid-cols-1 gap-0.5">
+                {earnedBadges.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => pickDisplayBadge(b)}
+                    className={`flex items-center gap-2 rounded-btn px-2 py-1.5 text-left text-[12px] transition-colors ${
+                      chosenBadge?.id === b.id
+                        ? "bg-white/[0.06] text-white"
+                        : "text-white/70 hover:bg-white/[0.04] hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full ${BADGE_COLOR_BG[b.color]}`}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                        <path
+                          d={BADGE_ICON_PATHS[b.icon]}
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="currentColor"
+                          fillOpacity="0.2"
+                        />
+                      </svg>
+                    </span>
+                    {b.title}
+                  </button>
+                ))}
+                {chosenBadge && (
+                  <button
+                    type="button"
+                    onClick={() => pickDisplayBadge(null)}
+                    className="mt-1 rounded-btn px-2 py-1.5 text-left text-[11px] text-white/40 hover:text-white/70"
+                  >
+                    Hide badge
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>

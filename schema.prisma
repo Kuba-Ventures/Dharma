@@ -41,6 +41,7 @@ model User {
   // Progression
   tier                     String               @default("Apprentice")
   lastSeenTier             String?
+  displayBadgeId           String?              // user-selected badge for avatar overlay
   cumulativeSecondsSaved   Int                  @default(0)
   nextNpsPromptAt          DateTime?
 

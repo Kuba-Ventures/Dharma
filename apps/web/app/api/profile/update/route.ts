@@ -20,6 +20,7 @@ export async function PATCH(req: Request) {
     firstName?: string;
     homeCity?: { name?: string; state?: string };
     timezone?: string;
+    displayBadgeId?: string | null;
   };
 
   const data: {
@@ -28,10 +29,14 @@ export async function PATCH(req: Request) {
     homeCityLat?: number | null;
     homeCityLng?: number | null;
     timezone?: string;
+    displayBadgeId?: string | null;
   } = {};
 
   if (typeof body.firstName === "string") {
     data.firstName = body.firstName.trim();
+  }
+  if (body.displayBadgeId !== undefined) {
+    data.displayBadgeId = body.displayBadgeId;
   }
   if (body.homeCity?.name) {
     const found = findCityByName(body.homeCity.name, body.homeCity.state);
