@@ -2,24 +2,24 @@
 
 import { signIn, signOut } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
 function LoginContent() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/";
-  const hint = params.get("hint") ?? "";
-  const [forcedEmail, setForcedEmail] = useState(hint);
+  // Optional login_hint via ?hint=email — kept for power-user URLs but no
+  // longer surfaced in the UI now that the OAuth carryover bug is fixed.
+  const hint = params.get("hint")?.trim() ?? "";
 
   async function handleSignIn() {
     // Clear any stale session cookie first. Auth.js's OAuth callback
     // otherwise silently links the new Google grant to the JWT cookie's
     // user — even if the user picks a different Google account.
     await signOut({ redirect: false });
-    const trimmed = forcedEmail.trim();
-    if (trimmed) {
-      signIn("google", { callbackUrl }, { login_hint: trimmed });
+    if (hint) {
+      signIn("google", { callbackUrl }, { login_hint: hint });
     } else {
       signIn("google", { callbackUrl });
     }
@@ -48,14 +48,6 @@ function LoginContent() {
             </p>
           </div>
 
-          <input
-            type="email"
-            value={forcedEmail}
-            onChange={(e) => setForcedEmail(e.target.value)}
-            placeholder="Specific Google account (optional)"
-            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
-          />
-
           <button
             onClick={handleSignIn}
             className="w-full flex items-center justify-center gap-3 bg-white text-[#1a1a1a] font-medium text-sm py-3 px-4 rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all duration-150"
@@ -68,10 +60,6 @@ function LoginContent() {
             </svg>
             Continue with Google
           </button>
-
-          <p className="text-[11px] text-white/30 leading-relaxed">
-            Fill in the email above to skip the Google chooser and sign in with that specific account directly.
-          </p>
 
           <p className="text-[11px] text-white/20 text-center leading-relaxed">
             Gmail + Calendar access required. You control what's automated.
