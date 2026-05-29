@@ -2,11 +2,6 @@ import Link from "next/link";
 
 const SECTIONS = [
   {
-    href: "/configuration",
-    title: "Tone, labels, scheduling",
-    description: "Configure the three features Dharma runs on your behalf.",
-  },
-  {
     href: "/settings/hidden-stats",
     title: "Hidden stats",
     description: "Restore dashboard tiles you've dismissed.",
