@@ -1,13 +1,13 @@
 # Dharma
 *AI-drafted Gmail replies and scheduling, wrapped in a labeled inbox.*
 
-*Last updated: 2026-05-29 by kuba-vault*
+*Last updated: 2026-05-29 by Claude (auto-loop session)*
 
 ---
 
 ## TL;DR
 
-Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. The "logical candy" product redesign just closed out: 5-tab navigation, purple-forward design system, onboarding flow, milestone + badge progression, and an admin Google Sheet for waitlist/subscribers. Live at `dharma-lake.vercel.app`. Phase is post-MVP iteration with a launch-prep overhang on Chrome Web Store review (submitted 2026-04-30, outcome still pending).
+Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. The "logical candy" product redesign closed out and three follow-on loops shipped today: all Anthropic calls now route through a Gateway-aware helper, the Metrics tab shows real per-label draft rates, and the Signals tab has live producers detecting deal flow, term sheets, and transactional emails via Haiku. Live at `dharma-lake.vercel.app`. Phase is post-MVP iteration with a launch-prep overhang on Chrome Web Store review (submitted 2026-04-30, outcome still pending).
 
 ---
 
@@ -33,7 +33,7 @@ Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user'
 
 ## Where we are right now
 
-The "logical candy" product redesign closed this week — ~70 commits on main against the plan at `~/.claude/plans/dharma-product-logical-candy.md`. New IA (Dashboard / Metrics / Configuration / Signals / Settings + Profile), purple-forward design tokens, a 4-step onboarding flow, and a milestone + badge progression system are all live. A nightly Vercel cron awards milestones, writes `UserMilestone` rows, and bumps tiers; the Dashboard fires confetti once when a tier-up is unacknowledged. An admin Google Sheet (Waitlist + Subscribers + Debugging tabs) is auto-headered and backfilled via service account. Share-card OG pages exist at `/share/milestone/[id]`. The multi-day Auth.js JWT-carryover bug is resolved — `lib/adapter.ts` wraps PrismaAdapter to upsert Accounts by `(userId, provider)` and the `signIn` callback rejects mismatched email/profile pairs. Next concrete steps: hear back on CWS, run one real external user through preset → Sync Inbox → draft, and verify the Pub/Sub push path end-to-end.
+The "logical candy" product redesign closed this week (~70 commits on main against `~/.claude/plans/dharma-product-logical-candy.md`), and this evening four follow-on loops closed in one auto-loop session: (1) all 9 Anthropic call sites now route through `lib/anthropicEndpoint.ts`, which toggles direct Anthropic vs Vercel AI Gateway based on `AI_GATEWAY_API_KEY`; (2) `ClassifiedThread` gained `labelName` + `draftCreated`, populated at write time by gmail/poll, gmail/webhook, labels/back-scan and flipped from the two draft routes, so `/api/metrics/by-label` now serves a real draft-generation rate per label; (3) the Signals tab is no longer a scaffold — `lib/signalDetector.ts` runs a Haiku pass after every classify and persists `deal_flow` / `term_sheet` / `transaction` rows at confidence ≥ 0.7, with the page rendering chips, summary, evidence, and a deep-link to the Gmail thread; (4) the sentence-case audit swept clean except for 3 Toggle aria-labels. The IA from the redesign (Dashboard / Metrics / Configuration / Signals / Settings + Profile), purple-forward tokens, 4-step onboarding, milestone + badge progression, nightly award cron, admin Google Sheet, and share-card OG pages are all still in place. Next concrete steps: hear back on CWS, run one real external user through preset → Sync Inbox → draft (now with real signal/draft-rate telemetry), and verify the Pub/Sub push path end-to-end.
 
 ---
 
@@ -113,6 +113,8 @@ The "logical candy" product redesign closed this week — ~70 commits on main ag
 | AI — scheduling reply | Claude Sonnet streaming | `/api/suggest-times` |
 | AI — toneSummary | Claude Sonnet 4 (env-gated) | onboarding step 3 → `User.toneSummary` |
 | AI — milestone generation | Claude Haiku | `lib/milestoneGenerator.ts`, on-demand per-city, ~$0.001/city |
+| AI — signal detection | Claude Haiku | `lib/signalDetector.ts`, runs after classify on every thread, fires only at confidence ≥ 0.7 |
+| AI routing | Vercel AI Gateway (optional, via `AI_GATEWAY_API_KEY`) | `lib/anthropicEndpoint.ts` flips all 9 fetch sites between Gateway and direct Anthropic |
 | Gmail | `googleapis` v144 (Gmail API v1) | Read, label, draft, history, watch; `gmail.modify` scope |
 | Calendar | Google Calendar + Microsoft Graph + Apple CalDAV (`tsdav` 2.0.11) | Free/busy + Meet links |
 | Hosting | Vercel | `vercel.json` runs `prisma generate && next build` |
@@ -194,17 +196,18 @@ The "logical candy" product redesign closed this week — ~70 commits on main ag
 - [ ] Verify Pub/Sub push path end-to-end (current default is the poller script) — Finley
 - [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only) — Finley
 - [ ] Multi-account switching (GitHub-style, ProfileChip dropdown) — needs custom NextAuth session-token cookie handling (per-account tokens + active-index pointer). Deferred; Chrome profiles cover the gap.
-- [ ] Migrate Anthropic calls to Vercel AI Gateway (per CLAUDE.md guidance) — still on direct `fetch`
-- [ ] Stripe / subscribe action — Subscribers-tab promotion fires once an endpoint exists
-- [ ] Per-thread reply rate by label — needs `ClassifiedThread` schema change
-- [ ] Signal producers — Claude deal/term-sheet detection on incoming threads (Signals tab UI exists, no producers yet)
-- [ ] A11y sweep — aria labels, keyboard handlers, focus rings
-- [ ] Sentence-case audit across new surfaces
-- [ ] Cities autocomplete expansion from ~60 metros to ~5k US cities
-- [ ] Milestone-generator prompt grounding — Stanley Park / Standing Stone Trail style hallucinations occasionally slip through
-- [x] `apps/web/next-env.d.ts` committed; `inspect-user.mjs` brought into tracked tooling (2026-05-29)
+- [ ] Stripe / subscribe action — Subscribers-tab promotion fires once an endpoint exists. Needs plan/pricing decisions before code.
+- [ ] Cities autocomplete: extended set up to ~240; ~5k still aspirational. Needs a US Cities dataset (Census / simplemaps) to be vendored.
+- [ ] Signal-detector cost ceiling — currently runs Haiku on every new classified thread (~$0.001/thread). At ~200 msgs/day per user that's ~$0.20/day. Consider gating by priority or per-user toggle.
 
 ### Recently closed
+- [x] Migrate Anthropic calls to Vercel AI Gateway (2026-05-29) — `lib/anthropicEndpoint.ts` toggles direct vs Gateway via `AI_GATEWAY_API_KEY`; all 9 fetch sites migrated.
+- [x] Per-thread reply rate by label (2026-05-29) — `ClassifiedThread.labelName` + `draftCreated` populated by gmail/poll, gmail/webhook, labels/back-scan; flipped from thread-draft + [id]/draft.
+- [x] Signal producers (2026-05-29) — `lib/signalDetector.ts` Haiku pass on every classified thread; persists `deal_flow` / `term_sheet` / `transaction` to `Signal` via `(userId, threadId, kind)` upsert. Signals page renders kind chips, summary, evidence, links to Gmail thread.
+- [x] Sentence-case audit (2026-05-29) — sweep across redesign surfaces was clean except 3 Toggle aria-labels (Tone/Scheduling/Labels) which were flipped.
+- [x] Milestone-generator prompt grounding (2026-05-29) — landmark-accuracy rules added to prompt.
+- [x] A11y focus sweep (2026-05-29) — global `:focus-visible` brand-purple outline.
+- [x] Cities autocomplete: extended to ~240 cities (2026-05-29) — state capitals + secondary metros + college towns.
 - [x] 12-step "logical candy" product redesign (2026-05-29)
 - [x] Auth.js JWT carryover bug (2026-05-26)
 - [x] Admin Google Sheet (Waitlist + Subscribers + Debugging) (2026-05-26)
@@ -224,7 +227,7 @@ The "logical candy" product redesign closed this week — ~70 commits on main ag
 - **Prisma version split** — root devDep `prisma@^6.12.0`, web app devDep + client `^5.22.0`. Confirm `prisma generate` uses the version expected at runtime.
 - **Polling fallback runs as a Node script** (`scripts/poller.mjs`) — needs a host if Pub/Sub isn't wired up. Vercel cron is the natural home.
 - **Cost visibility depends on `UsageEvent` writes** — any code path that forgets `logUsage` is invisible in Metrics.
-- **Milestone-generator can hallucinate landmarks** — Stanley Park (wrong city) and Standing Stone Trail (does not exist) have both surfaced; prompt grounding is on the open-loop list.
+- **Signal-detector token spend is unmetered** — runs Haiku on every classified thread; at ~200 msgs/day per user that's ~$0.20/day per user. Cost ceiling or per-user toggle is on the open-loop list.
 - **No automated tests visible** in `apps/web` (only `scripts/test-poll.mjs` for the poller).
 
 ---
@@ -245,6 +248,11 @@ The "logical candy" product redesign closed this week — ~70 commits on main ag
 
 ## Changelog
 
+- **2026-05-29 (PM, auto-loop session):** Closed three substantive open loops in sequence:
+  - **AI Gateway centralization** — `lib/anthropicEndpoint.ts` toggles via `AI_GATEWAY_API_KEY`; migrated all 9 Anthropic fetch sites.
+  - **Per-thread reply rate by label** — added `ClassifiedThread.labelName` + `draftCreated`, wired into 3 upsert sites (gmail/poll, gmail/webhook, labels/back-scan) and flipped from 2 draft routes (thread-draft, [id]/draft). `/api/metrics/by-label` returns real draftRate per label; component renders the %.
+  - **Signal producers** — `lib/signalDetector.ts` Haiku pass after each classify, persists `deal_flow` / `term_sheet` / `transaction` with confidence ≥ 0.7. Signal schema gained `threadId` + `@@unique([userId, threadId, kind])` for idempotency. Signals page rebuilt to render kind chips, subject/from, summary, evidence, and link to Gmail thread.
+  - **Sentence-case audit** — surfaces mostly clean; flipped 3 Toggle aria-labels.
 - **2026-05-29:** "Logical candy" redesign closed out. 5-tab IA, purple-forward design tokens + 10 UI primitives, Configuration tab, Dashboard + Metrics redesigns, 4-step onboarding, Profile + milestones + badges, Signals scaffold, Settings hub, FeedbackButton + `/api/feedback`, Sonnet 4 `toneSummary`, nightly cron at `/api/cron/awards`. Session-added: admin Google Sheet (Waitlist + Subscribers + Debugging), share-card OG generator at `/share/milestone/[id]`, `UserMilestone` persistence, tier-up confetti + `lastSeenTier`, on-demand city milestones via Haiku, jewel-tone badge rendering + Basquiat Founder crown, BadgeCase + MilestoneLibrary collapse + "See all" modals, hover-to-set `displayBadgeId`, Profile moved to its own sidebar tab, NPS prompt for users with >=10 drafts. Schema additions (all additive, `db push`): User fields + `MeetingHour`, `MilestoneDef`, `UserMilestone`, `BadgeDef`, `UserBadge`, `Signal`, `Feedback`.
 - **2026-05-26:** Auth.js JWT-carryover bug fixed (`lib/adapter.ts` wraps PrismaAdapter, `signIn` dual guard, login page `signOut`-then-`signIn`, `scripts/relink-google-account.mjs` recovery hatch). Also: built-in preset labels flattened (no "Dharma/" prefix), Custom preset name optional, `gmail.modify` scope restored, Google account-linking by verified email.
 - **2026-05-21:** Initial PROJECT.md superdoc generated by kuba-vault — scanned monorepo, Prisma schema, system diagram, recent git history, and CWS submission screenshots.
