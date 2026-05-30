@@ -32,6 +32,11 @@ type DayState = {
   hourEnd: number;
 };
 
+function to12h(h: number): string {
+  const hour = ((h + 11) % 12) + 1;
+  return String(hour);
+}
+
 function seedDays(initial: MeetingHour[]): DayState[] {
   const days: DayState[] = Array.from({ length: 7 }, () => ({
     active: false,
@@ -135,31 +140,28 @@ export default function MeetingHoursGrid({ initialHours, onChange }: Props) {
                     />
                   )}
                 </div>
-                <div className="relative h-full w-3 text-[7px] leading-none text-white/30">
-                  {[
-                    { label: "6", pct: 25 },
-                    { label: "12", pct: 50 },
-                    { label: "6", pct: 75 },
-                    { label: "12", pct: 100 },
-                  ].map((t) => (
-                    <span
-                      key={t.pct}
-                      className="absolute left-0 -translate-y-1/2"
-                      style={{ top: `${t.pct}%` }}
-                    >
-                      {t.label}
-                    </span>
-                  ))}
+                <div className="relative h-full w-3 text-[8px] leading-none text-white/45">
+                  {d.active && (
+                    <>
+                      <span
+                        className="absolute left-0 -translate-y-1/2"
+                        style={{ top: `${(d.hourStart / 24) * 100}%` }}
+                      >
+                        {to12h(d.hourStart)}
+                      </span>
+                      <span
+                        className="absolute left-0 -translate-y-1/2"
+                        style={{ top: `${(d.hourEnd / 24) * 100}%` }}
+                      >
+                        {to12h(d.hourEnd)}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <span className="mt-2 text-[10px] text-white/40">
-                {d.active ? `${d.hourStart}–${d.hourEnd}` : "off"}
+                {d.active ? `${d.hourEnd - d.hourStart}h` : "off"}
               </span>
-              {d.active && (
-                <span className="text-[10px] text-white/30">
-                  {d.hourEnd - d.hourStart}h
-                </span>
-              )}
             </button>
           );
         })}
