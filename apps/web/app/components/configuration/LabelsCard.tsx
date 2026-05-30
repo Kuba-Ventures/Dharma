@@ -24,11 +24,40 @@ const LABELS_ICON = (
 const PRESETS = ["VC", "PE", "Legal", "General", "Custom"] as const;
 type Preset = (typeof PRESETS)[number];
 
+type CustomLabel = {
+  shortName: string;
+  colorKey: string;
+  displayHex: string;
+};
+
+// Gmail's full label palette — three vibrancy rows. Hex doubles as the
+// `colorKey` sent to the API; the server maps to Gmail's accepted palette.
+const COLOR_ROWS: string[][] = [
+  ["#cc3a21","#eaa041","#f2c960","#149e60","#3dc789","#2da2bb","#4a86e8","#8e63ce","#b694e8","#e07798"],
+  ["#fb4c2f","#ffad47","#fad165","#16a766","#43d692","#4986e7","#a479e2","#f691b3","#cf8933","#653e9b"],
+  ["#f2b2a8","#ffc8af","#fce8b3","#b3efd3","#a0eac9","#98d7e4","#b6cff5","#e3d7ff","#d0bcf1","#fbd3e0"],
+];
+const DEFAULT_COLOR_HEX = "#4a86e8";
+
+function parseCustomLabels(raw: unknown): CustomLabel[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((l) => {
+      const o = l as Partial<CustomLabel>;
+      const shortName = typeof o.shortName === "string" ? o.shortName : "";
+      const colorKey = typeof o.colorKey === "string" ? o.colorKey : DEFAULT_COLOR_HEX;
+      const displayHex = typeof o.displayHex === "string" ? o.displayHex : colorKey;
+      return { shortName, colorKey, displayHex };
+    })
+    .filter((l) => l.shortName || l.colorKey);
+}
+
 type Props = {
   initial: {
     preset: Preset | null;
     enabled: boolean;
     customName: string | null;
+    customLabels: unknown;
     provisioned: number;
   };
 };
@@ -38,11 +67,23 @@ export default function LabelsCard({ initial }: Props) {
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [preset, setPreset] = useState<Preset>(initial.preset ?? "General");
   const [customName, setCustomName] = useState(initial.customName ?? "");
+  const [customLabels, setCustomLabels] = useState<CustomLabel[]>(() => {
+    const parsed = parseCustomLabels(initial.customLabels);
+    return parsed.length
+      ? parsed
+      : [{ shortName: "", colorKey: DEFAULT_COLOR_HEX, displayHex: DEFAULT_COLOR_HEX }];
+  });
   const [provisioned, setProvisioned] = useState(initial.provisioned);
   const [applying, setApplying] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function persistPreset(next: { preset?: Preset; enabled?: boolean; customName?: string }) {
+  async function persistPreset(next: {
+    preset?: Preset;
+    enabled?: boolean;
+    customName?: string;
+    customLabels?: CustomLabel[];
+  }) {
     await fetch("/api/labels/preset", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -52,22 +93,79 @@ export default function LabelsCard({ initial }: Props) {
 
   async function selectPreset(p: Preset) {
     setPreset(p);
-    await persistPreset({ preset: p, enabled: true, customName: p === "Custom" ? customName : "" });
+    setErrorMessage(null);
+    await persistPreset({
+      preset: p,
+      enabled: true,
+      customName: p === "Custom" ? customName : "",
+      ...(p === "Custom" && { customLabels: cleanedCustomLabels() }),
+    });
     setEnabled(true);
   }
 
+  function cleanedCustomLabels(): CustomLabel[] {
+    return customLabels
+      .map((l) => ({ ...l, shortName: l.shortName.trim() }))
+      .filter((l) => l.shortName);
+  }
+
+  function updateLabel(idx: number, patch: Partial<CustomLabel>) {
+    setCustomLabels((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  }
+
+  function addLabel() {
+    setCustomLabels((prev) => {
+      const row = COLOR_ROWS[0];
+      const next = row[prev.length % row.length];
+      return [...prev, { shortName: "", colorKey: next, displayHex: next }];
+    });
+  }
+
+  function removeLabel(idx: number) {
+    setCustomLabels((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  }
+
+  async function persistCustomState() {
+    if (preset !== "Custom") return;
+    await persistPreset({
+      preset: "Custom",
+      customName,
+      customLabels: cleanedCustomLabels(),
+    });
+  }
+
   async function applyToGmail() {
+    setErrorMessage(null);
+
+    if (preset === "Custom") {
+      const cleaned = cleanedCustomLabels();
+      if (cleaned.length === 0) {
+        setErrorMessage("Add at least one custom label before syncing.");
+        return;
+      }
+    }
+
     setApplying(true);
     setBackfillStatus(null);
     try {
+      const payload: Record<string, unknown> = { preset };
+      if (preset === "Custom") {
+        payload.customName = customName.trim();
+        payload.customLabels = cleanedCustomLabels();
+      }
       const res = await fetch("/api/labels/provision", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ preset, customName: preset === "Custom" ? customName : undefined }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         const data = (await res.json()) as { total?: number };
         if (typeof data.total === "number") setProvisioned(data.total);
+      } else {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(err.error ?? "Failed to sync labels.");
+        setApplying(false);
+        return;
       }
     } finally {
       setApplying(false);
@@ -140,7 +238,6 @@ export default function LabelsCard({ initial }: Props) {
     }
   }
 
-  // Refresh on mount and on focus.
   useEffect(() => {
     refresh();
     window.addEventListener("focus", refresh);
@@ -193,22 +290,79 @@ export default function LabelsCard({ initial }: Props) {
             </div>
 
             {preset === "Custom" && (
-              <label className="block">
-                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-                  Custom preset name (Gmail folder prefix)
-                </span>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  onBlur={() => persistPreset({ preset: "Custom", customName })}
-                  placeholder="e.g. Kuba Ventures"
-                  className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
-                />
-                <p className="mt-1 text-[11px] text-white/40">
-                  Leave blank for flat top-level labels.
-                </p>
-              </label>
+              <div className="space-y-4 rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] p-4">
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                    Gmail folder prefix{" "}
+                    <span className="text-white/30 normal-case tracking-normal">(optional)</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    onBlur={persistCustomState}
+                    placeholder="e.g. Kuba Ventures"
+                    className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
+                  />
+                  <p className="mt-1 text-[11px] text-white/40">
+                    {customName.trim() ? (
+                      <>
+                        Labels nest under{" "}
+                        <code className="text-white/55">{customName.trim()}/Label-Name</code> in your
+                        Gmail sidebar.
+                      </>
+                    ) : (
+                      <>Leave blank for flat top-level labels.</>
+                    )}
+                  </p>
+                </label>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                    Custom labels
+                  </span>
+                  <div className="mt-2 space-y-2">
+                    {customLabels.map((label, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <ColorPickerDot
+                          selectedHex={label.colorKey}
+                          onPick={(hex) => {
+                            updateLabel(idx, { colorKey: hex, displayHex: hex });
+                            void persistCustomState();
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={label.shortName}
+                          onChange={(e) => updateLabel(idx, { shortName: e.target.value })}
+                          onBlur={persistCustomState}
+                          placeholder="follow-up"
+                          className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-1.5 text-sm text-white placeholder:text-white/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removeLabel(idx);
+                            void persistCustomState();
+                          }}
+                          disabled={customLabels.length <= 1}
+                          aria-label="Remove label"
+                          className="px-2 text-base leading-none text-white/30 transition-colors hover:text-red-400/70 disabled:opacity-30 disabled:hover:text-white/30"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addLabel}
+                    className="mt-2 text-[11px] text-white/40 transition-colors hover:text-white/70"
+                  >
+                    + Add label
+                  </button>
+                </div>
+              </div>
             )}
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -219,6 +373,9 @@ export default function LabelsCard({ initial }: Props) {
                 Provisions the preset's labels in your Gmail and starts classifying new mail.
               </p>
             </div>
+            {errorMessage && (
+              <p className="text-[11px] text-red-300">{errorMessage}</p>
+            )}
             {backfillStatus && (
               <p className="text-[11px] text-brand-200">{backfillStatus}</p>
             )}
@@ -267,5 +424,51 @@ export default function LabelsCard({ initial }: Props) {
         onCancel={() => setConfirmingOff(false)}
       />
     </>
+  );
+}
+
+function ColorPickerDot({
+  selectedHex,
+  onPick,
+}: {
+  selectedHex: string;
+  onPick: (hex: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="h-5 w-5 rounded-full border border-white/20 ring-1 ring-black/40"
+        style={{ backgroundColor: selectedHex }}
+        aria-label="Pick color"
+      />
+      {open && (
+        <div className="absolute left-0 top-7 z-20 space-y-1.5 rounded-btn border border-[color:var(--border-subtle)] bg-[#1f1f1f] p-2 shadow-lg">
+          {COLOR_ROWS.map((row, rowIdx) => (
+            <div key={rowIdx} className="flex gap-1.5">
+              {row.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  onClick={() => {
+                    onPick(hex);
+                    setOpen(false);
+                  }}
+                  className={`h-4 w-4 rounded-full transition-transform ${
+                    hex.toLowerCase() === selectedHex.toLowerCase()
+                      ? "scale-125 ring-1 ring-white/50"
+                      : "opacity-80 hover:scale-110 hover:opacity-100"
+                  }`}
+                  style={{ backgroundColor: hex }}
+                  aria-label={hex}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

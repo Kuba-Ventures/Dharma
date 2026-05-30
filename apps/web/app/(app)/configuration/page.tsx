@@ -68,6 +68,7 @@ export default async function ConfigurationPage() {
             preset: (labelPreset?.preset as Preset | undefined) ?? null,
             enabled: labelPreset?.enabled ?? false,
             customName: labelPreset?.customName ?? null,
+            customLabels: (labelPreset?.customLabels as unknown) ?? null,
             provisioned: mappingCount,
           }}
         />
