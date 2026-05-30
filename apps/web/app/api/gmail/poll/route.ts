@@ -196,7 +196,11 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
             await prisma.classifiedThread.upsert({
               where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
-              create: { userId: googleCred.userId, threadId: msg.threadId },
+              create: {
+                userId: googleCred.userId,
+                threadId: msg.threadId,
+                labelName: matched?.name ?? null,
+              },
               update: {},
             });
           } catch (err) {

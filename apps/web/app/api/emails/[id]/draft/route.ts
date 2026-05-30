@@ -174,5 +174,10 @@ Reply draft:`;
     references,
   });
 
+  await prisma.classifiedThread.updateMany({
+    where: { userId, threadId },
+    data: { draftCreated: true },
+  });
+
   return NextResponse.json({ ok: true });
 }

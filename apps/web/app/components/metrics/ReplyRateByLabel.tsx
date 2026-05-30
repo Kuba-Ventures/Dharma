@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import DismissibleCard from "../ui/DismissibleCard";
 import Skeleton from "../ui/Skeleton";
 
-type Row = { labelName: string; color: string; tagged: number };
+type Row = {
+  labelName: string;
+  color: string;
+  tagged: number;
+  drafted: number;
+  draftRate: number;
+};
 type Payload = { rows: Row[]; totalTagged: number; days: number };
 
 export default function ReplyRateByLabel() {
@@ -28,7 +34,7 @@ export default function ReplyRateByLabel() {
       <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
         <div className="mb-3 flex items-baseline justify-between">
           <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
-            Volume by label · last {data?.days ?? 30} days
+            Volume + draft rate · last {data?.days ?? 30} days
           </p>
           <p className="text-[11px] text-white/40">{data?.totalTagged ?? 0} tagged</p>
         </div>
@@ -60,8 +66,13 @@ export default function ReplyRateByLabel() {
                     }}
                   />
                 </div>
-                <span className="w-10 shrink-0 text-right text-[11px] text-white/50">
+                <span className="w-14 shrink-0 text-right text-[11px] text-white/50">
                   {r.tagged}
+                  {r.tagged > 0 && (
+                    <span className="ml-1 text-white/30">
+                      · {Math.round(r.draftRate * 100)}%
+                    </span>
+                  )}
                 </span>
               </div>
             ))}

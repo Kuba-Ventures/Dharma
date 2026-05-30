@@ -199,9 +199,12 @@ model ClassifiedThread {
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   threadId     String
+  labelName    String?  // e.g. "Dharma/VC/Deal-Flow"; null for pre-redesign rows
+  draftCreated Boolean  @default(false) // set when a draft was generated for this thread
   classifiedAt DateTime @default(now())
 
   @@unique([userId, threadId])
+  @@index([userId, labelName])
 }
 
 // ── Cost / usage tracking ──────────────────────────────────────────────────

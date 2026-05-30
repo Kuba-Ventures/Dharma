@@ -349,6 +349,15 @@ Reply draft:`;
     });
   }
 
+  // Polish mode (draftText present) isn't a thread reply, so don't flip
+  // draftCreated on the ClassifiedThread.
+  if (!draftText && threadId) {
+    await prisma.classifiedThread.updateMany({
+      where: { userId, threadId },
+      data: { draftCreated: true },
+    });
+  }
+
   return NextResponse.json({ ok: true, text: replyBody }, { headers: CORS });
   } catch (err: any) {
     console.error("[thread-draft] unhandled error:", err?.message ?? err);

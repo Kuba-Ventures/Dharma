@@ -151,8 +151,8 @@ export async function POST(req: Request) {
 
       await prisma.classifiedThread.upsert({
         where: { userId_threadId: { userId, threadId: c.threadId } },
-        create: { userId, threadId: c.threadId },
-        update: {},
+        create: { userId, threadId: c.threadId, labelName: matched?.name ?? null },
+        update: { labelName: matched?.name ?? null },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
