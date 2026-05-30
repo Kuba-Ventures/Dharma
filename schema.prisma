@@ -216,6 +216,9 @@ model UsageEvent {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventType    String   // "classify" | "draft" | "tone_sync" | "schedule"
   model        String
+  // Tone preset active when the event was generated. Only set for
+  // eventType="draft" — null elsewhere. Powers the dashboard Tone tile.
+  tone         String?
   inputTokens  Int
   outputTokens Int
   costUsd      Float

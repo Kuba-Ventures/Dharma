@@ -160,6 +160,7 @@ Reply draft:`;
       eventType: "draft",
       model: "claude-haiku-4-5-20251001",
       usage: claudeData.usage,
+      tone: toneKey,
     });
   }
 

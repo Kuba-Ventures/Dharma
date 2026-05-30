@@ -26,8 +26,9 @@ export async function logUsage(params: {
   eventType: EventType;
   model: string;
   usage: AnthropicUsage;
+  tone?: string;
 }): Promise<void> {
-  const { userId, eventType, model, usage } = params;
+  const { userId, eventType, model, usage, tone } = params;
   if (!userId) return;
   const price = PRICING[model];
   if (!price) {
@@ -43,6 +44,7 @@ export async function logUsage(params: {
         userId,
         eventType,
         model,
+        tone: tone ?? null,
         inputTokens: usage.input_tokens ?? 0,
         outputTokens: usage.output_tokens ?? 0,
         costUsd: cost,

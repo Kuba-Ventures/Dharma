@@ -49,6 +49,7 @@ export default async function DashboardPage() {
     activity,
     userLabels,
     classifiedThisWeek,
+    toneUsage,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -92,6 +93,16 @@ export default async function DashboardPage() {
       where: { userId, classifiedAt: { gte: weekAgo } },
       select: { labelName: true },
     }),
+    prisma.usageEvent.groupBy({
+      by: ["tone"],
+      where: {
+        userId,
+        eventType: "draft",
+        createdAt: { gte: weekAgo },
+        tone: { not: null },
+      },
+      _count: { _all: true },
+    }),
   ]);
 
   const taggedByLabel = new Map<string, number>();
@@ -106,6 +117,18 @@ export default async function DashboardPage() {
     color: l.color,
     tagged: taggedByLabel.get(l.name) ?? 0,
   }));
+
+  // Tone usage breakdown — only tracked starting when the `tone` column
+  // shipped, so legacy drafts are skipped (null filter above). Sorted
+  // descending by count so the most-used preset reads first.
+  const toneTotal = toneUsage.reduce((sum, row) => sum + row._count._all, 0);
+  const toneBreakdown = toneUsage
+    .map((row) => ({
+      tone: row.tone ?? "Unknown",
+      count: row._count._all,
+      pct: toneTotal > 0 ? Math.round((row._count._all / toneTotal) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   if (!user) redirect("/login");
 
@@ -162,11 +185,38 @@ export default async function DashboardPage() {
             title="Tone"
             status={toneActive ? "Active" : "Paused"}
             stat={
-              toneActive
-                ? user.toneProfile
-                  ? "Trained on your sent mail"
-                  : `Using "${user.tone}" preset`
-                : "Drafts use a neutral default"
+              toneActive ? (
+                <div>
+                  <p className="text-[11px] text-white/50">
+                    {toneTotal > 0
+                      ? `${toneTotal} draft${toneTotal === 1 ? "" : "s"} this week`
+                      : `Using "${user.tone}" preset`}
+                  </p>
+                  {toneBreakdown.length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {toneBreakdown.map((row) => (
+                        <li
+                          key={row.tone}
+                          className="flex items-center gap-2 text-[11px]"
+                        >
+                          <span className="flex-1 truncate text-white/70">
+                            {row.tone === user.tone ? `${row.tone} (active)` : row.tone}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-white/40">
+                            {row.count} · {row.pct}%
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-white/30">
+                      Tone usage shows up once you generate drafts.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                "Drafts use a neutral default"
+              )
             }
           />
           <ConfigStatusCard

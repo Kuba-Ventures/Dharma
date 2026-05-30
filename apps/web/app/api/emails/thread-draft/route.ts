@@ -171,6 +171,11 @@ export async function POST(req: Request) {
     ? `\nWhen an opening greeting fits, use this form: ${dbUser.inferredIntro}`
     : "";
 
+  // Tone preference resolution: explicit request body wins, then the user's
+  // saved preference, then Concise. Hoisted so logUsage can attribute the
+  // draft to its tone preset regardless of which prompt branch ran.
+  const toneKey = tone ?? dbUser?.tone ?? "Concise";
+
   let prompt: string;
 
   if (draftText) {
@@ -233,11 +238,6 @@ Polished email:`;
     }
 
     const emailBody = extractBody(msg.payload) || msg.snippet || "";
-    // Tone preference resolution: explicit request body wins, then the user's
-    // saved preference, then Concise. This is how the inline button + compose
-    // FAB (which can't show a tone picker) produce drafts in the user's chosen
-    // tone instead of always defaulting to Concise.
-    const toneKey = tone ?? dbUser?.tone ?? "Concise";
 
     if (toneKey === "Scheduling") {
     if (dbUser?.schedulingEnabled === false) {
@@ -346,6 +346,7 @@ Reply draft:`;
       eventType: "draft",
       model: "claude-haiku-4-5-20251001",
       usage: claudeData.usage,
+      tone: toneKey,
     });
   }
 
