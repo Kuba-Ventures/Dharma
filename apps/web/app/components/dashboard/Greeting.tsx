@@ -1,6 +1,5 @@
 type Props = {
   firstName: string;
-  email: string;
   timezone: string | null;
 };
 
@@ -27,19 +26,16 @@ function formattedDate(timezone: string | null): string {
   });
 }
 
-export default function Greeting({ firstName, email, timezone }: Props) {
+export default function Greeting({ firstName, timezone }: Props) {
   const part = dayPart(timezone);
   return (
-    <header className="flex items-end justify-between">
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
-          {formattedDate(timezone)}
-        </p>
-        <h1 className="mt-1 font-display text-3xl text-white">
-          Good {part}, {firstName}.
-        </h1>
-      </div>
-      <span className="text-sm text-white/40">{email}</span>
-    </header>
+    <div>
+      <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
+        {formattedDate(timezone)}
+      </p>
+      <h1 className="mt-1 font-display text-3xl text-white">
+        Good {part}, {firstName}.
+      </h1>
+    </div>
   );
 }

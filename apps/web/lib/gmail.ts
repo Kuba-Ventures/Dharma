@@ -71,6 +71,33 @@ export async function setupGmailWatch(
   console.log(`[gmail] Initialized historyId=${historyId} for user ${userId}`);
 }
 
+// Renews an existing Gmail Pub/Sub watch without touching gmailHistoryId.
+// Use from the daily cron — overwriting historyId on renewal would drop any
+// in-flight messages between the last webhook push and this call.
+export async function renewGmailWatch(
+  userId: string,
+  accessToken: string,
+  refreshToken: string
+): Promise<{ expiry: Date }> {
+  const topic = process.env.GOOGLE_PUBSUB_TOPIC;
+  if (!topic) throw new Error("GOOGLE_PUBSUB_TOPIC not set");
+
+  const auth = makeOAuth2Client();
+  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  const gmail = google.gmail({ version: "v1", auth });
+
+  const res = await gmail.users.watch({
+    userId: "me",
+    requestBody: { topicName: topic, labelIds: ["INBOX"] },
+  });
+  const expiry = new Date(Number(res.data.expiration));
+  await prisma.googleCredential.update({
+    where: { userId },
+    data: { gmailWatchExpiry: expiry },
+  });
+  return { expiry };
+}
+
 export async function getNewMessageIds(
   accessToken: string,
   refreshToken: string,

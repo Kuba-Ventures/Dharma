@@ -1,30 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
+import { OAuth2Client } from "google-auth-library";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
+// Allow heavier classification work past the default 15s — caps at 60s to
+// stay under the Pub/Sub ack deadline.
+export const maxDuration = 60;
+
 // Pub/Sub push handler. Applies labels to new messages. Never creates drafts
 // or calendar events — those are user-button-only by design.
 //
-// Pub/Sub sends a verification token in the URL when the subscription is
-// created. Set PUBSUB_VERIFICATION_TOKEN to the same value used when creating
-// the subscription.
-function verifyToken(req: NextRequest): boolean {
-  const expected = process.env.PUBSUB_VERIFICATION_TOKEN;
-  if (!expected) return true; // token check disabled if env var not set
-  return req.nextUrl.searchParams.get("token") === expected;
+// Auth: accepts either an OIDC bearer JWT signed by the configured Pub/Sub
+// pusher service account (preferred) OR the URL `?token=` against
+// PUBSUB_VERIFICATION_TOKEN (legacy/transition). Both are checked; at least
+// one must pass. If neither env is set, the handler refuses all requests.
+const oidcClient = new OAuth2Client();
+
+async function authorize(req: NextRequest): Promise<boolean> {
+  const expectedToken = process.env.PUBSUB_VERIFICATION_TOKEN;
+  const expectedSA = process.env.PUBSUB_PUSH_SERVICE_ACCOUNT;
+  const expectedAud = process.env.PUBSUB_PUSH_AUDIENCE; // typically the webhook URL
+
+  // URL token path
+  if (expectedToken && req.nextUrl.searchParams.get("token") === expectedToken) {
+    return true;
+  }
+
+  // OIDC JWT path
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (expectedSA && authHeader.startsWith("Bearer ")) {
+    const idToken = authHeader.slice("Bearer ".length).trim();
+    try {
+      const ticket = await oidcClient.verifyIdToken({
+        idToken,
+        audience: expectedAud,
+      });
+      const payload = ticket.getPayload();
+      if (payload?.email === expectedSA && payload.email_verified) {
+        return true;
+      }
+    } catch (err) {
+      console.warn("[gmail/webhook] OIDC verify failed:", (err as Error).message);
+    }
+  }
+
+  return false;
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifyToken(req)) {
+  if (!(await authorize(req))) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Always return 200 to Pub/Sub — failures are logged and retries are prevented
-  // by updating historyId before processing.
-  let body: { message?: { data?: string } };
+  let body: { message?: { data?: string; messageId?: string } };
   try {
     body = await req.json();
   } catch {
@@ -58,41 +90,56 @@ export async function POST(req: NextRequest) {
 
   const startHistoryId = googleCred.gmailHistoryId;
 
-  // Advance historyId immediately so retries don't reprocess the same messages
+  // Advance historyId synchronously so the next Pub/Sub redelivery skips work
+  // and so subsequent notifications don't reprocess these messages.
   await prisma.googleCredential.update({
     where: { email: emailAddress },
     data: { gmailHistoryId: newHistoryId },
   });
 
+  // Heavy work happens after we return 200 — Pub/Sub's ack deadline is 60s
+  // and AI classification can stack up across multiple messages.
+  waitUntil(
+    processPush({
+      userId: googleCred.userId,
+      email: emailAddress,
+      accessToken: googleCred.accessToken,
+      refreshToken: googleCred.refreshToken,
+      startHistoryId,
+    }).catch((err) => console.error("[gmail/webhook] processPush failed:", err))
+  );
+
+  return new NextResponse("OK", { status: 200 });
+}
+
+interface PushContext {
+  userId: string;
+  email: string;
+  accessToken: string;
+  refreshToken: string;
+  startHistoryId: string;
+}
+
+async function processPush(ctx: PushContext): Promise<void> {
   let messageIds: string[];
   try {
-    messageIds = await getNewMessageIds(
-      googleCred.accessToken,
-      googleCred.refreshToken,
-      startHistoryId
-    );
+    messageIds = await getNewMessageIds(ctx.accessToken, ctx.refreshToken, ctx.startHistoryId);
   } catch (err) {
     console.error("[gmail/webhook] history.list failed:", err);
-    return new NextResponse("OK", { status: 200 });
+    return;
   }
 
-  console.log(`[gmail/webhook] ${messageIds.length} new message(s) for ${emailAddress}`);
+  console.log(`[gmail/webhook] ${messageIds.length} new message(s) for ${ctx.email}`);
 
   for (const messageId of messageIds) {
     try {
-      const msg = await getMessage(
-        googleCred.accessToken,
-        googleCred.refreshToken,
-        messageId,
-        emailAddress
-      );
-
+      const msg = await getMessage(ctx.accessToken, ctx.refreshToken, messageId, ctx.email);
       if (!msg) continue; // sent by the user themselves
 
       // Apply matching Gmail labels (rules first, then AI for labels without rules)
       try {
         const labels = await prisma.label.findMany({
-          where: { userId: googleCred.userId, enabled: true, gmailLabelId: { not: null } },
+          where: { userId: ctx.userId, enabled: true, gmailLabelId: { not: null } },
           include: { rules: true },
         });
 
@@ -111,7 +158,7 @@ export async function POST(req: NextRequest) {
 
         const gmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
         if (gmailIds.length > 0) {
-          await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+          await applyGmailLabels(ctx.userId, messageId, gmailIds);
           console.log(`[gmail/webhook] Labeled message ${messageId}:`, gmailIds);
         }
       } catch (err) {
@@ -121,7 +168,7 @@ export async function POST(req: NextRequest) {
       // Preset label classification. Idempotent per thread.
       try {
         const presetRow = await prisma.labelPreset.findUnique({
-          where: { userId: googleCred.userId },
+          where: { userId: ctx.userId },
         });
         if (presetRow?.enabled && isPresetKey(presetRow.preset) && process.env.ANTHROPIC_API_KEY) {
           const spec = resolvePresetSpec({
@@ -131,7 +178,7 @@ export async function POST(req: NextRequest) {
           });
           if (spec && spec.labels.length > 0) {
             const already = await prisma.classifiedThread.findUnique({
-              where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+              where: { userId_threadId: { userId: ctx.userId, threadId: msg.threadId } },
             });
             if (!already) {
               const labelNames = spec.labels
@@ -145,7 +192,7 @@ export async function POST(req: NextRequest) {
                 from: msg.from,
                 snippet: msg.body.slice(0, 200),
                 body: msg.body,
-                userId: googleCred.userId,
+                userId: ctx.userId,
               });
 
               const matched = result.label
@@ -160,19 +207,19 @@ export async function POST(req: NextRequest) {
 
               if (labelNamesToApply.length > 0) {
                 const mappings = await prisma.labelMapping.findMany({
-                  where: { userId: googleCred.userId, labelName: { in: labelNamesToApply } },
+                  where: { userId: ctx.userId, labelName: { in: labelNamesToApply } },
                 });
                 const gmailIds = mappings.map((m) => m.gmailLabelId);
                 if (gmailIds.length > 0) {
-                  await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+                  await applyGmailLabels(ctx.userId, messageId, gmailIds);
                   console.log(`[gmail/webhook] Preset labels applied to ${messageId}: ${mappings.map((m) => m.labelName).join(", ")} (priority=${result.priority.toFixed(2)})`);
                 }
               }
 
               await prisma.classifiedThread.upsert({
-                where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+                where: { userId_threadId: { userId: ctx.userId, threadId: msg.threadId } },
                 create: {
-                  userId: googleCred.userId,
+                  userId: ctx.userId,
                   threadId: msg.threadId,
                   labelName: matched?.name ?? null,
                 },
@@ -180,7 +227,7 @@ export async function POST(req: NextRequest) {
               });
 
               await detectAndPersistSignal({
-                userId: googleCred.userId,
+                userId: ctx.userId,
                 threadId: msg.threadId,
                 subject: msg.subject,
                 from: msg.from,
@@ -196,8 +243,6 @@ export async function POST(req: NextRequest) {
       console.error(`[gmail/webhook] Failed to process message ${messageId}:`, err);
     }
   }
-
-  return new NextResponse("OK", { status: 200 });
 }
 
 function matchesRule(

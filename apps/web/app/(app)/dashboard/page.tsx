@@ -121,12 +121,11 @@ export default async function DashboardPage() {
       {/* Header: greeting + Sync inbox + tier strip */}
       <header className="space-y-3">
         <div className="flex items-end justify-between gap-3">
-          <Greeting
-            firstName={firstName}
-            email={user.email ?? ""}
-            timezone={user.timezone}
-          />
-          <SyncInboxButton />
+          <Greeting firstName={firstName} timezone={user.timezone} />
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="text-sm text-white/40">{user.email}</span>
+            <SyncInboxButton />
+          </div>
         </div>
         <TierStrip cumulativeSecondsSaved={user.cumulativeSecondsSaved} />
       </header>

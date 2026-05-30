@@ -4,6 +4,11 @@
     {
       "path": "/api/cron/awards",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/renew-watches",
+      "schedule": "0 7 * * *"
     }
   ]
 }
+
