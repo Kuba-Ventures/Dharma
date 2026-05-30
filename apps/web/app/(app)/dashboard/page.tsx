@@ -17,18 +17,18 @@ import NpsPrompt from "../../components/dashboard/NpsPrompt";
 
 const TONE_ICON = (
   <svg width="56" height="56" viewBox="0 0 14 14" fill="none">
-    <path d="M2 5v4M5 6v3M8 3v8M11 5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M2 5v4M5 6v3M8 3v8M11 5v4" stroke="currentColor" strokeWidth="0.75" strokeLinecap="round" />
   </svg>
 );
 const LABELS_ICON = (
   <svg width="56" height="56" viewBox="0 0 14 14" fill="none">
-    <path d="M2.5 3h5.5L11 5.5 8 8H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+    <path d="M2.5 3h5.5L11 5.5 8 8H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="0.7" strokeLinejoin="round" fill="none" />
   </svg>
 );
 const CAL_ICON = (
   <svg width="56" height="56" viewBox="0 0 14 14" fill="none">
-    <rect x="2" y="3.5" width="10" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.4" fill="none" />
-    <line x1="2" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="1.4" />
+    <rect x="2" y="3.5" width="10" height="9" rx="1.2" stroke="currentColor" strokeWidth="0.7" fill="none" />
+    <line x1="2" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="0.7" />
   </svg>
 );
 
