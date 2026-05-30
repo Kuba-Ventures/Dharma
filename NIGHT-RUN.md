@@ -126,4 +126,66 @@ Commit: pending Phase 3 commit · will push after acceptance.
 
 Proceeding to Phase 4.
 
+---
+
+### Phase 4 — Signal rewrite + cap (improve in place)
+
+Commit: pending Phase 4 commit · will push after acceptance.
+
+**Detector rewrite** (`apps/web/lib/signalDetector.ts`):
+- `SignalKind` union switched from `deal_flow | term_sheet | transaction` to `buried_intent | cold_thread`. `cold_thread` is reserved in the type system but the detector does not currently fire it (see "Deferred work" below).
+- New `SYSTEM_PROMPT` elicits **buried intent only** — latent intent the sender did NOT state outright (founder updating you on traction whose subtext is "raising soon"; vendor mentioning growth whose subtext is "outgrowing current provider"; long-time relationship asking about your portfolio whose subtext is fundraise exploration). Explicit asks are rejected.
+- `SignalPayload` gained `title` (≤6-word headline) and `whyItMatters` (one-sentence rationale). `subject`, `from`, `summary`, `evidence` (≤120 chars), `confidence`, `threadId` retained.
+- Privacy assertion comment added at the top: only the new payload fields are persisted; full bodies stay out of `Signal.payload`.
+
+**Cost ceiling** (also `apps/web/lib/signalDetector.ts`):
+- Env var `SIGNAL_DAILY_LIMIT` (default 100 per user per UTC day). Tweakable without code change.
+- Helper `isUnderDailyLimit(userId)` counts today's `UsageEvent` rows where `eventType="signal"` since `setUTCHours(0,0,0,0)`. If ≥ limit, the detector short-circuits before the LLM call.
+- This piggybacks on the existing `logUsage({ eventType: "signal" })` write — no new schema.
+- Combined with the Phase 3 `signalDetectionEnabled` toggle, signal-detection is now bounded by both a per-user kill switch and a per-user daily ceiling.
+
+**Signals page** (`apps/web/app/(app)/signals/page.tsx`):
+- `KIND_LABEL` / `KIND_CHIP` rewritten as plain `Record<string, …>` (instead of typed `Record<SignalKind, …>`) so legacy rows from the pre-rewrite detector (`deal_flow`, `term_sheet`, `transaction`) still render with their existing chip colors during the transition. New kinds (`buried_intent` → violet, `cold_thread` → slate) added.
+- Render order: kind chip + timestamp → `title` (if present) → `subject` → `from` → `whyItMatters` (preferred) or `summary` (fallback) → `evidence` quote. Older rows without `title`/`whyItMatters` degrade gracefully to the original layout.
+- Header copy updated to mention "latent intent" and that cold-thread + pattern-shift are coming.
+
+**Deferred work documented (not built tonight):**
+
+1. **cold_thread detector** — by definition fires when there's been silence on a thread the user replied to, NOT when a new inbound arrives. The current call sites (`gmail/poll`, `gmail/webhook`, `labels/back-scan`) are inbound-triggered, so they're the wrong cadence. The right shape:
+   - New cron `/api/cron/cold-threads` (daily-ish) that walks each user's recent Gmail threads, finds threads where the user's last sent message is older than `COLD_THRESHOLD_DAYS` (default 7) AND no newer inbound exists, then issues a tiny Haiku call ("was this an active discussion that should have continued? Yes/No + one sentence; ≥0.7 confidence → persist").
+   - Same `(userId, threadId, "cold_thread")` upsert pattern; same `SIGNAL_DAILY_LIMIT` gate; same `signalDetectionEnabled` gate.
+   - Pre-work: need a deterministic way to walk threads efficiently — `gmail.users.threads.list` paginated, filtered to threads the user has sent from. Avoid quota burn by only scanning threads modified in the last ~30 days.
+
+2. **pattern_shift detector** — requires a `ContactBaseline` table that doesn't exist yet. Proposed model:
+
+   ```prisma
+   model ContactBaseline {
+     id                       String   @id @default(cuid())
+     userId                   String
+     user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+     fromAddress              String   // normalized email
+     avgInboundCadenceDays    Float?   // rolling avg of days between inbound
+     lastInboundAt            DateTime?
+     baselineSentimentRollup  Json?    // { tone, urgency, etc. }
+     updatedAt                DateTime @updatedAt
+     @@unique([userId, fromAddress])
+     @@index([userId, lastInboundAt])
+   }
+   ```
+
+   With that in place, `pattern_shift` would detect frequency spikes, urgency jumps, and sentiment shifts vs. the per-contact baseline. The baseline itself wants a backfill job (last 90 days of inbound) plus a per-message updater. Substantial — flagging for Finley's prioritization rather than guessing the data shape now.
+
+3. **Confirm/dismiss feedback loop** — `/api/signals/[id]/read` exists and persists `readAt`, but there's no `/confirm` ("this was useful") or `/dismiss` ("false positive") today. Adding fake telemetry is worse than having none, so the brief's "leave a TODO and flag" guidance is honored — see top-of-file TODO in `lib/signalDetector.ts`. Until confirm/dismiss ships, the detector has no closed-loop precision calibration.
+
+**Acceptance:**
+- ✅ Detector now emits `buried_intent` with the new payload shape; `cold_thread` and `pattern_shift` documented as deferred-and-why.
+- ✅ `SIGNAL_DAILY_LIMIT` enforced — counted via `UsageEvent` `signal` rows since UTC midnight; short-circuits before the LLM call when over.
+- ✅ Phase 3 `signalDetectionEnabled` toggle continues to short-circuit before everything.
+- ✅ Signal page renders the new kinds with appropriate chip colors AND keeps legacy chip styling for old rows so the transition is graceful.
+- ✅ Privacy invariant intact: full email body still passed to the LLM but never persisted; only `title`/`whyItMatters`/`summary`/`evidence`-snippet (≤120 chars)/`confidence`/identifying fields go into `Signal.payload`.
+- ✅ `npx tsc --noEmit` clean; `/signals` route compiles (307 unauth redirect).
+- ⏭ Live "synthetic burst hits the cap" verification deferred — would need a logged-in test user; will spot-check from the morning if Finley wants. Code path is `isUnderDailyLimit` → `UsageEvent.count`.
+
+Proceeding to Phase 5.
+
 
