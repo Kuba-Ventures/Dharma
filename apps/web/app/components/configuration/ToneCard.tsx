@@ -12,7 +12,31 @@ import {
   defaultScenarioIndex,
 } from "../../../lib/sampleScenarios";
 
-const TONE_OPTIONS = ["My Tone", "Concise", "Formal / Legal", "Scheduling"];
+// The `key` strings are persisted in User.tone and used as keys in the
+// TONE_INSTRUCTIONS switches inside the draft routes. Don't rename them —
+// UI-label tweaks go in the `label` field below, not in `key`.
+const TONE_CARDS: Array<{ key: string; label: string; description: string }> = [
+  {
+    key: "My Tone",
+    label: "My tone",
+    description: "Mirror how you actually write. Trained on your sent mail.",
+  },
+  {
+    key: "Concise",
+    label: "Concise",
+    description: "2–4 sentences. No filler. Get to the point.",
+  },
+  {
+    key: "Formal / Legal",
+    label: "Formal / legal",
+    description: "Precise, formal language. No contractions.",
+  },
+  {
+    key: "Scheduling",
+    label: "Scheduling",
+    description: "Calendar-aware replies with concrete time slots.",
+  },
+];
 
 const TONE_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -160,37 +184,51 @@ export default function ToneCard({ initial }: Props) {
 
         {enabled && (
           <div className="space-y-4">
-            <div className="flex gap-3">
-              <label className="flex-1">
-                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-                  Active mode
-                </span>
-                <select
-                  value={tone}
-                  onChange={(e) => updateTone(e.target.value)}
-                  className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white"
-                >
-                  {TONE_OPTIONS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex-1">
-                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-                  Sign-off
-                </span>
-                <input
-                  type="text"
-                  value={signOff}
-                  onChange={(e) => setSignOff(e.target.value)}
-                  onBlur={() => saveSignOff(signOff)}
-                  placeholder="Thanks,"
-                  className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
-                />
-              </label>
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                Active mode
+              </span>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {TONE_CARDS.map((opt) => {
+                  const active = tone === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => updateTone(opt.key)}
+                      className={`rounded-card border px-3 py-2.5 text-left transition-colors ${
+                        active
+                          ? "border-[color:var(--border-brand)] bg-brand-400/12"
+                          : "border-[color:var(--border-subtle)] bg-white/[0.02] hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <div
+                        className={`text-sm ${active ? "text-brand-100" : "text-white/85"}`}
+                      >
+                        {opt.label}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-white/45">
+                        {opt.description}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                Sign-off
+              </span>
+              <input
+                type="text"
+                value={signOff}
+                onChange={(e) => setSignOff(e.target.value)}
+                onBlur={() => saveSignOff(signOff)}
+                placeholder="Thanks,"
+                className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
+              />
+            </label>
 
             <Card variant="elevated">
               <div className="mb-2 flex items-center justify-between">

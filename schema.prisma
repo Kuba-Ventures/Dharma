@@ -44,6 +44,7 @@ model User {
   displayBadgeId           String?              // user-selected badge for avatar overlay
   cumulativeSecondsSaved   Int                  @default(0)
   nextNpsPromptAt          DateTime?
+  signalDetectionEnabled   Boolean              @default(true)
 
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt

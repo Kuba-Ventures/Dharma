@@ -97,4 +97,33 @@ Commit: pending Phase 2 commit · will push after acceptance.
 
 Proceeding to Phase 3.
 
+---
+
+### Phase 3 — Configuration polish + signal toggle
+
+Commit: pending Phase 3 commit · will push after acceptance.
+
+**Schema change (additive, applied to Neon via `prisma db push --skip-generate`):**
+- `User.signalDetectionEnabled Boolean @default(true)` — defaulted, fully additive, no data loss possible. `prisma generate` ran clean.
+
+**Changes:**
+- New: `apps/web/app/api/preferences/signal-detection/route.ts` — `PATCH { enabled: boolean }` updates the new flag.
+- New: `apps/web/app/components/configuration/SignalDetectionCard.tsx` — fourth card with `Toggle`, status pill, and a one-line explainer mentioning the per-thread Haiku cost.
+- `apps/web/app/(app)/configuration/page.tsx` — selects `signalDetectionEnabled`, mounts `SignalDetectionCard` below Scheduling.
+- `apps/web/app/components/configuration/ToneCard.tsx` — `<select>` replaced with a 4-card grid (`TONE_CARDS`). Card `key` values stay verbatim (`My Tone`, `Concise`, `Formal / Legal`, `Scheduling`) since they're stored in `User.tone` and used as keys in the draft routes' `TONE_INSTRUCTIONS`. UI labels are sentence-case via a separate `label` field.
+- `apps/web/app/components/configuration/SchedulingCard.tsx` (via `MeetingHoursGrid.tsx`) — each per-day card now shows the numeric range `HH–HH` plus the hours-per-day count beneath it, instead of just `Xh`.
+- `apps/web/app/components/configuration/LabelsCard.tsx` — adds an "Active labels · last 7 days" list. Each row: color dot + label name + tagged count. Sources from `/api/metrics/by-label?days=7` (the canonical label-count source). Mounts on initial load and refreshes on window focus alongside the provisioned-count refresh.
+- `apps/web/lib/signalDetector.ts` — `detectAndPersistSignal()` now short-circuits if `User.signalDetectionEnabled === false`. The check runs before any LLM call so no token spend or `UsageEvent` gets logged for opted-out users.
+
+**Acceptance:**
+- ✅ Tone is card-selectable; selecting a card PATCHes `User.tone` with the same DB-stable key.
+- ✅ Scheduling shows `HH–HH` per active day plus the hours-per-day count.
+- ✅ Labels card shows active preset + per-label counts (7d) below the preset picker.
+- ✅ Signal-detection toggle persists via PATCH; UI rolls back on failure.
+- ✅ `prisma db push --skip-generate` succeeded (additive boolean, no `--accept-data-loss` needed).
+- ✅ `npx tsc --noEmit` exits clean; `npm run dev` boots and `/configuration` compiles (307 unauth redirect).
+- ⚠ End-to-end "off → no new signals" verification deferred to Phase 4's acceptance (which has the detector loop in scope).
+
+Proceeding to Phase 4.
+
 

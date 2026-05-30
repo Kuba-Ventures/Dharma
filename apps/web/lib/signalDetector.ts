@@ -113,6 +113,14 @@ export async function detectAndPersistSignal(args: {
   from: string;
   body: string;
 }): Promise<void> {
+  // Per-user gate from Configuration → Signal detection. Short-circuits
+  // before any LLM call so we don't burn tokens for users who opted out.
+  const user = await prisma.user.findUnique({
+    where: { id: args.userId },
+    select: { signalDetectionEnabled: true },
+  });
+  if (!user || !user.signalDetectionEnabled) return;
+
   const result = await detect({
     subject: args.subject,
     from: args.from,

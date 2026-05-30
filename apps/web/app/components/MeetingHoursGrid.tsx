@@ -135,8 +135,13 @@ export default function MeetingHoursGrid({ initialHours, onChange }: Props) {
                 )}
               </div>
               <span className="mt-2 text-[10px] text-white/40">
-                {d.active ? `${d.hourEnd - d.hourStart}h` : "off"}
+                {d.active ? `${d.hourStart}–${d.hourEnd}` : "off"}
               </span>
+              {d.active && (
+                <span className="text-[10px] text-white/30">
+                  {d.hourEnd - d.hourStart}h
+                </span>
+              )}
             </button>
           );
         })}

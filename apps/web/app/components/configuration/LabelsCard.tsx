@@ -87,18 +87,35 @@ export default function LabelsCard({ initial }: Props) {
     await persistPreset({ enabled: false });
   }
 
-  // Refresh provisioned count on focus
-  useEffect(() => {
-    function onFocus() {
-      fetch("/api/labels/status")
-        .then((r) => r.json())
-        .then((d: { count?: number }) => {
-          if (typeof d.count === "number") setProvisioned(d.count);
-        })
-        .catch(() => null);
+  type ByLabelRow = {
+    labelName: string;
+    color: string;
+    tagged: number;
+    drafted: number;
+    draftRate: number;
+  };
+  const [byLabel, setByLabel] = useState<ByLabelRow[] | null>(null);
+
+  async function refresh() {
+    const [statusRes, byLabelRes] = await Promise.allSettled([
+      fetch("/api/labels/status").then((r) => r.json()),
+      fetch("/api/metrics/by-label?days=7").then((r) => r.json()),
+    ]);
+    if (statusRes.status === "fulfilled") {
+      const d = statusRes.value as { count?: number };
+      if (typeof d.count === "number") setProvisioned(d.count);
     }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    if (byLabelRes.status === "fulfilled") {
+      const d = byLabelRes.value as { rows?: ByLabelRow[] };
+      if (Array.isArray(d.rows)) setByLabel(d.rows);
+    }
+  }
+
+  // Refresh on mount and on focus.
+  useEffect(() => {
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   return (
@@ -173,6 +190,33 @@ export default function LabelsCard({ initial }: Props) {
                 Provisions the preset's labels in your Gmail and starts classifying new mail.
               </p>
             </div>
+
+            {byLabel && byLabel.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                  Active labels · last 7 days
+                </span>
+                <ul className="mt-2 space-y-1.5">
+                  {byLabel.map((row) => (
+                    <li
+                      key={row.labelName}
+                      className="flex items-center gap-2.5 text-[12px]"
+                    >
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: row.color }}
+                      />
+                      <span className="flex-1 truncate text-white/80">
+                        {row.labelName}
+                      </span>
+                      <span className="shrink-0 text-white/50">
+                        {row.tagged} tagged
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
               Labels live in your own Gmail account. Dharma never reads
