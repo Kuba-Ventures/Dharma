@@ -120,7 +120,7 @@ export default function LabelsCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle Labels" />
+          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle labels" />
         </div>
 
         {enabled && (

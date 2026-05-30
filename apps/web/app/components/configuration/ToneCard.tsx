@@ -155,7 +155,7 @@ export default function ToneCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle Tone" />
+          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle tone" />
         </div>
 
         {enabled && (

@@ -141,7 +141,7 @@ export default function SchedulingCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle Scheduling" />
+          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle scheduling" />
         </div>
 
         {enabled && (
