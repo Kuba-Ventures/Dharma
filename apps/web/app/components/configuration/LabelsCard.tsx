@@ -75,6 +75,7 @@ export default function LabelsCard({ initial }: Props) {
   });
   const [provisioned, setProvisioned] = useState(initial.provisioned);
   const [applying, setApplying] = useState(false);
+  const [syncingInbox, setSyncingInbox] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -214,6 +215,35 @@ export default function LabelsCard({ initial }: Props) {
     await persistPreset({ enabled: false });
   }
 
+  async function syncInbox() {
+    setSyncingInbox(true);
+    setErrorMessage(null);
+    setBackfillStatus("Re-classifying your last 25 inbox threads…");
+    try {
+      const res = await fetch("/api/labels/back-scan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { scanned?: number; tagged?: number };
+        const tagged = data.tagged ?? 0;
+        const scanned = data.scanned ?? 0;
+        setBackfillStatus(`Re-classified ${tagged} of ${scanned} recent threads.`);
+      } else {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(err.error ?? "Sync inbox failed.");
+        setBackfillStatus(null);
+      }
+    } catch {
+      setErrorMessage("Sync inbox failed.");
+      setBackfillStatus(null);
+    } finally {
+      setSyncingInbox(false);
+      refresh();
+    }
+  }
+
   type ByLabelRow = {
     labelName: string;
     color: string;
@@ -263,7 +293,29 @@ export default function LabelsCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle labels" />
+          <div className="flex items-center gap-2">
+            {enabled && (
+              <button
+                type="button"
+                onClick={syncInbox}
+                disabled={syncingInbox || applying}
+                title="Re-classify your last 25 inbox threads under the current preset"
+                className="inline-flex items-center gap-1.5 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className={syncingInbox ? "animate-spin" : ""}>
+                  <path
+                    d="M2 6a4 4 0 0 1 7-2.6M10 6a4 4 0 0 1-7 2.6M9 1.5V3.6H6.9M3 10.5V8.4h2.1"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {syncingInbox ? "Syncing…" : "Sync inbox"}
+              </button>
+            )}
+            <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle labels" />
+          </div>
         </div>
 
         {enabled && (

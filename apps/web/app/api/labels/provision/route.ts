@@ -75,6 +75,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // Drop LabelMappings from prior presets that no longer apply. Gmail labels
+  // themselves are left alone (users may want to keep historical folders) —
+  // this just stops them from inflating the "provisioned in Gmail" count and
+  // from being applied during back-scan.
+  const currentNames = spec.labels.map((l) => l.name);
+  await prisma.labelMapping.deleteMany({
+    where: { userId, labelName: { notIn: currentNames } },
+  });
+
   // Persist preset choice (and custom spec if applicable). Enable classification.
   await prisma.labelPreset.upsert({
     where: { userId },
