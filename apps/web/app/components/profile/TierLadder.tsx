@@ -30,7 +30,10 @@ export default function TierLadder({ secondsSaved }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-1.5">
+      <div
+        className="grid gap-1.5"
+        style={{ gridTemplateColumns: `repeat(${TIERS.length}, minmax(0, 1fr))` }}
+      >
         {TIERS.map((t) => {
           const idx = TIERS.findIndex((x) => x.id === current);
           const tIdx = TIERS.findIndex((x) => x.id === t.id);

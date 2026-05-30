@@ -1,12 +1,12 @@
 // Tier ladder for the Profile page. Log-scale thresholds on cumulative
 // seconds saved — early wins feel fast, partner status feels earned.
+//
+// Tier is intentionally `string`, not a union. The Prisma schema stores
+// `User.tier` as a free-form String, and the TIERS array below is the only
+// source of truth at runtime. Adding new tiers is a one-line push to the
+// array — consumers iterate, they don't branch on specific tier names.
 
-export type Tier =
-  | "Apprentice"
-  | "Adept"
-  | "Practitioner"
-  | "Master"
-  | "Partner";
+export type Tier = string;
 
 export type TierSpec = {
   id: Tier;
