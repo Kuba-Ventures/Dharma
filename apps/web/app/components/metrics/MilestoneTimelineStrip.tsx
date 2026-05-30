@@ -31,8 +31,8 @@ export default function MilestoneTimelineStrip() {
       </p>
       {items.length === 0 ? (
         <p className="text-sm text-white/40">
-          Your milestones unlock as you save time. Check back as you use Dharma
-          — the first one is just around the corner.
+          Your milestones unlock as you save time. Check back as you use Dharma,
+          the first one is just around the corner.
         </p>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-1">

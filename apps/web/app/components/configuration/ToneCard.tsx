@@ -82,6 +82,23 @@ export default function ToneCard({ initial }: Props) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ tone: next }),
     });
+    // Regenerate the sample so what's shown reflects the just-selected tone.
+    // Keeps the current scenario so the user can compare tones on the same
+    // prompt; advance scenarios only via the explicit Regenerate button.
+    setRegenerating(true);
+    try {
+      const res = await fetch("/api/preferences/tone/sample", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scenarioId: SAMPLE_SCENARIOS[scenarioIdx].id }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { draft?: string };
+        if (data.draft) setDraft(data.draft);
+      }
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   async function saveSummary() {
@@ -230,38 +247,48 @@ export default function ToneCard({ initial }: Props) {
               />
             </label>
 
-            <Card variant="elevated">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
-                  Your voice, summarized
-                </span>
-                {!editingSummary && summary && (
-                  <button
-                    onClick={() => setEditingSummary(true)}
-                    className="text-[11px] text-white/40 hover:text-white/70"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-              {editingSummary ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={summary}
-                    onChange={(e) => setSummary(e.target.value)}
-                    className="w-full resize-none rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.04] p-2 text-sm text-white"
-                    rows={3}
-                  />
-                  <Button size="sm" variant="primary" onClick={saveSummary}>
-                    Save
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm leading-relaxed text-white/80">
-                  {summary || "Retrain on recent emails to learn your voice."}
-                </p>
-              )}
-            </Card>
+            {(() => {
+              const isMyTone = tone === "My Tone";
+              const activeCard = TONE_CARDS.find((c) => c.key === tone);
+              const eyebrow = isMyTone
+                ? "Your voice, summarized"
+                : `${activeCard?.label ?? tone} mode`;
+              const body = isMyTone
+                ? summary || "Retrain on recent emails to learn your voice."
+                : activeCard?.description ?? "";
+              return (
+                <Card variant="elevated">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
+                      {eyebrow}
+                    </span>
+                    {isMyTone && !editingSummary && summary && (
+                      <button
+                        onClick={() => setEditingSummary(true)}
+                        className="text-[11px] text-white/40 hover:text-white/70"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                  {isMyTone && editingSummary ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={summary}
+                        onChange={(e) => setSummary(e.target.value)}
+                        className="w-full resize-none rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.04] p-2 text-sm text-white"
+                        rows={3}
+                      />
+                      <Button size="sm" variant="primary" onClick={saveSummary}>
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-relaxed text-white/80">{body}</p>
+                  )}
+                </Card>
+              );
+            })()}
 
             <Card variant="elevated">
               <div className="mb-2 flex items-center justify-between">
