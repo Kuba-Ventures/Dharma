@@ -4,7 +4,6 @@ import { prisma } from "../../../lib/prisma";
 import ToneCard from "../../components/configuration/ToneCard";
 import LabelsCard from "../../components/configuration/LabelsCard";
 import SchedulingCard from "../../components/configuration/SchedulingCard";
-import SignalDetectionCard from "../../components/configuration/SignalDetectionCard";
 
 type Preset = "VC" | "PE" | "Legal" | "General" | "Custom";
 
@@ -26,7 +25,6 @@ export default async function ConfigurationPage() {
         schedulingPreferences: true,
         timezone: true,
         homeCity: true,
-        signalDetectionEnabled: true,
       },
     }),
     prisma.labelPreset.findUnique({ where: { userId } }),
@@ -82,10 +80,6 @@ export default async function ConfigurationPage() {
             homeCity: user.homeCity,
             hours,
           }}
-        />
-
-        <SignalDetectionCard
-          initial={{ enabled: user.signalDetectionEnabled }}
         />
       </div>
     </div>

@@ -127,17 +127,28 @@ function BadgeChip({
       } ${isDisplay ? "ring-2 ring-brand-400" : ""}`}
       title={`${badge.title}: ${badge.description}`}
     >
-      <svg width="40" height="40" viewBox="0 0 14 14" fill="none">
-        <path
-          d={BADGE_ICON_PATHS[badge.icon]}
-          stroke={earned ? JEWEL_STROKE[badge.color] : "currentColor"}
-          strokeWidth={basquiat ? 1.6 : earned ? 1.3 : 1.2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill={earned ? JEWEL_FILL[badge.color] : "none"}
-          fillOpacity={earned ? 1 : 0}
+      {badge.iconImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={badge.iconImage}
+          alt=""
+          width={40}
+          height={40}
+          className={earned ? "" : "opacity-40 grayscale"}
         />
-      </svg>
+      ) : (
+        <svg width="40" height="40" viewBox="0 0 14 14" fill="none">
+          <path
+            d={BADGE_ICON_PATHS[badge.icon]}
+            stroke={earned ? JEWEL_STROKE[badge.color] : "currentColor"}
+            strokeWidth={basquiat ? 1.6 : earned ? 1.3 : 1.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill={earned ? JEWEL_FILL[badge.color] : "none"}
+            fillOpacity={earned ? 1 : 0}
+          />
+        </svg>
+      )}
       <p className={`mt-2 text-center text-[11px] ${earned ? "" : "text-white/40"}`}>
         {badge.title}
       </p>

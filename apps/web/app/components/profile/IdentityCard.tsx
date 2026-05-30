@@ -160,17 +160,22 @@ export default function IdentityCard({
               aria-label={`Change display badge — currently ${chosenBadge.title}`}
               className={`absolute -bottom-3 -right-3 transition-transform hover:scale-110 ${chosenBadge.color === "yellow" ? "" : BADGE_COLOR_BG[chosenBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
             >
-              <svg width="42" height="42" viewBox="0 0 14 14" fill="none">
-                <path
-                  d={BADGE_ICON_PATHS[chosenBadge.icon]}
-                  stroke={JEWEL_STROKE[chosenBadge.color]}
-                  strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.3}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill={JEWEL_FILL[chosenBadge.color]}
-                  fillOpacity={1}
-                />
-              </svg>
+              {chosenBadge.iconImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={chosenBadge.iconImage} alt="" width={42} height={42} />
+              ) : (
+                <svg width="42" height="42" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d={BADGE_ICON_PATHS[chosenBadge.icon]}
+                    stroke={JEWEL_STROKE[chosenBadge.color]}
+                    strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill={JEWEL_FILL[chosenBadge.color]}
+                    fillOpacity={1}
+                  />
+                </svg>
+              )}
             </button>
           )}
           {!chosenBadge && earnedBadges.length > 0 && (
@@ -204,17 +209,22 @@ export default function IdentityCard({
                     <span
                       className={`flex h-5 w-5 items-center justify-center rounded-full ${BADGE_COLOR_BG[b.color]}`}
                     >
-                      <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                        <path
-                          d={BADGE_ICON_PATHS[b.icon]}
-                          stroke={JEWEL_STROKE[b.color]}
-                          strokeWidth={1.3}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill={JEWEL_FILL[b.color]}
-                          fillOpacity={1}
-                        />
-                      </svg>
+                      {b.iconImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={b.iconImage} alt="" width={11} height={11} />
+                      ) : (
+                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                          <path
+                            d={BADGE_ICON_PATHS[b.icon]}
+                            stroke={JEWEL_STROKE[b.color]}
+                            strokeWidth={1.3}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            fill={JEWEL_FILL[b.color]}
+                            fillOpacity={1}
+                          />
+                        </svg>
+                      )}
                     </span>
                     {b.title}
                   </button>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { OAuth2Client } from "google-auth-library";
 import { prisma } from "../../../../lib/prisma";
-import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
+import { getNewMessageIds, getMessage, applyGmailLabels, HistoryExpiredError } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
@@ -125,6 +125,16 @@ async function processPush(ctx: PushContext): Promise<void> {
   try {
     messageIds = await getNewMessageIds(ctx.accessToken, ctx.refreshToken, ctx.startHistoryId);
   } catch (err) {
+    if (err instanceof HistoryExpiredError) {
+      console.warn(
+        `[gmail/webhook] historyId expired for ${ctx.email}; resetting to ${err.newHistoryId}. Messages between the old and new ID are not recoverable.`
+      );
+      await prisma.googleCredential.update({
+        where: { email: ctx.email },
+        data: { gmailHistoryId: err.newHistoryId },
+      });
+      return;
+    }
     console.error("[gmail/webhook] history.list failed:", err);
     return;
   }

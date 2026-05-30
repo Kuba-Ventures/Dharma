@@ -98,6 +98,17 @@ export async function renewGmailWatch(
   return { expiry };
 }
 
+// Thrown when Gmail's history buffer no longer contains startHistoryId
+// (buffer is roughly 7 days but shorter for high-volume accounts). The
+// webhook handler catches this and resets gmailHistoryId so subsequent
+// pushes succeed.
+export class HistoryExpiredError extends Error {
+  constructor(public readonly newHistoryId: string) {
+    super(`Gmail history buffer expired; reset historyId to ${newHistoryId}`);
+    this.name = "HistoryExpiredError";
+  }
+}
+
 export async function getNewMessageIds(
   accessToken: string,
   refreshToken: string,
@@ -107,20 +118,29 @@ export async function getNewMessageIds(
   auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
 
   const gmail = google.gmail({ version: "v1", auth });
-  const res = await gmail.users.history.list({
-    userId: "me",
-    startHistoryId,
-    historyTypes: ["messageAdded"],
-    labelId: "INBOX",
-  });
-
-  const ids: string[] = [];
-  for (const record of res.data.history ?? []) {
-    for (const added of record.messagesAdded ?? []) {
-      if (added.message?.id) ids.push(added.message.id);
+  try {
+    const res = await gmail.users.history.list({
+      userId: "me",
+      startHistoryId,
+      historyTypes: ["messageAdded"],
+      labelId: "INBOX",
+    });
+    const ids: string[] = [];
+    for (const record of res.data.history ?? []) {
+      for (const added of record.messagesAdded ?? []) {
+        if (added.message?.id) ids.push(added.message.id);
+      }
     }
+    return ids;
+  } catch (err) {
+    const code = (err as { code?: number; response?: { status?: number } })?.code
+      ?? (err as { response?: { status?: number } })?.response?.status;
+    if (code === 404) {
+      const profile = await gmail.users.getProfile({ userId: "me" });
+      throw new HistoryExpiredError(String(profile.data.historyId ?? ""));
+    }
+    throw err;
   }
-  return ids;
 }
 
 export interface ParsedMessage {

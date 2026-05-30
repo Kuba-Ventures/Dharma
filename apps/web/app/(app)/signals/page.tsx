@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import type { SignalPayload } from "../../../lib/signalDetector";
+import SignalDetectionCard from "../../components/configuration/SignalDetectionCard";
 
 // Kind chip mapping. Includes today's active kind (buried_intent), the
 // reserved-but-not-yet-firing kind (cold_thread), and a legacy fallback for
@@ -27,11 +28,17 @@ export default async function SignalsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const signals = await prisma.signal.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  const [signals, user] = await Promise.all([
+    prisma.signal.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { signalDetectionEnabled: true },
+    }),
+  ]);
 
   return (
     <div className="max-w-3xl">
@@ -45,6 +52,12 @@ export default async function SignalsPage() {
           labels. Cold threads (overdue replies) and pattern shifts are coming.
         </p>
       </header>
+
+      <div className="mb-5">
+        <SignalDetectionCard
+          initial={{ enabled: user?.signalDetectionEnabled ?? false }}
+        />
+      </div>
 
       {signals.length === 0 ? (
         <div className="rounded-card border border-dashed border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-8 text-center">

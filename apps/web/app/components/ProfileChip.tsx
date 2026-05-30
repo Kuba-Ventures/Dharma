@@ -53,17 +53,22 @@ export default function ProfileChip({ user, displayBadge }: Props) {
               className={`absolute -bottom-2 -right-2 ${displayBadge.color === "yellow" ? "" : BADGE_COLOR_BG[displayBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
               aria-label={displayBadge.title}
             >
-              <svg width="22" height="22" viewBox="0 0 14 14" fill="none">
-                <path
-                  d={BADGE_ICON_PATHS[displayBadge.icon]}
-                  stroke={JEWEL_STROKE[displayBadge.color]}
-                  strokeWidth={displayBadge.color === "yellow" ? 1.8 : 1.4}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill={JEWEL_FILL[displayBadge.color]}
-                  fillOpacity={1}
-                />
-              </svg>
+              {displayBadge.iconImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={displayBadge.iconImage} alt="" width={22} height={22} />
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d={BADGE_ICON_PATHS[displayBadge.icon]}
+                    stroke={JEWEL_STROKE[displayBadge.color]}
+                    strokeWidth={displayBadge.color === "yellow" ? 1.8 : 1.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill={JEWEL_FILL[displayBadge.color]}
+                    fillOpacity={1}
+                  />
+                </svg>
+              )}
             </span>
           )}
         </div>
