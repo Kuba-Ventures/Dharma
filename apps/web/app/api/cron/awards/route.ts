@@ -12,10 +12,7 @@ import {
   readRows,
   setColumnDropdown,
 } from "../../../../lib/adminSheet";
-
-// Seconds-saved constants — same as /api/metrics + /api/metrics/timeseries.
-const SECONDS_SAVED_PER_DRAFT = 180;
-const SECONDS_SAVED_PER_TAG = 30;
+import { timeSavedSeconds } from "../../../../lib/timeSaved";
 
 // GET /api/cron/awards
 // Protected by header `Authorization: Bearer <CRON_SECRET>` so only Vercel
@@ -59,8 +56,7 @@ export async function GET(req: Request) {
         prisma.usageEvent.count({ where: { userId: u.id, eventType: "draft" } }),
         prisma.classifiedThread.count({ where: { userId: u.id } }),
       ]);
-      const cumulativeSecondsSaved =
-        draftCount * SECONDS_SAVED_PER_DRAFT + tagCount * SECONDS_SAVED_PER_TAG;
+      const cumulativeSecondsSaved = timeSavedSeconds(draftCount, tagCount);
       const tier = tierFor(cumulativeSecondsSaved);
       await prisma.user.update({
         where: { id: u.id },

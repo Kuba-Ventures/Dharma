@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-
-// Seconds saved per AI action — same constants as /api/metrics so the
-// totals reconcile. Move to a shared constant if these ever diverge.
-const SECONDS_SAVED_PER_DRAFT = 180;
-const SECONDS_SAVED_PER_TAG = 30;
+import { timeSavedSeconds } from "../../../../lib/timeSaved";
 
 // GET /api/metrics/timeseries?days=30
 // → { points: [{ date: "2026-05-20", draftCount, tagCount, secondsSaved }] }
@@ -58,8 +54,7 @@ export async function GET(req: Request) {
     date,
     draftCount: b.draftCount,
     tagCount: b.tagCount,
-    secondsSaved:
-      b.draftCount * SECONDS_SAVED_PER_DRAFT + b.tagCount * SECONDS_SAVED_PER_TAG,
+    secondsSaved: timeSavedSeconds(b.draftCount, b.tagCount),
   }));
 
   const totalSecondsSaved = points.reduce((s, p) => s + p.secondsSaved, 0);

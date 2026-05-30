@@ -37,6 +37,7 @@ export default async function DashboardPage() {
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [
     user,
     labelPreset,
@@ -46,6 +47,7 @@ export default async function DashboardPage() {
     recentSignals,
     unreadSignalCount,
     activity,
+    taggedThisWeek,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -80,6 +82,9 @@ export default async function DashboardPage() {
     }),
     prisma.signal.count({ where: { userId, readAt: null } }),
     getRecentActivity(userId, 10),
+    prisma.classifiedThread.count({
+      where: { userId, classifiedAt: { gte: weekAgo }, labelName: { not: null } },
+    }),
   ]);
 
   if (!user) redirect("/login");
@@ -152,7 +157,7 @@ export default async function DashboardPage() {
             status={labelsActive ? "Active" : "Paused"}
             stat={
               labelsActive
-                ? `${mappingCount} provisioned in Gmail`
+                ? `${mappingCount} provisioned · ${taggedThisWeek} tagged this week`
                 : "Not classifying new mail"
             }
           />
