@@ -1,13 +1,13 @@
 # Dharma
 *AI-drafted Gmail replies and scheduling, wrapped in a labeled inbox.*
 
-*Last updated: 2026-05-21 by kuba-vault*
+*Last updated: 2026-05-29 by kuba-vault*
 
 ---
 
 ## TL;DR
 
-Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user's Gmail, classifies incoming threads into industry-preset labels (VC, PE, Legal, General, Custom), and auto-drafts replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple calendars. The web app is deployed at `dharma-lake.vercel.app` on Vercel; the Chrome extension is mid-submission to the Chrome Web Store as of April 30 (screenshots at repo root). Current focus is the preset-label classifier and the Sync Inbox flow that re-tags historical threads when a user switches presets. Project is in active post-MVP iteration with shipping cadence (46 commits in the last 30 days).
+Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. The "logical candy" product redesign just closed out: 5-tab navigation, purple-forward design system, onboarding flow, milestone + badge progression, and an admin Google Sheet for waitlist/subscribers. Live at `dharma-lake.vercel.app`. Phase is post-MVP iteration with a launch-prep overhang on Chrome Web Store review (submitted 2026-04-30, outcome still pending).
 
 ---
 
@@ -22,68 +22,81 @@ Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user'
 
 ## Status
 
-- **Phase:** post-MVP iteration / launch prep (Chrome Web Store submission in flight)
+- **Phase:** post-MVP iteration / launch prep (Chrome Web Store submission in flight; product redesign just shipped)
 - **Engagement manager:** self-directed (Finley)
 - **Lead:** Finley
 - **Cadence:** daily commits; no formal external client cadence
-- **Next milestone:** Chrome Web Store approval + first external users on preset-label flow
+- **Next milestone:** CWS approval + first external user end-to-end on the redesigned flow
 - **Flags:** shipping
 
 ---
 
 ## Where we are right now
 
-The preset-label classifier is the active workstream. Last week added Custom preset (user-named label set + Gmail folder prefix), expanded the color picker to Gmail's full 30-color palette, and built a Sync Inbox button that force-reclassifies recent threads when a user changes presets — so switching from VC to Legal actually re-tags the inbox instead of just affecting new mail. The classifier prompt was sharpened (temperature 0 for determinism, decisive single-label output) and made case/hyphen-insensitive after Haiku occasionally returned `"meeting"` instead of `"Meeting"`. Yesterday's fixes are mostly polish: surface Gmail label-create errors in the provision response, handle 409s when a label already exists, and use `#000000` instead of `#1d1d1d` for text on light Gmail label colors. Chrome Web Store submission was filed April 30 (multiple submission screenshots saved at repo root); status of the review is not tracked in the repo. Next concrete steps: confirm CWS approval, then exercise the full preset → sync → draft flow end-to-end with a real user.
+The "logical candy" product redesign closed this week — ~70 commits on main against the plan at `~/.claude/plans/dharma-product-logical-candy.md`. New IA (Dashboard / Metrics / Configuration / Signals / Settings + Profile), purple-forward design tokens, a 4-step onboarding flow, and a milestone + badge progression system are all live. A nightly Vercel cron awards milestones, writes `UserMilestone` rows, and bumps tiers; the Dashboard fires confetti once when a tier-up is unacknowledged. An admin Google Sheet (Waitlist + Subscribers + Debugging tabs) is auto-headered and backfilled via service account. Share-card OG pages exist at `/share/milestone/[id]`. The multi-day Auth.js JWT-carryover bug is resolved — `lib/adapter.ts` wraps PrismaAdapter to upsert Accounts by `(userId, provider)` and the `signIn` callback rejects mismatched email/profile pairs. Next concrete steps: hear back on CWS, run one real external user through preset → Sync Inbox → draft, and verify the Pub/Sub push path end-to-end.
 
 ---
 
 ## What's built
 
 **Frontend / UI (apps/web)**
-- Landing page at `/` with Plus Jakarta Sans headings; Arial elsewhere
-- Login page (`/login`) → Google OAuth via NextAuth v5
-- Dashboard with Tone, Scheduling, Tabs & Labels (with industry presets + Custom), and a separate Metrics tab showing per-event AI cost
-- Settings page issues the HMAC extension token for the Chrome extension
-- Privacy, Terms, Support static pages
+- Landing page at `/` (Plus Jakarta Sans headings; Arial elsewhere) — four-feature positioning
+- Login page (`/login`) — Google OAuth, optional `login_hint` via `?hint=` URL param, calls `signOut()` before `signIn()` to dodge JWT carryover
+- 4-step onboarding at `/onboarding/step-1-connect`, `/step-2-city`, `/step-3-tone`, `/step-4-labels` with bundled US-cities autocomplete (~60 metros)
+- 5-tab app shell under `app/(app)/`: `/dashboard`, `/metrics`, `/configuration`, `/signals`, `/settings`, plus `/profile`
+- Dashboard: Greeting + MilestoneHero + 3 dismissable metric tiles + 3 config-status cards + QuickActions + RecentActivity + NPS prompt (>=10 drafts)
+- Metrics: ReplyRateHero + TimeSavedChart with milestone dots + ReplyRateByLabel + MilestoneTimelineStrip
+- Configuration: consolidates Tone / Labels / Scheduling cards (the old `DashboardWrapper` was deleted)
+- Profile: IdentityCard, BadgeCase (top 10 + "See all" modal), MilestoneLibrary (top 5 + modal), hover-on-earned-badge sets `displayBadgeId`
+- ProfileChip in sidebar: avatar with display-badge overlay, badge title bold, tier muted underneath
+- Settings hub + sub-pages (Advanced, Hidden stats, Profile-legacy)
+- 10 shared UI primitives under `app/components/ui/`; purple-forward design tokens (`--brand-50..900`, surface/text/label palette)
+- Tier-up confetti (~80 LOC canvas, brand palette)
+- FeedbackButton + ConfirmModal
 
 **Backend / API (apps/web/app/api)**
-- `auth/[...nextauth]` — Google OAuth login
-- `emails/thread-draft` — generate or polish a reply for a given Gmail thread (session, HMAC, or GoogleBearer auth)
-- `emails/recent` — last 10 inbox emails for dashboard preview
-- `gmail/poll` + `scripts/poller.mjs` — process new Gmail messages for all users (default path)
-- `gmail/webhook` — Cloud Pub/Sub push handler (optional real-time mode)
-- `suggest-times` — multi-calendar free/busy + streaming Claude Sonnet scheduling reply
+- `auth/[...nextauth]` — Google OAuth via NextAuth v5; PrismaAdapter wrapped in `lib/adapter.ts` for idempotent Account linking
+- `emails/thread-draft`, `emails/recent`, `emails/[id]` — draft/polish, dashboard preview
+- `gmail/poll` + `gmail/webhook` + `scripts/poller.mjs` — polling default, Pub/Sub push optional
+- `suggest-times` — Sonnet streaming scheduling reply over multi-calendar free/busy
 - `labels/*` — CRUD, `preset`, `provision`, `setup-gmail`, `scan-inbox`, `back-scan`, `seed-rules`, `status`
-- `preferences/tone`, `preferences/scheduling`, `user/preferences`, `user/me`, `user/extension-token`
-- `calendar/*` — connect/disconnect Google, Microsoft, Apple; Google `schedule` route creates events with Meet links
-- `metrics` — cost dashboard data
+- `preferences/{tone,scheduling,meeting-hours}`, `user/{me,preferences,extension-token,nps-postpone,ack-tier,dismiss}`
+- `calendar/{google,microsoft,apple,rsvp}` — connect/disconnect + Google `schedule` writes events with Meet links
+- `metrics`, `metrics/timeseries`, `metrics/by-label`
+- `signals`, `signals/[id]` — scaffold (no producers yet)
+- `feedback` — POST writes to `Feedback` table
+- `onboarding/*` — step state
+- `profile/*`, `milestones/*` — read endpoints for Profile UI
+- `share/milestone/[id]` — Edge-runtime OG image generator; public `/share/milestone/[id]` page with OG meta
+- `cron/awards` — nightly Vercel cron; per-user try/catch; writes `UserMilestone`, bumps `tier`, backfills the Subscribers tab in the admin sheet
+- `waitlist/join` — admin-sheet write
+- `geo/cities` — bundled autocomplete
 
 **Chrome extension (apps/chrome-extension)**
 - MV3, no build step; injects "Draft reply" + "Polish draft" into Gmail DOM via `content.js`
-- Popup at `popup.html` for pasting the HMAC token from `dharma-lake.vercel.app/settings`
+- Popup pastes HMAC token from `dharma-lake.vercel.app/settings`
 - Host permissions: `mail.google.com` + `dharma-lake.vercel.app`
 
 **Gmail add-on (apps/gmail-addon)**
-- Google Apps Script (`Code.gs`, ~19KB) deployed via `clasp`
-- Sidebar panel with tone buttons (purple) and Polish Draft (gray)
-- Calls Dharma API with `GoogleBearer` token
+- Apps Script `Code.gs` (~19KB) deployed via `clasp`
+- Sidebar with tone buttons + Polish Draft; calls Dharma API with `GoogleBearer`
 
 **Shared packages**
-- `@dharma/types` — TimeSlot, SchedulingRequest, shared types
-- `@dharma/calendar-core` — free-slot finder
-- `@dharma/providers-google` / `providers-outlook` / `providers-apple` — calendar provider adapters
-- `@dharma/reply-generation` — template + AI reply generators
+- `@dharma/types`, `@dharma/calendar-core`, `@dharma/providers-google` / `-outlook` / `-apple`, `@dharma/reply-generation`
 
 **Database (Neon Postgres via Prisma, schema at repo root `schema.prisma`)**
-- User, GoogleCredential, MicrosoftCredential, AppleCredential (AES-256-GCM encrypted)
-- Label + LabelRule, LabelPreset (VC | PE | Legal | General | Custom), LabelMapping, ClassifiedThread
-- NextAuth Account/Session/VerificationToken
-- UsageEvent for token/cost tracking
+- User (+ `firstName`, `homeCity/Lat/Lng`, `timezone`, `toneSummary`, `dismissedTiles[]`, `onboardingStep/CompletedAt`, `tier`, `lastSeenTier`, `displayBadgeId`, `cumulativeSecondsSaved`, `nextNpsPromptAt`)
+- GoogleCredential, MicrosoftCredential, AppleCredential (AES-256-GCM encrypted)
+- Label, LabelRule, LabelPreset (VC | PE | Legal | General | Custom), LabelMapping, ClassifiedThread
+- NextAuth Account, Session, VerificationToken
+- UsageEvent (token/cost)
+- New for redesign: `MeetingHour`, `MilestoneDef` (with `requiredCity`), `UserMilestone`, `BadgeDef`, `UserBadge`, `Signal`, `Feedback`
 
 **Infrastructure**
-- Vercel hosting at `dharma-lake.vercel.app`
-- Neon Postgres (referenced in system diagram as the DB)
-- Optional Google Cloud Pub/Sub topic for real-time Gmail push
+- Vercel hosting at `dharma-lake.vercel.app`; nightly cron at `/api/cron/awards` (UTC)
+- Neon Postgres
+- Admin Google Sheet (Waitlist / Subscribers / Debugging) via service account, auto-headered + backfilled
+- Optional Google Cloud Pub/Sub for real-time Gmail push
 
 ---
 
@@ -93,16 +106,37 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 |---|---|---|
 | Monorepo | npm workspaces | `apps/*` + `packages/*`, Node >=20 |
 | Frontend | Next.js 16.2.1 (App Router) + React 18.3 + Tailwind 3.4 | `apps/web` |
-| Auth | NextAuth v5 beta + `@auth/prisma-adapter` | Google OAuth; HMAC tokens for extension; GoogleBearer for add-on |
+| Design system | Custom tokens (`--brand-50..900`) + 10 shared UI primitives | `apps/web/app/components/ui/` |
+| Auth | NextAuth v5 beta + wrapped Prisma adapter | `lib/adapter.ts` makes Account linking idempotent |
 | Database | PostgreSQL via Prisma 5.22 client (root devDep Prisma 6.12) | `schema.prisma` at repo root |
-| AI — classify/polish/tone | Claude Haiku (`claude-haiku-4-5-20251001`) | Raw `fetch` to Anthropic API, no SDK |
-| AI — scheduling reply | Claude Sonnet (`claude-sonnet-4-20250514`) streaming | `/api/suggest-times` |
-| Gmail | `googleapis` v144 (Gmail API v1) | Read, label, draft, history, watch |
-| Calendar | Google Calendar API + Microsoft Graph + Apple CalDAV (`tsdav` 2.0.11) | Free/busy aggregation |
+| AI — classify/polish/tone | Claude Haiku (`claude-haiku-4-5-20251001`) | Raw `fetch` to Anthropic API |
+| AI — scheduling reply | Claude Sonnet streaming | `/api/suggest-times` |
+| AI — toneSummary | Claude Sonnet 4 (env-gated) | onboarding step 3 → `User.toneSummary` |
+| AI — milestone generation | Claude Haiku | `lib/milestoneGenerator.ts`, on-demand per-city, ~$0.001/city |
+| Gmail | `googleapis` v144 (Gmail API v1) | Read, label, draft, history, watch; `gmail.modify` scope |
+| Calendar | Google Calendar + Microsoft Graph + Apple CalDAV (`tsdav` 2.0.11) | Free/busy + Meet links |
 | Hosting | Vercel | `vercel.json` runs `prisma generate && next build` |
+| OG / share cards | Vercel Edge runtime | `app/api/share/milestone/[id]` |
+| Cron | Vercel cron, UTC | `/api/cron/awards` nightly |
 | Chrome extension | Vanilla MV3 (no bundler) | `apps/chrome-extension/` |
-| Gmail add-on | Google Apps Script via `clasp` | `apps/gmail-addon/Code.gs` |
+| Gmail add-on | Apps Script via `clasp` | `apps/gmail-addon/Code.gs` |
 | Poller | Node script `apps/web/scripts/poller.mjs` | Hits `/api/gmail/poll` on a schedule |
+
+---
+
+## Key files & directories worth knowing
+
+- `apps/web/lib/adapter.ts` — wrapped PrismaAdapter; upserts Account by `(userId, provider)`. The fix at the center of the JWT-carryover saga.
+- `apps/web/lib/auth.config.ts`, `auth.ts` — `signIn` callback dual guard (resolved-User email ≠ OAuth profile, JWT cookie email ≠ OAuth profile)
+- `apps/web/lib/milestoneGenerator.ts` — Haiku writes 6 city-specific milestones into `MilestoneDef` the first time a user sets a new home city; cached for subsequent users
+- `apps/web/lib/milestones.ts`, `milestoneResolution.ts`, `tiers.ts`, `badges.ts`, `badgeIcons.ts` — progression system, jewel-tone badge rendering, Basquiat-style Founder crown
+- `apps/web/lib/adminSheet.ts` — service-account writes to Waitlist / Subscribers / Debugging tabs; auto-header + auto-backfill
+- `apps/web/lib/cities.ts`, `sampleScenarios.ts` — onboarding inputs
+- `apps/web/app/(app)/profile/` and `app/components/profile/` — Profile tab UI
+- `apps/web/app/share/milestone/[id]/`, `app/api/share/milestone/[id]/` — public share page + Edge OG generator
+- `apps/web/app/api/cron/awards/` — nightly award sweep
+- `apps/web/scripts/relink-google-account.mjs` — recovery hatch when an Account row's `providerAccountId` is wrong
+- `apps/web/scripts/bump-tier.mjs`, `seed-city-milestones.mjs`, `trigger-cron.mjs`, `backfill-cumulative.mjs`, `backfill-onboarding.mjs`, `inspect-user.mjs` — operational tooling
 
 ---
 
@@ -110,60 +144,87 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 
 | Integration | Purpose | Cost | Status |
 |---|---|---|---|
-| Vercel (hosting + functions) | Hosts Next.js app, runs API routes | TBD (Hobby/Pro tier) | live (`dharma-lake.vercel.app`) |
+| Vercel (hosting + functions + cron + Edge OG) | Hosts Next.js app, runs API routes, nightly cron, share-card OG | TBD (Hobby/Pro tier) | live (`dharma-lake.vercel.app`) |
 | Neon (Postgres) | Primary database | TBD | live |
-| Anthropic API (direct) | Claude Haiku (classify/polish/tone) + Claude Sonnet (scheduling) | usage-based; tracked per-event in `UsageEvent` | live |
+| Anthropic API (direct) | Haiku (classify/polish/tone/milestone-gen) + Sonnet (scheduling, toneSummary) | usage-based; tracked per-event in `UsageEvent` | live |
 | Google OAuth | User login | free | live |
 | Gmail API | Read inbox, apply labels, create drafts, register Watch | free (quota-limited) | live |
 | Google Calendar API | Free/busy, create events with Meet | free (quota-limited) | live |
 | Google Cloud Pub/Sub | Real-time Gmail push notifications | usage-based, TBD | optional (falls back to polling) |
+| Google Sheets (service account) | Admin sheet: Waitlist / Subscribers / Debugging | free (quota-limited) | live |
 | Microsoft Graph | Outlook calendar free/busy | free (quota-limited) | live |
 | Apple iCloud CalDAV | iCloud calendar free/busy | free | live |
 | Chrome Web Store | Distribution for the extension | one-time $5 developer fee | submission in review (filed 2026-04-30) |
 | Google Workspace Marketplace | Distribution for the Gmail add-on | TBD | not yet listed (deployed via clasp only) |
 
-*Source: no MCP configs found in repo; this table is generated from `.env`/`.env.local` references, the system diagram (`docs/architecture/dharma_system_diagram.md`), and Chrome Web Store screenshots in `docs/screenshots/cws/`.*
+*Source: no MCP configs found in repo; this table is generated from `.env`/`.env.local` references, the system diagram (`docs/architecture/dharma_system_diagram.md`), and the admin-sheet wiring in `lib/adminSheet.ts`.*
 
-*Note: CLAUDE.md recommends Vercel AI Gateway with `AI_GATEWAY_API_KEY`. Current code calls Anthropic directly (raw `fetch` to `api.anthropic.com`). Migrating to AI Gateway is a candidate cleanup — not yet done.*
+*Note: CLAUDE.md recommends Vercel AI Gateway with `AI_GATEWAY_API_KEY`. Current code calls Anthropic directly. Migration is still on the open-loop list.*
 
 ---
 
 ## Decisions log
 
-- **2026-05-20 — Sync Inbox force-reclassifies** — Switching presets used to only affect new mail; users couldn't tell their preset change had worked. Decision: Sync Inbox re-runs the classifier on recent threads even if previously classified. Rejected: a separate "re-classify" action — would have added a second button for the same intent.
-- **2026-05-19 — Custom preset over open-ended label CRUD** — Added Custom preset that lets a user name their own labels + Gmail folder prefix. Rejected fully-freeform label editor for now: keeping users on the preset rail simplifies the classifier prompt and color picker.
-- **2026-05-19 — Classifier prompt: decisive single-label, temperature 0** — Returning `null` too often hurt UX. New prompt forces decisive single-label choice; `null` only as last resort. Temperature 0 for determinism. Rejected multi-label preset classification: legacy `classifyEmailLabels` still supports it for the free-form label list flow, but preset flow is single-label.
-- **2026-05-19 — Metrics moved to its own tab** — Dashboard was getting busy. Decision: dedicated Metrics tab for cost/usage charts.
-- **2026-05-19 — Industry-preset labels added (VC / PE / Legal / General)** — Replaces generic defaults so the classifier has meaningful categories out of the box.
-- **2026-05-18 — Use Arial site-wide, scope Plus Jakarta Sans to landing page** — Originally Jakarta everywhere; readability suffered in dashboard tables.
-- **2026-05-18 — Remove em-dashes from all user-facing copy and AI prompts** — Em-dashes read as "written by AI." Stripped server-side from AI replies too.
-- **2026-04-30 — Submit Chrome extension to Chrome Web Store** — Filed publisher account + listing. Screenshots of the submission flow saved at `docs/screenshots/cws/` for future reference.
-- **2026-04 — Apple Calendar uses app-specific password, not OAuth** — Apple does not offer OAuth for CalDAV. App-specific password is stored AES-256-GCM encrypted using `APPLE_CREDENTIAL_ENCRYPTION_KEY`.
-- **2026-04 — Anthropic API called directly via `fetch`, no SDK** — Keeps the dependency surface small; trivial to swap models. Tradeoff: not using AI Gateway yet (see Risks).
+- **2026-05-29 — "Logical candy" redesign closed** — Shipped the 12-step plan at `~/.claude/plans/dharma-product-logical-candy.md` plus session-added work: admin Google Sheet, share-card OG, `UserMilestone` persistence, tier-up confetti, on-demand city milestones, jewel-tone badges, NPS prompt, Profile sidebar tab. Rejected: shipping the redesign behind a feature flag — preview was clean enough to cut straight to main, and the old `DashboardWrapper` was deleted in the same pass.
+- **2026-05-29 — Milestones generated per-city on demand** — First user to set a new home city triggers Haiku to write 6 city-specific milestones into `MilestoneDef`; subsequent users in that city reuse the cached rows (~$0.001 per city total). Rejected: pre-seeding all US metros (waste, and a hand-curated list outdates fast).
+- **2026-05-29 — Jewel-tone palette + Basquiat-style Founder crown** — Hardcoded SVG fills (topaz, amethyst, sapphire, emerald, tanzanite, citrine) with dark strokes; Founder badge gets yellow fill + heavy black outline. Rejected: `currentColor`-driven theming — fights Tailwind purge and looks washed out on dark surfaces.
+- **2026-05-29 — Display-badge picker is a hover overlay on earned badges** — Hovering an earned badge in BadgeCase shows "Display on profile"; click writes `User.displayBadgeId` and ProfileChip + IdentityCard update via prop-sync. Rejected: a separate settings page for badge selection.
+- **2026-05-29 — Profile gets its own sidebar tab** — Moved off `/settings/profile` to `/profile`. Profile is high-traffic now that badges are a thing; burying it in Settings was wrong.
+- **2026-05-26 — Auth.js JWT carryover fix** — Multi-day bug: `@auth/core` `handle-login.js` silently linked new OAuth grants to a stale session-cookie user, and one Account row had wrong `providerAccountId`. Fix: `lib/adapter.ts` upserts Account by `(userId, provider)`; `signIn` callback rejects mismatched emails; login page calls `signOut()` before `signIn()`; `scripts/relink-google-account.mjs` provides a recovery hatch.
+- **2026-05-26 — IA: 5-tab sidebar + Profile** — Dashboard / Metrics / Configuration / Signals / Settings, plus a separate Profile tab. Replaces the previous kitchen-sink `DashboardWrapper`. Configuration consolidates Tone / Labels / Scheduling cards.
+- **2026-05-26 — Admin sheet over a custom admin UI** — Waitlist + Subscribers + Debugging tabs in a service-account-writable Google Sheet, auto-headered and backfilled by the nightly cron. Rejected: building a Next.js admin route — Sheet is faster for Robbie to read and edit by hand.
+- **2026-05-26 — Built-in preset labels are flat (no "Dharma/" prefix)** — Custom preset name is optional; blank = flat top-level labels.
+- **2026-05-20 — Sync Inbox force-reclassifies** — Switching presets used to only affect new mail; Sync Inbox re-runs the classifier on recent threads even if previously classified.
+- **2026-05-19 — Custom preset over open-ended label CRUD** — Custom preset lets a user name their own labels + Gmail folder prefix; keeps the preset rail simple.
+- **2026-05-19 — Classifier prompt: decisive single-label, temperature 0** — Returning `null` too often hurt UX; new prompt forces a decisive single-label choice.
+- **2026-05-19 — Metrics moved to its own tab.**
+- **2026-05-19 — Industry-preset labels added (VC / PE / Legal / General).**
+- **2026-05-18 — Use Arial site-wide, scope Plus Jakarta Sans to landing page.**
+- **2026-05-18 — Remove em-dashes from all user-facing copy and AI prompts.**
+- **2026-04-30 — Submit Chrome extension to Chrome Web Store** — Screenshots at `docs/screenshots/cws/`.
+- **2026-04 — Apple Calendar uses app-specific password, not OAuth.**
+- **2026-04 — Anthropic API called directly via `fetch`, no SDK.**
 
 ---
 
 ## Open loops
 
 - [ ] Confirm Chrome Web Store review outcome (submitted 2026-04-30) — Finley
-- [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only)
-- [ ] Decide whether to migrate Anthropic calls to Vercel AI Gateway (per CLAUDE.md guidance) — Finley
-- [ ] Verify Pub/Sub push path end-to-end (current default appears to be the poller script)
-- [ ] First external user test of preset-label + Sync Inbox flow
+- [ ] First external user test of preset-label + Sync Inbox flow — Finley
+- [ ] Verify Pub/Sub push path end-to-end (current default is the poller script) — Finley
+- [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only) — Finley
+- [ ] Multi-account switching (GitHub-style, ProfileChip dropdown) — needs custom NextAuth session-token cookie handling (per-account tokens + active-index pointer). Deferred; Chrome profiles cover the gap.
+- [ ] Migrate Anthropic calls to Vercel AI Gateway (per CLAUDE.md guidance) — still on direct `fetch`
+- [ ] Stripe / subscribe action — Subscribers-tab promotion fires once an endpoint exists
+- [ ] Per-thread reply rate by label — needs `ClassifiedThread` schema change
+- [ ] Signal producers — Claude deal/term-sheet detection on incoming threads (Signals tab UI exists, no producers yet)
+- [ ] A11y sweep — aria labels, keyboard handlers, focus rings
+- [ ] Sentence-case audit across new surfaces
+- [ ] Cities autocomplete expansion from ~60 metros to ~5k US cities
+- [ ] Milestone-generator prompt grounding — Stanley Park / Standing Stone Trail style hallucinations occasionally slip through
 - [ ] `apps/web/next-env.d.ts` is uncommitted; decide whether to ignore or commit
-- [x] Loose root-level screenshots and architecture files moved to `docs/screenshots/` and `docs/architecture/` (2026-05-26)
-- [ ] Multi-account switching (GitHub-style) — let one browser session hold multiple signed-in Dharma accounts and swap via the ProfileChip dropdown. Requires custom NextAuth session-token cookie handling (per-account tokens + active-index pointer) and ProfileChip UX. Defer until more users need it; Chrome profiles cover the gap.
+
+### Recently closed
+- [x] 12-step "logical candy" product redesign (2026-05-29)
+- [x] Auth.js JWT carryover bug (2026-05-26)
+- [x] Admin Google Sheet (Waitlist + Subscribers + Debugging) (2026-05-26)
+- [x] Onboarding flow (`/onboarding/step-1..4`) (2026-05-26)
+- [x] Profile + milestones + badges system (2026-05-26..29)
+- [x] Share-card OG generator at `/share/milestone/[id]` (2026-05-29)
+- [x] Nightly Vercel cron at `/api/cron/awards` (2026-05-26)
+- [x] Loose root screenshots / architecture files moved to `docs/` (2026-05-26)
 
 ---
 
 ## Risks & known issues
 
-- **Chrome Web Store approval timing is unknown** — submission filed April 30; no in-repo tracking of review status. Blocks public distribution.
-- **Anthropic calls bypass Vercel AI Gateway** — CLAUDE.md recommends AI Gateway for model routing. Current code hardcodes `api.anthropic.com`. Means no automatic model failover, no Gateway-side observability, no easy model swap without code change.
-- **`next-auth` is on a 5.0 beta** (`^5.0.0-beta.25`) — fine for now; pin carefully on breaking releases.
-- **Prisma version split**: root devDep `prisma@^6.12.0`, web app devDep + client `^5.22.0`. Confirm `prisma generate` uses the version expected at runtime to avoid schema drift.
-- **Polling fallback runs server-side as a Node script** (`scripts/poller.mjs`) — needs to be hosted somewhere if Pub/Sub isn't wired up in production. Vercel cron is the natural home (CLAUDE.md notes cron runs in UTC against production URL).
-- **Cost visibility depends on `UsageEvent` writes** — if a code path forgets to call `logUsage`, that cost is invisible in the Metrics dashboard.
+- **Chrome Web Store approval timing unknown** — submission filed April 30; no in-repo tracking of review status. Blocks public distribution.
+- **Anthropic calls bypass Vercel AI Gateway** — no automatic failover, no Gateway-side observability, no easy model swap without code change.
+- **`next-auth` is on a 5.0 beta** (`^5.0.0-beta.25`) — pin carefully on breaking releases. The JWT-carryover saga exposed real edges in `@auth/core`'s login handler.
+- **Prisma version split** — root devDep `prisma@^6.12.0`, web app devDep + client `^5.22.0`. Confirm `prisma generate` uses the version expected at runtime.
+- **Polling fallback runs as a Node script** (`scripts/poller.mjs`) — needs a host if Pub/Sub isn't wired up. Vercel cron is the natural home.
+- **Cost visibility depends on `UsageEvent` writes** — any code path that forgets `logUsage` is invisible in Metrics.
+- **Milestone-generator can hallucinate landmarks** — Stanley Park (wrong city) and Standing Stone Trail (does not exist) have both surfaced; prompt grounding is on the open-loop list.
 - **No automated tests visible** in `apps/web` (only `scripts/test-poll.mjs` for the poller).
 
 ---
@@ -172,8 +233,11 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 
 - **Live URL:** https://dharma-lake.vercel.app
 - **Settings (extension token):** https://dharma-lake.vercel.app/settings
+- **Share-card example:** https://dharma-lake.vercel.app/share/milestone/[id]
 - **Staging:** not configured (or not documented in repo)
 - **Chrome Web Store listing:** pending review (submitted 2026-04-30)
+- **Admin Google Sheet:** referenced via service account in `lib/adminSheet.ts` (URL in env)
+- **Redesign plan:** `~/.claude/plans/dharma-product-logical-candy.md`
 - **System diagram:** `docs/architecture/dharma_system_diagram.md`
 - **DB schema:** `/Users/finley/Code/Dharma Code/schema.prisma`
 
@@ -181,4 +245,6 @@ The preset-label classifier is the active workstream. Last week added Custom pre
 
 ## Changelog
 
-- **2026-05-21:** Initial PROJECT.md superdoc generated by kuba-vault — scanned monorepo (apps/web, apps/chrome-extension, apps/gmail-addon, packages/*), Prisma schema, system diagram, recent git history (46 commits in 30 days), and CWS submission screenshots.
+- **2026-05-29:** "Logical candy" redesign closed out. 5-tab IA, purple-forward design tokens + 10 UI primitives, Configuration tab, Dashboard + Metrics redesigns, 4-step onboarding, Profile + milestones + badges, Signals scaffold, Settings hub, FeedbackButton + `/api/feedback`, Sonnet 4 `toneSummary`, nightly cron at `/api/cron/awards`. Session-added: admin Google Sheet (Waitlist + Subscribers + Debugging), share-card OG generator at `/share/milestone/[id]`, `UserMilestone` persistence, tier-up confetti + `lastSeenTier`, on-demand city milestones via Haiku, jewel-tone badge rendering + Basquiat Founder crown, BadgeCase + MilestoneLibrary collapse + "See all" modals, hover-to-set `displayBadgeId`, Profile moved to its own sidebar tab, NPS prompt for users with >=10 drafts. Schema additions (all additive, `db push`): User fields + `MeetingHour`, `MilestoneDef`, `UserMilestone`, `BadgeDef`, `UserBadge`, `Signal`, `Feedback`.
+- **2026-05-26:** Auth.js JWT-carryover bug fixed (`lib/adapter.ts` wraps PrismaAdapter, `signIn` dual guard, login page `signOut`-then-`signIn`, `scripts/relink-google-account.mjs` recovery hatch). Also: built-in preset labels flattened (no "Dharma/" prefix), Custom preset name optional, `gmail.modify` scope restored, Google account-linking by verified email.
+- **2026-05-21:** Initial PROJECT.md superdoc generated by kuba-vault — scanned monorepo, Prisma schema, system diagram, recent git history, and CWS submission screenshots.
