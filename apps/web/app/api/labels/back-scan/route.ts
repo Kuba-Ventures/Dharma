@@ -5,7 +5,7 @@ import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser, applyGmailLabels } from "../../../../lib/gmail";
 import { google } from "googleapis";
-import { classifyForPreset } from "../../../../lib/classify";
+import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import {
   HIGH_PRIORITY_NAME,
   isBuiltInPresetKey,
@@ -14,7 +14,7 @@ import {
 } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
-const MAX_THREADS = 30;
+const MAX_THREADS = 25;
 const CONCURRENCY = 5;
 
 export async function POST(req: Request) {
@@ -63,6 +63,14 @@ export async function POST(req: Request) {
   // Load LabelMappings into a map so we can resolve short names → Gmail ids.
   const mappings = await prisma.labelMapping.findMany({ where: { userId } });
   const mappingByName = new Map(mappings.map((m) => [m.labelName, m.gmailLabelId]));
+
+  // User-defined Labels (separate from preset). Mirrors the path in
+  // app/api/gmail/webhook/route.ts so the first-impression scan covers
+  // both surfaces a new email would.
+  const userLabels = await prisma.label.findMany({
+    where: { userId, enabled: true, gmailLabelId: { not: null } },
+    include: { rules: true },
+  });
 
   // Pull recent inbox threads — by thread we'd need history, so use messages.list
   // and dedupe by threadId since classification is thread-scoped.
@@ -122,6 +130,28 @@ export async function POST(req: Request) {
       const from = getHeader("From");
       const snippet = msg.snippet ?? "";
       const body = extractBody(msg.payload) || snippet;
+
+      // User-defined Label classification (rules first, then AI for labels
+      // without rules) — same logic as the webhook.
+      if (userLabels.length > 0) {
+        const ruleMatches = userLabels.filter(
+          (l) => l.rules.length > 0 && l.rules.some((rule) => matchesRule(rule, { subject, from, body }))
+        );
+        const labelsWithoutRules = userLabels.filter((l) => l.rules.length === 0);
+        let aiMatches: typeof userLabels = [];
+        if (labelsWithoutRules.length > 0) {
+          const aiNames = await classifyEmailLabels(
+            subject, from, body,
+            labelsWithoutRules.map((l) => ({ name: l.name, description: l.description })),
+            userId
+          );
+          aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
+        }
+        const userGmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
+        if (userGmailIds.length > 0) {
+          await applyGmailLabels(userId, c.messageId, userGmailIds);
+        }
+      }
 
       const result = await classifyForPreset({
         displayName: spec.displayName,
@@ -183,6 +213,28 @@ export async function POST(req: Request) {
     errors: errors.slice(0, 5),
     total: candidates.length,
   });
+}
+
+function matchesRule(
+  rule: { field: string; operator: string; value: string },
+  msg: { subject: string; from: string; body: string }
+): boolean {
+  const haystack = (() => {
+    switch (rule.field) {
+      case "subject": return msg.subject.toLowerCase();
+      case "from":    return msg.from.toLowerCase();
+      case "body":    return msg.body.toLowerCase();
+      default:        return "";
+    }
+  })();
+  const needle = rule.value.toLowerCase();
+  switch (rule.operator) {
+    case "contains":     return haystack.includes(needle);
+    case "not_contains": return !haystack.includes(needle);
+    case "starts_with":  return haystack.startsWith(needle);
+    case "is":           return haystack === needle;
+    default:             return false;
+  }
 }
 
 function extractBody(payload: unknown): string {

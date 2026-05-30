@@ -40,6 +40,7 @@ export default function LabelsCard({ initial }: Props) {
   const [customName, setCustomName] = useState(initial.customName ?? "");
   const [provisioned, setProvisioned] = useState(initial.provisioned);
   const [applying, setApplying] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState<string | null>(null);
 
   async function persistPreset(next: { preset?: Preset; enabled?: boolean; customName?: string }) {
     await fetch("/api/labels/preset", {
@@ -57,6 +58,7 @@ export default function LabelsCard({ initial }: Props) {
 
   async function applyToGmail() {
     setApplying(true);
+    setBackfillStatus(null);
     try {
       const res = await fetch("/api/labels/provision", {
         method: "POST",
@@ -69,6 +71,33 @@ export default function LabelsCard({ initial }: Props) {
       }
     } finally {
       setApplying(false);
+    }
+
+    // Auto-backfill the last 25 INBOX threads so the user sees what labels
+    // will look like on incoming mail. Idempotent: re-running skips threads
+    // already in ClassifiedThread.
+    setBackfillStatus("Labeling your last 25 inbox threads…");
+    try {
+      const res = await fetch("/api/labels/back-scan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { scanned?: number; tagged?: number; skipped?: number };
+        const tagged = data.tagged ?? 0;
+        const scanned = data.scanned ?? 0;
+        const skipped = data.skipped ?? 0;
+        setBackfillStatus(
+          skipped > 0
+            ? `Labeled ${tagged} of ${scanned} new threads. ${skipped} already labeled.`
+            : `Labeled ${tagged} of ${scanned} recent threads. Check your inbox.`
+        );
+      } else {
+        setBackfillStatus("Backfill skipped — labels still apply to new mail.");
+      }
+    } catch {
+      setBackfillStatus("Backfill skipped — labels still apply to new mail.");
     }
   }
 
@@ -190,6 +219,9 @@ export default function LabelsCard({ initial }: Props) {
                 Provisions the preset's labels in your Gmail and starts classifying new mail.
               </p>
             </div>
+            {backfillStatus && (
+              <p className="text-[11px] text-brand-200">{backfillStatus}</p>
+            )}
 
             {byLabel && byLabel.length > 0 && (
               <div>
