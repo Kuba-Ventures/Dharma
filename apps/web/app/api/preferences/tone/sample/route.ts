@@ -3,6 +3,7 @@ import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { logUsage } from "../../../../../lib/usage";
 import { SAMPLE_SCENARIOS, scenarioById } from "../../../../../lib/sampleScenarios";
+import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 
 // POST { scenarioId? } → { scenarioId, label, draft }
 // Generates a fresh sample draft in the user's current tone, against the
@@ -58,13 +59,9 @@ Scenario: ${scenario.prompt}
 
 Return only the email body. No subject line. No commentary.`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: anthropicHeaders(apiKey),
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 500,

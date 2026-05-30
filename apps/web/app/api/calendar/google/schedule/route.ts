@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
+import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { prisma } from "../../../../../lib/prisma";
 import { google } from "googleapis";
 
@@ -53,13 +54,9 @@ Return a JSON object with exactly these fields:
 
 JSON only, no other text.`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: anthropicHeaders(apiKey),
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,

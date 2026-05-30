@@ -1,4 +1,5 @@
 import { logUsage, type EventType } from "./usage";
+import { ANTHROPIC_URL, anthropicHeaders } from "./anthropicEndpoint";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
@@ -14,13 +15,9 @@ async function callClaude(
   }
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(ANTHROPIC_URL, {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
+      headers: anthropicHeaders(apiKey),
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: maxTokens,
@@ -260,13 +257,9 @@ Use null for label only as a last resort.`;
   const userMessage = `Subject: ${subject}\nFrom: ${from}\nSnippet: ${snippet}\nBody (first 1500 chars): ${body.slice(0, 1500)}`;
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(ANTHROPIC_URL, {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
+      headers: anthropicHeaders(apiKey),
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: 120,

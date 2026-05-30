@@ -4,6 +4,7 @@
 // idempotent: existing rows for the city short-circuit immediately.
 
 import { prisma } from "./prisma";
+import { ANTHROPIC_URL, anthropicHeaders } from "./anthropicEndpoint";
 
 type GeneratedMilestone = {
   id: string;
@@ -91,13 +92,9 @@ export async function generateMilestonesForCity(city: string): Promise<{
 
   const prompt = PROMPT.replace("{CITY}", city);
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: anthropicHeaders(apiKey),
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1200,

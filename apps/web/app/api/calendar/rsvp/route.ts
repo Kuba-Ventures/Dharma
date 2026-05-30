@@ -4,6 +4,7 @@ import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { logUsage } from "../../../../lib/usage";
+import { ANTHROPIC_URL, anthropicHeaders } from "../../../../lib/anthropicEndpoint";
 import { google } from "googleapis";
 
 // RSVP to a Google Calendar invite OR generate a reschedule draft.
@@ -114,13 +115,9 @@ Rules:
 
 Reschedule reply:`;
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const claudeRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
+      headers: anthropicHeaders(apiKey),
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 300,

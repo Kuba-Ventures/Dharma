@@ -3,6 +3,7 @@ import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
+import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { google } from "googleapis";
 
 // Analyze the user's most recent 15 sent emails. Per the May 23 spec: fewer
@@ -90,13 +91,9 @@ Return a JSON object with exactly four fields:
 
 JSON only, no other text.`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(ANTHROPIC_URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: anthropicHeaders(apiKey),
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 800,
@@ -221,13 +218,9 @@ Rules: max 18 words. No adverbs like "professionally" or "effectively". No menti
 
 Return just the completing phrase. No quotes, no preamble.`;
 
-      const sonnetRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const sonnetRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
-        headers: {
-          "x-api-key": process.env.ANTHROPIC_API_KEY!,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
+        headers: anthropicHeaders(process.env.ANTHROPIC_API_KEY!),
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 60,
