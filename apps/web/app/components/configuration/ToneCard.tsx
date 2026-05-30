@@ -196,7 +196,16 @@ export default function ToneCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle tone" />
+          <div className="flex items-center gap-2">
+            <ResyncButton
+              busy={retraining}
+              onClick={retrain}
+              label="Resync mail"
+              busyLabel="Retraining…"
+              title="Re-read your sent mail to update your tone summary"
+            />
+            <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle tone" />
+          </div>
         </div>
 
         {enabled && (
@@ -308,12 +317,6 @@ export default function ToneCard({ initial }: Props) {
               </pre>
             </Card>
 
-            <div className="flex gap-2 pt-1">
-              <Button variant="primary" onClick={retrain} disabled={retraining}>
-                {retraining ? "Retraining…" : "Retrain on recent emails"}
-              </Button>
-            </div>
-
             <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
               Dharma reads only your sent mail to learn your voice. Nothing is
               stored beyond the summary; nothing is shared.
@@ -331,5 +334,46 @@ export default function ToneCard({ initial }: Props) {
         onCancel={() => setConfirmingOff(false)}
       />
     </>
+  );
+}
+
+function ResyncButton({
+  busy,
+  onClick,
+  label,
+  busyLabel,
+  title,
+}: {
+  busy: boolean;
+  onClick: () => void;
+  label: string;
+  busyLabel: string;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title={title}
+      className="flex items-center gap-1.5 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2.5 py-1 text-xs text-white/75 transition-colors hover:bg-white/[0.09] disabled:opacity-60"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 14 14"
+        fill="none"
+        className={busy ? "animate-spin" : ""}
+      >
+        <path
+          d="M2 7a5 5 0 0 1 9-3M12 7a5 5 0 0 1-9 3M11 2v3h-3M3 12V9h3"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {busy ? busyLabel : label}
+    </button>
   );
 }

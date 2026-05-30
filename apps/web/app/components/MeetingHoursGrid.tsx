@@ -123,16 +123,34 @@ export default function MeetingHoursGrid({ initialHours, onChange }: Props) {
               <span className="mb-2 text-[10px] uppercase tracking-wide text-white/50">
                 {DAY_LABELS[dayIdx]}
               </span>
-              <div className="relative h-16 w-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                {d.active && (
-                  <div
-                    className="absolute inset-x-0 bg-brand-400"
-                    style={{
-                      top: `${(d.hourStart / 24) * 100}%`,
-                      height: `${((d.hourEnd - d.hourStart) / 24) * 100}%`,
-                    }}
-                  />
-                )}
+              <div className="flex h-16 items-stretch gap-1">
+                <div className="relative h-full w-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                  {d.active && (
+                    <div
+                      className="absolute inset-x-0 bg-brand-400"
+                      style={{
+                        top: `${(d.hourStart / 24) * 100}%`,
+                        height: `${((d.hourEnd - d.hourStart) / 24) * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="relative h-full w-3 text-[7px] leading-none text-white/30">
+                  {[
+                    { label: "6", pct: 25 },
+                    { label: "12", pct: 50 },
+                    { label: "6", pct: 75 },
+                    { label: "12", pct: 100 },
+                  ].map((t) => (
+                    <span
+                      key={t.pct}
+                      className="absolute left-0 -translate-y-1/2"
+                      style={{ top: `${t.pct}%` }}
+                    >
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
               </div>
               <span className="mt-2 text-[10px] text-white/40">
                 {d.active ? `${d.hourStart}–${d.hourEnd}` : "off"}

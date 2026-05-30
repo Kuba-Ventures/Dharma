@@ -69,6 +69,8 @@ export default function SchedulingCard({ initial }: Props) {
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(parsePrefs(initial.schedulingPreferences));
   const [hours, setHours] = useState<MeetingHour[]>(initial.hours);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   // Detect timezone if user has no value set yet (best-effort).
   const tz =
@@ -106,6 +108,26 @@ export default function SchedulingCard({ initial }: Props) {
     });
   }
 
+  async function syncCalendar() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/calendar/google/sync", { method: "POST" });
+      if (res.ok) {
+        setSyncMessage("Calendar resynced");
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setSyncMessage(data.error ?? "Sync failed");
+      }
+    } catch {
+      setSyncMessage("Sync failed");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMessage(null), 4000);
+    }
+  }
+
   async function confirmPause() {
     setEnabled(false);
     setConfirmingOff(false);
@@ -141,7 +163,33 @@ export default function SchedulingCard({ initial }: Props) {
               </div>
             </div>
           </div>
-          <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle scheduling" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={syncCalendar}
+              disabled={syncing}
+              title="Re-sync your calendar availability"
+              className="flex items-center gap-1.5 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2.5 py-1 text-xs text-white/75 transition-colors hover:bg-white/[0.09] disabled:opacity-60"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 14 14"
+                fill="none"
+                className={syncing ? "animate-spin" : ""}
+              >
+                <path
+                  d="M2 7a5 5 0 0 1 9-3M12 7a5 5 0 0 1-9 3M11 2v3h-3M3 12V9h3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {syncing ? "Syncing…" : syncMessage ?? "Resync calendar"}
+            </button>
+            <Toggle checked={enabled} onChange={onToggle} aria-label="Toggle scheduling" />
+          </div>
         </div>
 
         {enabled && (

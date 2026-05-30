@@ -24,7 +24,7 @@ export default function ConfigStatusCard({
       className="block rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-4 transition-colors hover:bg-[color:var(--bg-card-elevated)]"
     >
       <div className="mb-3 flex items-center gap-3">
-        <IconTile tone={iconTone}>
+        <IconTile tone={iconTone} size="lg">
           <span className="text-brand-200">{icon}</span>
         </IconTile>
         <div className="flex-1">
