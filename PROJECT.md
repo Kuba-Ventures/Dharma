@@ -202,7 +202,7 @@ The "logical candy" product redesign closed this week — ~70 commits on main ag
 - [ ] Sentence-case audit across new surfaces
 - [ ] Cities autocomplete expansion from ~60 metros to ~5k US cities
 - [ ] Milestone-generator prompt grounding — Stanley Park / Standing Stone Trail style hallucinations occasionally slip through
-- [ ] `apps/web/next-env.d.ts` is uncommitted; decide whether to ignore or commit
+- [x] `apps/web/next-env.d.ts` committed; `inspect-user.mjs` brought into tracked tooling (2026-05-29)
 
 ### Recently closed
 - [x] 12-step "logical candy" product redesign (2026-05-29)
