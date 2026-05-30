@@ -14,7 +14,7 @@ export const PRICING: Record<string, { in: number; out: number }> = {
   "claude-sonnet-4-20250514":  { in: 3.0  / 1_000_000, out: 15.0 / 1_000_000 },
 };
 
-export type EventType = "classify" | "draft" | "tone_sync" | "schedule";
+export type EventType = "classify" | "draft" | "tone_sync" | "schedule" | "signal";
 
 export interface AnthropicUsage {
   input_tokens: number;

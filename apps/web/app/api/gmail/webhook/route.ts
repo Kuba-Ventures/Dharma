@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
+import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
 // Pub/Sub push handler. Applies labels to new messages. Never creates drafts
 // or calendar events — those are user-button-only by design.
@@ -176,6 +177,14 @@ export async function POST(req: NextRequest) {
                   labelName: matched?.name ?? null,
                 },
                 update: {},
+              });
+
+              await detectAndPersistSignal({
+                userId: googleCred.userId,
+                threadId: msg.threadId,
+                subject: msg.subject,
+                from: msg.from,
+                body: msg.body,
               });
             }
           }

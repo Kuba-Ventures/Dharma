@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
+import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
 // Manual-invoke / debugging endpoint for label backfill across all connected
 // accounts. No longer attached to a cron (see vercel.json) and never creates
@@ -202,6 +203,14 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
                 labelName: matched?.name ?? null,
               },
               update: {},
+            });
+
+            await detectAndPersistSignal({
+              userId: googleCred.userId,
+              threadId: msg.threadId,
+              subject: msg.subject,
+              from: msg.from,
+              body: msg.body,
             });
           } catch (err) {
             console.error(`[poll] Preset classification failed for ${messageId}:`, err);

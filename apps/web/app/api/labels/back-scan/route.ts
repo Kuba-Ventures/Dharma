@@ -12,6 +12,7 @@ import {
   isPresetKey,
   resolvePresetSpec,
 } from "../../../../lib/labelPresets";
+import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
 const MAX_THREADS = 30;
 const CONCURRENCY = 5;
@@ -153,6 +154,14 @@ export async function POST(req: Request) {
         where: { userId_threadId: { userId, threadId: c.threadId } },
         create: { userId, threadId: c.threadId, labelName: matched?.name ?? null },
         update: { labelName: matched?.name ?? null },
+      });
+
+      await detectAndPersistSignal({
+        userId,
+        threadId: c.threadId,
+        subject,
+        from,
+        body,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

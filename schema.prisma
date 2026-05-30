@@ -299,11 +299,13 @@ model Signal {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kind      String    // "deal_flow" | "term_sheet" | etc.
+  kind      String    // "deal_flow" | "term_sheet" | "transaction"
+  threadId  String?   // Gmail threadId; nullable for pre-producer rows
   payload   Json
   createdAt DateTime  @default(now())
   readAt    DateTime?
 
+  @@unique([userId, threadId, kind])
   @@index([userId, readAt])
 }
 
