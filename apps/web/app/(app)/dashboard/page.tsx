@@ -6,6 +6,7 @@ import MilestoneHero from "../../components/dashboard/MilestoneHero";
 import DashboardMetrics from "../../components/dashboard/DashboardMetrics";
 import ConfigStatusCard from "../../components/dashboard/ConfigStatusCard";
 import QuickActions from "../../components/dashboard/QuickActions";
+import NpsPrompt from "../../components/dashboard/NpsPrompt";
 import InboxPanel from "../../components/InboxPanel";
 
 const TONE_ICON = (
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
-  const [user, labelPreset, mappingCount, meetingHourCount] = await Promise.all([
+  const [user, labelPreset, mappingCount, meetingHourCount, draftCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -41,11 +42,13 @@ export default async function DashboardPage() {
         tone: true,
         toneProfile: true,
         schedulingEnabled: true,
+        nextNpsPromptAt: true,
       },
     }),
     prisma.labelPreset.findUnique({ where: { userId } }),
     prisma.labelMapping.count({ where: { userId } }),
     prisma.meetingHour.count({ where: { userId } }),
+    prisma.usageEvent.count({ where: { userId, eventType: "draft" } }),
   ]);
 
   if (!user) redirect("/login");
@@ -57,6 +60,12 @@ export default async function DashboardPage() {
   const labelsActive = labelPreset?.enabled ?? false;
   const schedulingActive = user.schedulingEnabled;
 
+  // Show the NPS card once the user has real product experience and we're not
+  // in a cooldown window from a previous prompt.
+  const showNps =
+    draftCount >= 10 &&
+    (!user.nextNpsPromptAt || user.nextNpsPromptAt < new Date());
+
   return (
     <div className="space-y-6">
       <Greeting
@@ -66,6 +75,8 @@ export default async function DashboardPage() {
       />
 
       <MilestoneHero />
+
+      {showNps && <NpsPrompt firstName={firstName} />}
 
       <DashboardMetrics />
 
