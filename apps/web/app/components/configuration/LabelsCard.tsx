@@ -218,6 +218,46 @@ export default function LabelsCard({ initial }: Props) {
   async function syncInbox() {
     setSyncingInbox(true);
     setErrorMessage(null);
+
+    if (preset === "Custom" && cleanedCustomLabels().length === 0) {
+      setErrorMessage("Add at least one custom label before syncing.");
+      setSyncingInbox(false);
+      return;
+    }
+
+    // 1. Re-provision so colors/names/new labels are pushed to Gmail AND stale
+    //    LabelMappings from prior presets are pruned (this is what fixes the
+    //    inflated "N provisioned" count).
+    setBackfillStatus("Updating labels in Gmail…");
+    try {
+      const payload: Record<string, unknown> = { preset };
+      if (preset === "Custom") {
+        payload.customName = customName.trim();
+        payload.customLabels = cleanedCustomLabels();
+      }
+      const provRes = await fetch("/api/labels/provision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!provRes.ok) {
+        const err = (await provRes.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(err.error ?? "Sync failed during label provisioning.");
+        setBackfillStatus(null);
+        setSyncingInbox(false);
+        return;
+      }
+      const provData = (await provRes.json()) as { total?: number };
+      if (typeof provData.total === "number") setProvisioned(provData.total);
+    } catch {
+      setErrorMessage("Sync failed during label provisioning.");
+      setBackfillStatus(null);
+      setSyncingInbox(false);
+      return;
+    }
+
+    // 2. Force-classify recent inbox threads under the current preset so
+    //    color/name/new-label changes show up on existing mail.
     setBackfillStatus("Re-classifying your last 25 inbox threads…");
     try {
       const res = await fetch("/api/labels/back-scan", {
@@ -231,13 +271,10 @@ export default function LabelsCard({ initial }: Props) {
         const scanned = data.scanned ?? 0;
         setBackfillStatus(`Re-classified ${tagged} of ${scanned} recent threads.`);
       } else {
-        const err = (await res.json().catch(() => ({}))) as { error?: string };
-        setErrorMessage(err.error ?? "Sync inbox failed.");
-        setBackfillStatus(null);
+        setBackfillStatus("Labels synced. Back-scan skipped.");
       }
     } catch {
-      setErrorMessage("Sync inbox failed.");
-      setBackfillStatus(null);
+      setBackfillStatus("Labels synced. Back-scan skipped.");
     } finally {
       setSyncingInbox(false);
       refresh();
