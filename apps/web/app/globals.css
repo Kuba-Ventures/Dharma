@@ -72,6 +72,14 @@
   }
 }
 
+/* A11y: visible keyboard focus rings on all interactive elements.
+ * Mouse clicks don't trigger focus-visible, so non-keyboard users see no ring. */
+*:focus-visible {
+  outline: 2px solid var(--brand-200);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }

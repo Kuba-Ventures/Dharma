@@ -31,7 +31,13 @@ const PROMPT = `You are designing milestones for an AI email assistant's gamific
 
 Generate exactly 6 milestones tied to the city: {CITY}
 
-Each milestone references a REAL local landmark, peak, trail, park, neighborhood, cultural site, or cross-town distance within ~100 miles. Do not invent fictional places — if you're unsure a landmark exists, choose a different one or fall back to a regional one (state park, scenic byway, well-known historic site). Stanley Park, for example, is in Vancouver, not Virginia — be specific to the actual region.
+**Landmark accuracy is the hardest constraint:**
+- Every landmark must be a REAL place documented on Wikipedia or a government website (state park system, NPS, city tourism board).
+- If a candidate landmark sounds plausible but you're not 100% certain it exists in this specific region, DROP IT and pick another. False precision is worse than vague.
+- Cross-check: would a local resident roll their eyes? (e.g. Stanley Park is in Vancouver, not Virginia — do not relocate famous landmarks.)
+- For small towns, lean on REGIONAL landmarks within ~100 miles (state parks, AT trail sections, well-known peaks, scenic byways, historic sites). Better to reference a real landmark 90 miles away than invent one in town.
+- Do NOT mash up two real landmarks (e.g. "Humpback Rock via McAfee Knob" — those are separate landmarks in different parts of Virginia).
+- For each milestone, internally name the Wikipedia article title or government website that documents it; if you can't, drop the milestone.
 
 **Threshold calibration — this is the most important constraint:**
 The threshold (in seconds) should approximate the REAL-WORLD time investment to complete the activity from this city, including round-trip drive time. Be honest. If a landmark is 30 minutes away, the threshold reflects that, not an arbitrary larger number.

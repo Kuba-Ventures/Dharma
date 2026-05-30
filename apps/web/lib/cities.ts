@@ -75,10 +75,17 @@ export const CITIES: City[] = [
   { name: "Honolulu", state: "HI", lat: 21.3099, lng: -157.8581, timezone: "Pacific/Honolulu" },
 ];
 
+import { EXTENDED_CITIES } from "./citiesExtended";
+
+// Combined dataset for search and findByName: featured CITIES first (top 60
+// metros, surfaces in empty-query defaults), then ~180 extended entries
+// covering state capitals + secondary metros + college towns.
+const ALL_CITIES = [...CITIES, ...EXTENDED_CITIES];
+
 export function searchCities(query: string, limit = 8): City[] {
   const q = query.trim().toLowerCase();
   if (!q) return CITIES.slice(0, limit);
-  return CITIES.filter(
+  return ALL_CITIES.filter(
     (c) =>
       c.name.toLowerCase().includes(q) ||
       `${c.name.toLowerCase()}, ${c.state.toLowerCase()}` === q ||
@@ -88,7 +95,7 @@ export function searchCities(query: string, limit = 8): City[] {
 
 export function findCityByName(name: string, state?: string): City | undefined {
   const lower = name.toLowerCase();
-  return CITIES.find(
+  return ALL_CITIES.find(
     (c) =>
       c.name.toLowerCase() === lower &&
       (!state || c.state.toLowerCase() === state.toLowerCase()),
