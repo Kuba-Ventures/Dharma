@@ -8,7 +8,7 @@ type Props = {
   iconTone?: "brand" | "brand-deep" | "brand-deeper";
   title: string;
   status: string;
-  stat: string;
+  stat: ReactNode;
 };
 
 export default function ConfigStatusCard({
@@ -49,7 +49,11 @@ export default function ConfigStatusCard({
           />
         </svg>
       </div>
-      <p className="text-[11px] text-white/50">{stat}</p>
+      {typeof stat === "string" ? (
+        <p className="text-[11px] text-white/50">{stat}</p>
+      ) : (
+        stat
+      )}
     </Link>
   );
 }

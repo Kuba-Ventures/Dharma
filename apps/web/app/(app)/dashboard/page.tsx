@@ -47,7 +47,8 @@ export default async function DashboardPage() {
     recentSignals,
     unreadSignalCount,
     activity,
-    taggedThisWeek,
+    userLabels,
+    classifiedThisWeek,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -82,10 +83,29 @@ export default async function DashboardPage() {
     }),
     prisma.signal.count({ where: { userId, readAt: null } }),
     getRecentActivity(userId, 10),
-    prisma.classifiedThread.count({
-      where: { userId, classifiedAt: { gte: weekAgo }, labelName: { not: null } },
+    prisma.label.findMany({
+      where: { userId },
+      select: { name: true, color: true },
+      orderBy: { order: "asc" },
+    }),
+    prisma.classifiedThread.findMany({
+      where: { userId, classifiedAt: { gte: weekAgo } },
+      select: { labelName: true },
     }),
   ]);
+
+  const taggedByLabel = new Map<string, number>();
+  let taggedThisWeek = 0;
+  for (const t of classifiedThisWeek) {
+    if (!t.labelName) continue;
+    taggedThisWeek += 1;
+    taggedByLabel.set(t.labelName, (taggedByLabel.get(t.labelName) ?? 0) + 1);
+  }
+  const labelBreakdown = userLabels.map((l) => ({
+    name: l.name,
+    color: l.color,
+    tagged: taggedByLabel.get(l.name) ?? 0,
+  }));
 
   if (!user) redirect("/login");
 
@@ -155,9 +175,36 @@ export default async function DashboardPage() {
             title="Labels"
             status={labelsActive ? "Active" : "Paused"}
             stat={
-              labelsActive
-                ? `${mappingCount} provisioned · ${taggedThisWeek} tagged this week`
-                : "Not classifying new mail"
+              labelsActive ? (
+                <div>
+                  <p className="text-[11px] text-white/50">
+                    {mappingCount} provisioned · {taggedThisWeek} tagged this week
+                  </p>
+                  {labelBreakdown.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {labelBreakdown.map((row) => (
+                        <li
+                          key={row.name}
+                          className="flex items-center gap-2 text-[11px]"
+                        >
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: row.color }}
+                          />
+                          <span className="flex-1 truncate text-white/70">
+                            {row.name}
+                          </span>
+                          <span className="shrink-0 text-white/40">
+                            {row.tagged} tagged
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                "Not classifying new mail"
+              )
             }
           />
           <ConfigStatusCard
