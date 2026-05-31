@@ -51,8 +51,6 @@ export default async function DashboardPage() {
     activity,
     userLabels,
     classifiedThisWeek,
-    toneUsage,
-    schedulingDraftsThisWeek,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -96,7 +94,14 @@ export default async function DashboardPage() {
       where: { userId, classifiedAt: { gte: weekAgo } },
       select: { labelName: true },
     }),
-    prisma.usageEvent.groupBy({
+  ]);
+
+  // Tone-column-dependent queries run separately and tolerate failure —
+  // the column is new and the DB may not be migrated yet in every
+  // environment. If they throw, the dashboard still renders with the
+  // tone/scheduling tiles in their "no data yet" state.
+  const toneUsage = await prisma.usageEvent
+    .groupBy({
       by: ["tone"],
       where: {
         userId,
@@ -105,16 +110,25 @@ export default async function DashboardPage() {
         tone: { not: null },
       },
       _count: { _all: true },
-    }),
-    prisma.usageEvent.count({
+    })
+    .catch((err) => {
+      console.error("[dashboard] toneUsage groupBy failed:", err);
+      return [];
+    });
+
+  const schedulingDraftsThisWeek = await prisma.usageEvent
+    .count({
       where: {
         userId,
         eventType: "draft",
         createdAt: { gte: weekAgo },
         tone: "Scheduling",
       },
-    }),
-  ]);
+    })
+    .catch((err) => {
+      console.error("[dashboard] schedulingDrafts count failed:", err);
+      return 0;
+    });
 
   const taggedByLabel = new Map<string, number>();
   let taggedThisWeek = 0;
