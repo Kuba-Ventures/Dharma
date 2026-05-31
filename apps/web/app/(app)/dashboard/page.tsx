@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { google } from "googleapis";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { makeAuthForUser } from "../../../lib/gmail";
 import { effectiveNextLockedMilestone } from "../../../lib/milestoneResolution";
 import { applyTemplate } from "../../../lib/milestones";
 import { getRecentActivity } from "../../../lib/recentActivity";
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
     userLabels,
     classifiedThisWeek,
     toneUsage,
+    schedulingDraftsThisWeek,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -103,6 +106,14 @@ export default async function DashboardPage() {
       },
       _count: { _all: true },
     }),
+    prisma.usageEvent.count({
+      where: {
+        userId,
+        eventType: "draft",
+        createdAt: { gte: weekAgo },
+        tone: "Scheduling",
+      },
+    }),
   ]);
 
   const taggedByLabel = new Map<string, number>();
@@ -118,6 +129,40 @@ export default async function DashboardPage() {
     tagged: taggedByLabel.get(l.name) ?? 0,
   }));
 
+  if (!user) redirect("/login");
+
+  // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
+  // try/catch so a Calendar API blip doesn't fail the whole dashboard
+  // render — falls back to null and the tile shows a graceful "—".
+  const meetingsThisWeek = await (async (): Promise<number | null> => {
+    if (!user.schedulingEnabled) return null;
+    try {
+      const now = new Date();
+      const startOfWeek = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()),
+      );
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 7);
+
+      const { auth: oauthClient } = await makeAuthForUser(userId);
+      const calendar = google.calendar({ version: "v3", auth: oauthClient });
+      const res = await calendar.events.list({
+        calendarId: "primary",
+        timeMin: startOfWeek.toISOString(),
+        timeMax: endOfWeek.toISOString(),
+        maxResults: 250,
+        singleEvents: true,
+        eventTypes: ["default"],
+      });
+      return (res.data.items ?? []).filter(
+        (e) => e.status !== "cancelled" && e.start?.dateTime,
+      ).length;
+    } catch (err) {
+      console.error("[dashboard] meetings-this-week query failed:", err);
+      return null;
+    }
+  })();
+
   // Tone usage breakdown — only tracked starting when the `tone` column
   // shipped, so legacy drafts are skipped (null filter above). Sorted
   // descending by count so the most-used preset reads first.
@@ -129,8 +174,6 @@ export default async function DashboardPage() {
       pct: toneTotal > 0 ? Math.round((row._count._all / toneTotal) * 100) : 0,
     }))
     .sort((a, b) => b.count - a.count);
-
-  if (!user) redirect("/login");
 
   const firstName =
     user.firstName ?? user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "there";
@@ -263,11 +306,41 @@ export default async function DashboardPage() {
             title="Scheduling"
             status={schedulingActive ? "Active" : "Paused"}
             stat={
-              schedulingActive
-                ? meetingHourCount > 0
-                  ? `${meetingHourCount} day${meetingHourCount === 1 ? "" : "s"} with hours set`
-                  : "Set meeting hours in Configuration"
-                : "Not proposing times"
+              schedulingActive ? (
+                <div>
+                  <p className="text-[11px] text-white/50">
+                    {meetingsThisWeek === null
+                      ? "Meetings this week unavailable"
+                      : `${meetingsThisWeek} meeting${meetingsThisWeek === 1 ? "" : "s"} this week`}
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    <li className="flex items-center gap-2 text-[11px]">
+                      <span className="flex-1 truncate text-white/70">
+                        Scheduled with Dharma
+                      </span>
+                      <span className="shrink-0 tabular-nums text-white/40">
+                        {schedulingDraftsThisWeek}
+                      </span>
+                    </li>
+                    {meetingHourCount > 0 ? (
+                      <li className="flex items-center gap-2 text-[11px]">
+                        <span className="flex-1 truncate text-white/70">
+                          Meeting hours set
+                        </span>
+                        <span className="shrink-0 tabular-nums text-white/40">
+                          {meetingHourCount} day{meetingHourCount === 1 ? "" : "s"}
+                        </span>
+                      </li>
+                    ) : (
+                      <li className="text-[11px] text-white/30">
+                        Set meeting hours in Configuration
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ) : (
+                "Not proposing times"
+              )
             }
           />
         </div>
