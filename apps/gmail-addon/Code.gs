@@ -906,9 +906,14 @@ function buildToneStatusSection() {
       .setBackgroundColor(BRAND_PRIMARY)
       .setOnClickAction(CardService.newAction().setFunctionName('setupTone')));
   } else {
-    var summary = profile.toneProfile.length > 140
-      ? profile.toneProfile.substring(0, 140) + '...'
-      : profile.toneProfile;
+    var summary = profile.toneProfile;
+    // Only truncate truly long summaries, and break at the last word boundary
+    // so we never cut mid-word.
+    if (summary.length > 360) {
+      var cut = summary.substring(0, 360);
+      var lastSpace = cut.lastIndexOf(' ');
+      summary = (lastSpace > 200 ? cut.substring(0, lastSpace) : cut) + '…';
+    }
     section.addWidget(
       CardService.newDecoratedText()
         .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
