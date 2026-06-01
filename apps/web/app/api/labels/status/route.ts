@@ -20,5 +20,6 @@ export async function GET() {
     count: mappingCount,
     customName: preset?.customName ?? null,
     customLabels: preset?.customLabels ?? null,
+    uncategorizedEnabled: preset?.uncategorizedEnabled ?? true,
   });
 }

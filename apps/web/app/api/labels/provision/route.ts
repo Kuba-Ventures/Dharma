@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { createGmailLabel, listGmailLabels, updateGmailLabel } from "../../../../lib/gmail";
-import { isPresetKey, resolvePresetSpec, type CustomPresetLabel } from "../../../../lib/labelPresets";
+import { isPresetKey, resolvePresetSpec, UNCATEGORIZED_NAME, type CustomPresetLabel } from "../../../../lib/labelPresets";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -26,14 +26,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Google not connected" }, { status: 400 });
   }
 
+  // Respect the user's catch-all choice — if they deleted Uncategorized, don't
+  // recreate it on the next sync. Defaults to on for first-time provisioning.
+  const existingPreset = await prisma.labelPreset.findUnique({ where: { userId } });
+  const includeUncategorized = existingPreset?.uncategorizedEnabled ?? true;
+
   // For Custom presets, the request body carries the spec (we also persist it
   // so subsequent polls can classify). For built-ins, the spec is hardcoded.
   const spec = resolvePresetSpec({
     preset: presetKey,
     customName: body.customName,
     customLabels: body.customLabels,
+    includeUncategorized,
   });
-  if (!spec || spec.labels.length === 0) {
+  // Require at least one real (non-catch-all) label — otherwise a Custom preset
+  // with only Uncategorized would slip through.
+  if (!spec || spec.labels.filter((l) => l.shortName !== UNCATEGORIZED_NAME).length === 0) {
     return NextResponse.json(
       { error: "Custom preset needs at least one label" },
       { status: 400 }

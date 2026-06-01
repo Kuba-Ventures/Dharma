@@ -138,6 +138,7 @@ export default async function DashboardPage() {
         preset: labelPreset.preset,
         customName: labelPreset.customName,
         customLabels: labelPreset.customLabels,
+        includeUncategorized: labelPreset.uncategorizedEnabled,
       })
     : null;
   const labelBreakdown = (presetSpec?.labels ?? []).map((l) => ({

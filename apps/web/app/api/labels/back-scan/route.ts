@@ -8,6 +8,7 @@ import { google } from "googleapis";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import {
   HIGH_PRIORITY_NAME,
+  UNCATEGORIZED_NAME,
   isBuiltInPresetKey,
   isPresetKey,
   resolvePresetSpec,
@@ -49,6 +50,7 @@ export async function POST(req: Request) {
     preset: presetRow.preset,
     customName: presetRow.customName,
     customLabels: presetRow.customLabels,
+    includeUncategorized: presetRow.uncategorizedEnabled,
   });
   if (!maybeSpec || maybeSpec.labels.length === 0) {
     return NextResponse.json({ error: "Preset has no labels" }, { status: 400 });
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
 
   const labelNames = spec.labels
     .map((l) => l.shortName)
-    .filter((n) => n !== "High-Priority");
+    .filter((n) => n !== HIGH_PRIORITY_NAME && n !== UNCATEGORIZED_NAME);
 
   // Load LabelMappings into a map so we can resolve short names → Gmail ids.
   const mappings = await prisma.labelMapping.findMany({ where: { userId } });
@@ -163,7 +165,11 @@ export async function POST(req: Request) {
         userId,
       });
 
-      const matched = result.label ? spec.labels.find((l) => l.shortName === result.label) : null;
+      // Fall back to the catch-all so nothing goes unlabeled.
+      const matched =
+        (result.label ? spec.labels.find((l) => l.shortName === result.label) : null) ??
+        spec.labels.find((l) => l.shortName === UNCATEGORIZED_NAME) ??
+        null;
       const namesToApply: string[] = [];
       if (matched) namesToApply.push(matched.name);
       if (result.priority > 0.75 && isBuiltInPresetKey(preset)) {

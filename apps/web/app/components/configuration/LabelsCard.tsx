@@ -59,8 +59,11 @@ type Props = {
     customName: string | null;
     customLabels: unknown;
     provisioned: number;
+    uncategorizedEnabled: boolean;
   };
 };
+
+const UNCATEGORIZED_HEX = "#999999";
 
 export default function LabelsCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
@@ -78,6 +81,8 @@ export default function LabelsCard({ initial }: Props) {
   const [syncingInbox, setSyncingInbox] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uncategorizedEnabled, setUncategorizedEnabled] = useState(initial.uncategorizedEnabled);
+  const [uncategorizedBusy, setUncategorizedBusy] = useState(false);
 
   async function persistPreset(next: {
     preset?: Preset;
@@ -213,6 +218,31 @@ export default function LabelsCard({ initial }: Props) {
     setEnabled(false);
     setConfirmingOff(false);
     await persistPreset({ enabled: false });
+  }
+
+  // Delete (or re-add) the Uncategorized catch-all label. The endpoint flips the
+  // persisted flag and creates/removes the matching Gmail label.
+  async function toggleUncategorized(next: boolean) {
+    setUncategorizedBusy(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch("/api/labels/uncategorized", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (res.ok) {
+        setUncategorizedEnabled(next);
+        refresh();
+      } else {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(err.error ?? "Failed to update the catch-all label.");
+      }
+    } catch {
+      setErrorMessage("Failed to update the catch-all label.");
+    } finally {
+      setUncategorizedBusy(false);
+    }
   }
 
   async function syncInbox() {
@@ -438,6 +468,49 @@ export default function LabelsCard({ initial }: Props) {
                 </div>
               </div>
             )}
+
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                Catch-all
+              </span>
+              {uncategorizedEnabled ? (
+                <div className="mt-2 flex items-center gap-2.5 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.02] px-3.5 py-2.5">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: UNCATEGORIZED_HEX }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-medium text-white/75">Uncategorized</span>
+                    <p className="text-[11px] text-white/40">
+                      Mail that matches no other label gets tagged here instead of going unlabeled.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleUncategorized(false)}
+                    disabled={uncategorizedBusy}
+                    aria-label="Delete Uncategorized label"
+                    className="px-2 text-base leading-none text-white/30 transition-colors hover:text-red-400/70 disabled:opacity-30"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.02] px-3.5 py-2.5">
+                  <p className="text-[11px] text-white/40">
+                    Unmatched mail stays unlabeled.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => toggleUncategorized(true)}
+                    disabled={uncategorizedBusy}
+                    className="shrink-0 text-[11px] text-white/50 transition-colors hover:text-white/80 disabled:opacity-30"
+                  >
+                    + Add Uncategorized
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Button variant="primary" onClick={applyToGmail} disabled={applying}>

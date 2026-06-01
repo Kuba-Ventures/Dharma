@@ -320,6 +320,27 @@ function buildComposeToneCard(subject, threadId) {
     );
   }
 
+  // Instant path: paste notes here → polished text drops straight into the compose box (live, no reopening).
+  var instantSection = CardService.newCardSection().setHeader('Polish & insert (instant)')
+    .addWidget(CardService.newTextParagraph()
+      .setText('Type or paste your notes here. The polished version drops straight into the compose box — no need to open Drafts.'))
+    .addWidget(
+      CardService.newTextInput()
+        .setFieldName('dharmaNotes')
+        .setTitle('Your notes')
+        .setMultiline(true)
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('Polish & insert')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor(BRAND_PRIMARY)
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('polishFromInput')
+        )
+    );
+
+  // In-compose path (unchanged): reads your already-typed draft and replaces it — view it in Drafts.
   var polishSection = CardService.newCardSection().setHeader('Have a draft?')
     .addWidget(CardService.newTextParagraph()
       .setText('Dharma will rewrite it in your voice without changing the meaning.'))
@@ -338,6 +359,7 @@ function buildComposeToneCard(subject, threadId) {
   return CardService.newCardBuilder()
     .setHeader(dharmaHeader('Dharma'))
     .addSection(replySection)
+    .addSection(instantSection)
     .addSection(polishSection)
     .build();
 }
@@ -635,6 +657,59 @@ function insertPolishedDraft(e) {
 
   // Diagnostic: show why we couldn't replace
   return notificationResponse('No draft ID found in cache. meta=' + JSON.stringify(meta) + ' text_len=' + (polishedText ? polishedText.length : 0));
+}
+
+// ── Polish & insert (instant): polishes notes from the sidebar input, inserts live into compose ──
+function polishFromInput(e) {
+  try {
+    return polishFromInputInner(e);
+  } catch (globalErr) {
+    return notificationResponse('Caught: ' + globalErr.message);
+  }
+}
+
+function polishFromInputInner(e) {
+  var notes = '';
+  if (e && e.formInput && e.formInput.dharmaNotes) notes = e.formInput.dharmaNotes;
+  notes = (notes || '').trim();
+  if (!notes) {
+    return notificationResponse('Type or paste your notes first, then click Polish & insert.');
+  }
+
+  var accessToken = ScriptApp.getOAuthToken();
+
+  var response;
+  try {
+    response = UrlFetchApp.fetch(DHARMA_API + '/api/emails/thread-draft', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
+      payload: JSON.stringify({ threadId: 'none', draftText: notes }),
+      muteHttpExceptions: true,
+    });
+  } catch (err) {
+    return notificationResponse('Network error: ' + err.message);
+  }
+
+  var data;
+  try {
+    data = JSON.parse(response.getContentText());
+  } catch (_) {
+    return notificationResponse('HTTP ' + response.getResponseCode() + ': server error');
+  }
+
+  if (!data.ok || !data.text) {
+    return notificationResponse(data.error || 'Polish failed.');
+  }
+
+  // Native compose action → inserts live into the open compose box (empty box = clean replace).
+  return CardService.newUpdateDraftActionResponseBuilder()
+    .setUpdateDraftBodyAction(
+      CardService.newUpdateDraftBodyAction()
+        .addUpdateContent(textToGmailHtml(data.text), CardService.ContentType.MUTABLE_HTML)
+        .setUpdateType(CardService.UpdateDraftBodyType.INSERT_AT_START)
+    )
+    .build();
 }
 
 function textToGmailHtml(text) {
