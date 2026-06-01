@@ -28,7 +28,13 @@ const CAL_ICON = (
   </svg>
 );
 
-type BlockedWindow = { start: string; end: string; label?: string };
+type BlockedWindow = {
+  start: string;
+  end: string;
+  label?: string;
+  mirrorToCalendar?: boolean;
+  calendarEventId?: string;
+};
 
 type Prefs = {
   defaultDurationMin: number;
@@ -57,6 +63,8 @@ function parsePrefs(raw: string | null): Prefs {
           start: obj.start,
           end: obj.end,
           ...(typeof obj.label === "string" && obj.label.trim() ? { label: obj.label.trim() } : {}),
+          ...(obj.mirrorToCalendar ? { mirrorToCalendar: true } : {}),
+          ...(typeof obj.calendarEventId === "string" ? { calendarEventId: obj.calendarEventId } : {}),
         };
       })
       .filter((b): b is BlockedWindow => b !== null);
@@ -143,11 +151,23 @@ export default function SchedulingCard({ initial }: Props) {
 
   async function persistPrefs(next: Prefs) {
     setPrefs(next);
-    await fetch("/api/preferences/scheduling", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ schedulingPreferences: JSON.stringify(next) }),
-    });
+    try {
+      const res = await fetch("/api/preferences/scheduling", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ schedulingPreferences: JSON.stringify(next) }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { schedulingPreferences?: string | null };
+      // Server may have populated calendarEventIds on mirrored blocks.
+      // Reflect those back into local state so subsequent edits patch the
+      // right event instead of creating duplicates.
+      if (typeof data.schedulingPreferences === "string") {
+        setPrefs(parsePrefs(data.schedulingPreferences));
+      }
+    } catch (err) {
+      console.error("[scheduling] persistPrefs failed:", err);
+    }
   }
 
   async function persistHours(next: MeetingHour[]) {
@@ -334,55 +354,77 @@ export default function SchedulingCard({ initial }: Props) {
               </div>
               {prefs.blockedWindows.length === 0 ? (
                 <p className="text-[11px] text-white/40">
-                  Use this for recurring blocks like lunch or focus time. Applies daily.
+                  Recurring blocks like lunch or focus time. Toggle <span className="text-white/60">Show on calendar</span> to
+                  also create a recurring event in your Google Calendar on active days.
                 </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {prefs.blockedWindows.map((b, idx) => (
-                    <li key={idx} className="flex items-center gap-2">
-                      <input
-                        type="time"
-                        value={b.start}
-                        onChange={(e) => {
-                          const next = [...prefs.blockedWindows];
-                          next[idx] = { ...next[idx], start: e.target.value };
-                          persistPrefs({ ...prefs, blockedWindows: next });
-                        }}
-                        className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
-                      />
-                      <span className="text-white/40 text-xs">to</span>
-                      <input
-                        type="time"
-                        value={b.end}
-                        onChange={(e) => {
-                          const next = [...prefs.blockedWindows];
-                          next[idx] = { ...next[idx], end: e.target.value };
-                          persistPrefs({ ...prefs, blockedWindows: next });
-                        }}
-                        className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Lunch, focus, …"
-                        value={b.label ?? ""}
-                        onChange={(e) => {
-                          const next = [...prefs.blockedWindows];
-                          next[idx] = { ...next[idx], label: e.target.value };
-                          persistPrefs({ ...prefs, blockedWindows: next });
-                        }}
-                        className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white placeholder:text-white/30"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = prefs.blockedWindows.filter((_, i) => i !== idx);
-                          persistPrefs({ ...prefs, blockedWindows: next });
-                        }}
-                        className="text-white/40 hover:text-white/80 text-sm leading-none px-1"
-                        aria-label="Remove block"
-                      >
-                        ×
-                      </button>
+                    <li key={idx} className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={b.start}
+                          onChange={(e) => {
+                            const next = [...prefs.blockedWindows];
+                            next[idx] = { ...next[idx], start: e.target.value };
+                            persistPrefs({ ...prefs, blockedWindows: next });
+                          }}
+                          className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
+                        />
+                        <span className="text-white/40 text-xs">to</span>
+                        <input
+                          type="time"
+                          value={b.end}
+                          onChange={(e) => {
+                            const next = [...prefs.blockedWindows];
+                            next[idx] = { ...next[idx], end: e.target.value };
+                            persistPrefs({ ...prefs, blockedWindows: next });
+                          }}
+                          className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Lunch, focus, …"
+                          value={b.label ?? ""}
+                          onChange={(e) => {
+                            const next = [...prefs.blockedWindows];
+                            next[idx] = { ...next[idx], label: e.target.value };
+                            persistPrefs({ ...prefs, blockedWindows: next });
+                          }}
+                          className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white placeholder:text-white/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = prefs.blockedWindows.filter((_, i) => i !== idx);
+                            persistPrefs({ ...prefs, blockedWindows: next });
+                          }}
+                          className="text-white/40 hover:text-white/80 text-sm leading-none px-1"
+                          aria-label="Remove block"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <label className="ml-1 inline-flex items-center gap-2 text-[11px] text-white/60 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!b.mirrorToCalendar}
+                          onChange={(e) => {
+                            const next = [...prefs.blockedWindows];
+                            next[idx] = { ...next[idx], mirrorToCalendar: e.target.checked };
+                            persistPrefs({ ...prefs, blockedWindows: next });
+                          }}
+                          className="accent-brand-400"
+                        />
+                        Show on calendar
+                        {b.mirrorToCalendar && b.calendarEventId && (
+                          <span className="text-white/30">· synced</span>
+                        )}
+                        {b.mirrorToCalendar && !b.calendarEventId && (
+                          <span className="text-white/30">· syncing…</span>
+                        )}
+                      </label>
                     </li>
                   ))}
                 </ul>

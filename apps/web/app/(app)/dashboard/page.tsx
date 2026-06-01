@@ -45,7 +45,6 @@ export default async function DashboardPage() {
     user,
     labelPreset,
     mappingCount,
-    meetingHourCount,
     draftCount,
     recentSignals,
     unreadSignalCount,
@@ -69,7 +68,6 @@ export default async function DashboardPage() {
     }),
     prisma.labelPreset.findUnique({ where: { userId } }),
     prisma.labelMapping.count({ where: { userId } }),
-    prisma.meetingHour.count({ where: { userId } }),
     prisma.usageEvent.count({ where: { userId, eventType: "draft" } }),
     prisma.signal.findMany({
       where: { userId },
@@ -390,7 +388,7 @@ export default async function DashboardPage() {
                       })}
                     </ul>
                   )}
-                  <ul className="mt-4 space-y-1 border-t border-white/[0.06] pt-3">
+                  <ul className="mt-6 border-t border-white/[0.06] pt-4">
                     <li className="flex items-center gap-2 text-[11px]">
                       <span className="flex-1 truncate text-white/70">
                         Scheduled with Dharma
@@ -399,20 +397,6 @@ export default async function DashboardPage() {
                         {schedulingDraftsThisWeek}
                       </span>
                     </li>
-                    {meetingHourCount > 0 ? (
-                      <li className="flex items-center gap-2 text-[11px]">
-                        <span className="flex-1 truncate text-white/70">
-                          Meeting hours set
-                        </span>
-                        <span className="shrink-0 tabular-nums text-white/40">
-                          {meetingHourCount} day{meetingHourCount === 1 ? "" : "s"}
-                        </span>
-                      </li>
-                    ) : (
-                      <li className="text-[11px] text-white/30">
-                        Set meeting hours in Configuration
-                      </li>
-                    )}
                   </ul>
                 </div>
               ) : (
