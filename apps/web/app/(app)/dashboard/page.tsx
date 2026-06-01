@@ -7,6 +7,7 @@ import { makeAuthForUser } from "../../../lib/gmail";
 import { effectiveNextLockedMilestone } from "../../../lib/milestoneResolution";
 import { applyTemplate } from "../../../lib/milestones";
 import { getRecentActivity } from "../../../lib/recentActivity";
+import { resolvePresetSpec } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
 import TierStrip from "../../components/dashboard/TierStrip";
 import SyncInboxButton from "../../components/dashboard/SyncInboxButton";
@@ -49,7 +50,6 @@ export default async function DashboardPage() {
     recentSignals,
     unreadSignalCount,
     activity,
-    userLabels,
     classifiedThisWeek,
   ] = await Promise.all([
     prisma.user.findUnique({
@@ -85,11 +85,6 @@ export default async function DashboardPage() {
     }),
     prisma.signal.count({ where: { userId, readAt: null } }),
     getRecentActivity(userId, 10),
-    prisma.label.findMany({
-      where: { userId },
-      select: { name: true, color: true },
-      orderBy: { order: "asc" },
-    }),
     prisma.classifiedThread.findMany({
       where: { userId, classifiedAt: { gte: weekAgo } },
       select: { labelName: true },
@@ -137,10 +132,20 @@ export default async function DashboardPage() {
     taggedThisWeek += 1;
     taggedByLabel.set(t.labelName, (taggedByLabel.get(t.labelName) ?? 0) + 1);
   }
-  const labelBreakdown = userLabels.map((l) => ({
-    name: l.name,
-    color: l.color,
-    tagged: taggedByLabel.get(l.name) ?? 0,
+  // Source of truth is LabelPreset (what the Configuration page edits). The
+  // legacy `Label` table can lag behind preset switches and is no longer the
+  // canonical list.
+  const presetSpec = labelPreset
+    ? resolvePresetSpec({
+        preset: labelPreset.preset,
+        customName: labelPreset.customName,
+        customLabels: labelPreset.customLabels,
+      })
+    : null;
+  const labelBreakdown = (presetSpec?.labels ?? []).map((l) => ({
+    name: l.shortName,           // user-readable, no prefix
+    color: l.displayHex,
+    tagged: taggedByLabel.get(l.name) ?? 0,   // ClassifiedThread stores full Gmail name
   }));
 
   if (!user) redirect("/login");
@@ -280,7 +285,11 @@ export default async function DashboardPage() {
             icon={LABELS_ICON}
             iconTone="brand-deep"
             title="Labels"
-            status={labelsActive ? "Active" : "Paused"}
+            status={
+              labelsActive
+                ? `Active · ${presetSpec?.displayName ?? labelPreset?.preset ?? ""}`.trim()
+                : "Paused"
+            }
             stat={
               labelsActive ? (
                 <div>
