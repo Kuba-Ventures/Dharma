@@ -360,12 +360,7 @@ function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
           {/* Left */}
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 mb-8">
-              <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-medium text-muted-foreground">Private Beta</span>
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 font-display text-gradient leading-[1.1]">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 font-display text-gradient leading-[1.15] pb-2">
               Your inbox, on autopilot, without giving up the wheel.
             </h1>
 
