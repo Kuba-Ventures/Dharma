@@ -1004,11 +1004,17 @@ function buildToneEditCard(profile) {
 
   section.addWidget(CardService.newDivider());
 
-  section.addWidget(CardService.newTextButton()
-    .setText('Save')
-    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-    .setBackgroundColor(BRAND_PRIMARY)
-    .setOnClickAction(CardService.newAction().setFunctionName('saveToneEdits')));
+  var buttonSet = CardService.newButtonSet()
+    .addButton(CardService.newTextButton()
+      .setText('Save')
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setBackgroundColor(BRAND_PRIMARY)
+      .setOnClickAction(CardService.newAction().setFunctionName('saveToneEdits')))
+    .addButton(CardService.newTextButton()
+      .setText('Back')
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(CardService.newAction().setFunctionName('popCard')));
+  section.addWidget(buttonSet);
 
   return CardService.newCardBuilder()
     .setHeader(dharmaHeader('My tone'))
