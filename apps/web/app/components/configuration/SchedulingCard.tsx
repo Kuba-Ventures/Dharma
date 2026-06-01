@@ -134,50 +134,80 @@ function summarizeHours(hours: MeetingHour[]): string | null {
     .join(", ");
 }
 
-// IANA zones grouped by continent for the timezone picker. Computed once
-// at module load.
-function getTimezoneOptions(): { group: string; zones: string[] }[] {
-  // Intl.supportedValuesOf is widely supported in modern browsers + Node 18+.
-  const all: string[] =
-    typeof Intl !== "undefined" &&
-    typeof (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
-      .supportedValuesOf === "function"
-      ? (Intl as unknown as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf(
-          "timeZone",
-        )
-      : [
-          "America/New_York",
-          "America/Chicago",
-          "America/Denver",
-          "America/Los_Angeles",
-          "America/Phoenix",
-          "America/Anchorage",
-          "Pacific/Honolulu",
-          "Europe/London",
-          "Europe/Paris",
-          "Europe/Berlin",
-          "Asia/Tokyo",
-          "Asia/Singapore",
-          "Australia/Sydney",
-          "UTC",
-        ];
-  const groups = new Map<string, string[]>();
-  for (const z of all) {
-    const continent = z.split("/")[0];
-    if (!groups.has(continent)) groups.set(continent, []);
-    groups.get(continent)!.push(z);
-  }
-  // Sort continents in a sensible order (Americas/Europe first, then the rest).
-  const order = ["America", "US", "Canada", "Europe", "Asia", "Australia", "Pacific", "Africa", "Atlantic", "Indian", "Antarctica", "Arctic", "Etc", "UTC"];
-  return [...groups.entries()]
-    .sort((a, b) => {
-      const ai = order.indexOf(a[0]);
-      const bi = order.indexOf(b[0]);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    })
-    .map(([group, zones]) => ({ group, zones: zones.sort() }));
-}
-const TZ_OPTIONS = getTimezoneOptions();
+// Curated timezone list grouped by UTC offset. Each entry maps a
+// human-friendly label to a representative IANA zone. Display labels
+// like "(UTC-05:00) Eastern Standard Time (EST)" are unambiguous and
+// give every user something to scan for. Saved value is the IANA zone.
+type TzOption = { offset: string; label: string; zone: string };
+const TZ_OPTIONS: TzOption[] = [
+  { offset: "UTC-12:00", label: "Baker Island, Howland Island",            zone: "Etc/GMT+12" },
+  { offset: "UTC-11:00", label: "Samoa Standard Time",                     zone: "Pacific/Pago_Pago" },
+  { offset: "UTC-11:00", label: "Niue",                                    zone: "Pacific/Niue" },
+  { offset: "UTC-10:00", label: "Hawaii-Aleutian Standard Time",           zone: "Pacific/Honolulu" },
+  { offset: "UTC-10:00", label: "Tahiti",                                  zone: "Pacific/Tahiti" },
+  { offset: "UTC-09:30", label: "Marquesas Islands",                       zone: "Pacific/Marquesas" },
+  { offset: "UTC-09:00", label: "Alaska Standard Time",                    zone: "America/Anchorage" },
+  { offset: "UTC-08:00", label: "Pacific Standard Time (PST)",             zone: "America/Los_Angeles" },
+  { offset: "UTC-07:00", label: "Mountain Standard Time (MST)",            zone: "America/Denver" },
+  { offset: "UTC-06:00", label: "Central Standard Time (CST)",             zone: "America/Chicago" },
+  { offset: "UTC-06:00", label: "Central America",                         zone: "America/Costa_Rica" },
+  { offset: "UTC-05:00", label: "Eastern Standard Time (EST)",             zone: "America/New_York" },
+  { offset: "UTC-05:00", label: "Colombia",                                zone: "America/Bogota" },
+  { offset: "UTC-05:00", label: "Peru",                                    zone: "America/Lima" },
+  { offset: "UTC-04:00", label: "Atlantic Standard Time (AST)",            zone: "America/Halifax" },
+  { offset: "UTC-04:00", label: "Bolivia",                                 zone: "America/La_Paz" },
+  { offset: "UTC-04:00", label: "Chile",                                   zone: "America/Santiago" },
+  { offset: "UTC-03:30", label: "Newfoundland Standard Time",              zone: "America/St_Johns" },
+  { offset: "UTC-03:00", label: "Argentina",                               zone: "America/Argentina/Buenos_Aires" },
+  { offset: "UTC-03:00", label: "Brazil",                                  zone: "America/Sao_Paulo" },
+  { offset: "UTC-03:00", label: "Greenland",                               zone: "America/Godthab" },
+  { offset: "UTC-02:00", label: "Fernando de Noronha",                     zone: "America/Noronha" },
+  { offset: "UTC-02:00", label: "South Georgia",                           zone: "Atlantic/South_Georgia" },
+  { offset: "UTC-01:00", label: "Azores",                                  zone: "Atlantic/Azores" },
+  { offset: "UTC-01:00", label: "Cape Verde",                              zone: "Atlantic/Cape_Verde" },
+  { offset: "UTC+00:00", label: "Greenwich Mean Time (GMT)",               zone: "Etc/GMT" },
+  { offset: "UTC+00:00", label: "Western European Time",                   zone: "Europe/Lisbon" },
+  { offset: "UTC+01:00", label: "Central European Time (CET)",             zone: "Europe/Paris" },
+  { offset: "UTC+01:00", label: "West Africa Time",                        zone: "Africa/Lagos" },
+  { offset: "UTC+02:00", label: "Eastern European Time (EET)",             zone: "Europe/Helsinki" },
+  { offset: "UTC+02:00", label: "Central Africa Time",                     zone: "Africa/Maputo" },
+  { offset: "UTC+03:00", label: "Moscow Standard Time",                    zone: "Europe/Moscow" },
+  { offset: "UTC+03:00", label: "East Africa Time",                        zone: "Africa/Nairobi" },
+  { offset: "UTC+03:30", label: "Iran Standard Time",                      zone: "Asia/Tehran" },
+  { offset: "UTC+04:00", label: "Gulf Standard Time",                      zone: "Asia/Dubai" },
+  { offset: "UTC+04:00", label: "Samara Time",                             zone: "Europe/Samara" },
+  { offset: "UTC+04:30", label: "Afghanistan Time",                        zone: "Asia/Kabul" },
+  { offset: "UTC+05:00", label: "Pakistan Standard Time",                  zone: "Asia/Karachi" },
+  { offset: "UTC+05:00", label: "Yekaterinburg Time",                      zone: "Asia/Yekaterinburg" },
+  { offset: "UTC+05:30", label: "Indian Standard Time (IST)",              zone: "Asia/Kolkata" },
+  { offset: "UTC+05:30", label: "Sri Lanka",                               zone: "Asia/Colombo" },
+  { offset: "UTC+05:45", label: "Nepal Time",                              zone: "Asia/Kathmandu" },
+  { offset: "UTC+06:00", label: "Bangladesh Standard Time",                zone: "Asia/Dhaka" },
+  { offset: "UTC+06:00", label: "Omsk Time",                               zone: "Asia/Omsk" },
+  { offset: "UTC+06:30", label: "Cocos Islands",                           zone: "Indian/Cocos" },
+  { offset: "UTC+06:30", label: "Myanmar Time",                            zone: "Asia/Yangon" },
+  { offset: "UTC+07:00", label: "Indochina Time",                          zone: "Asia/Bangkok" },
+  { offset: "UTC+07:00", label: "Krasnoyarsk Time",                        zone: "Asia/Krasnoyarsk" },
+  { offset: "UTC+08:00", label: "China Standard Time",                     zone: "Asia/Shanghai" },
+  { offset: "UTC+08:00", label: "Australian Western Time",                 zone: "Australia/Perth" },
+  { offset: "UTC+08:45", label: "Central Western Time (Australia)",        zone: "Australia/Eucla" },
+  { offset: "UTC+09:00", label: "Japan Standard Time (JST)",               zone: "Asia/Tokyo" },
+  { offset: "UTC+09:00", label: "Korea Standard Time",                     zone: "Asia/Seoul" },
+  { offset: "UTC+09:30", label: "Australian Central Standard Time (ACST)", zone: "Australia/Adelaide" },
+  { offset: "UTC+10:00", label: "Australian Eastern Standard Time (AEST)", zone: "Australia/Sydney" },
+  { offset: "UTC+10:00", label: "Vladivostok Time",                        zone: "Asia/Vladivostok" },
+  { offset: "UTC+10:30", label: "Lord Howe Island",                        zone: "Australia/Lord_Howe" },
+  { offset: "UTC+11:00", label: "Solomon Islands",                         zone: "Pacific/Guadalcanal" },
+  { offset: "UTC+11:00", label: "Magadan Time",                            zone: "Asia/Magadan" },
+  { offset: "UTC+11:30", label: "Norfolk Island",                          zone: "Pacific/Norfolk" },
+  { offset: "UTC+12:00", label: "Fiji",                                    zone: "Pacific/Fiji" },
+  { offset: "UTC+12:00", label: "New Zealand",                             zone: "Pacific/Auckland" },
+  { offset: "UTC+12:00", label: "Kamchatka Time",                          zone: "Asia/Kamchatka" },
+  { offset: "UTC+12:45", label: "Chatham Islands Standard Time",           zone: "Pacific/Chatham" },
+  { offset: "UTC+13:00", label: "Tonga",                                   zone: "Pacific/Tongatapu" },
+  { offset: "UTC+13:00", label: "Samoa Time",                              zone: "Pacific/Apia" },
+  { offset: "UTC+14:00", label: "Line Islands, Kiribati",                  zone: "Pacific/Kiritimati" },
+];
 
 export default function SchedulingCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
@@ -368,20 +398,16 @@ export default function SchedulingCard({ initial }: Props) {
                   <select
                     value={tz}
                     onChange={(e) => persistTimezone(e.target.value)}
-                    className="max-w-[180px] truncate rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white"
+                    className="max-w-[260px] truncate rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white"
                     aria-label="Time zone"
                   >
-                    {!initial.timezone && (
-                      <option value={detectedTz}>{detectedTz} (detected)</option>
+                    {!TZ_OPTIONS.some((o) => o.zone === tz) && (
+                      <option value={tz}>(current) {tz}</option>
                     )}
-                    {TZ_OPTIONS.map((g) => (
-                      <optgroup key={g.group} label={g.group}>
-                        {g.zones.map((z) => (
-                          <option key={z} value={z}>
-                            {z}
-                          </option>
-                        ))}
-                      </optgroup>
+                    {TZ_OPTIONS.map((o) => (
+                      <option key={`${o.offset}-${o.zone}`} value={o.zone}>
+                        ({o.offset}) {o.label}
+                      </option>
                     ))}
                   </select>
                   {initial.homeCity ? <span>· {initial.homeCity}</span> : null}
