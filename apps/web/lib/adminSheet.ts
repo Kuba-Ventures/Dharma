@@ -109,6 +109,46 @@ export async function appendRow(tab: TabName, values: (string | number | null)[]
   }
 }
 
+// Sign-in allowlist gate. The Subscribers tab is the source of truth for who
+// can create an account. Cached for 60s to avoid a Sheets API call on every
+// OAuth callback. Fails closed (rejects sign-in) if the sheet is unreachable.
+let subscriberCache: { emails: Set<string>; expiresAt: number } | null = null;
+const SUBSCRIBER_CACHE_TTL_MS = 60_000;
+
+export async function isSubscriber(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+
+  if (subscriberCache && Date.now() < subscriberCache.expiresAt) {
+    return subscriberCache.emails.has(normalized);
+  }
+
+  const sheets = client();
+  const id = sheetId();
+  if (!sheets || !id) {
+    console.warn("[adminSheet] isSubscriber: sheet client unavailable, rejecting");
+    return false;
+  }
+
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: id,
+      range: "Subscribers!A2:A",
+    });
+    const emails = new Set(
+      ((res.data.values ?? []) as string[][])
+        .map((row) => (row[0] ?? "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+    subscriberCache = { emails, expiresAt: Date.now() + SUBSCRIBER_CACHE_TTL_MS };
+    return emails.has(normalized);
+  } catch (err) {
+    console.error("[adminSheet] isSubscriber: Subscribers read failed:", err);
+    return false;
+  }
+}
+
 // Read every row below the header. Returns rows as arrays of strings in the
 // order they appear in the sheet. Used by the cron to walk Subscribers and
 // award badges.

@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { authConfig } from "./auth.config";
 import { prisma } from "./prisma";
 import { makeResilientAdapter } from "./adapter";
+import { isSubscriber } from "./adminSheet";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -99,6 +100,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } catch (err) {
           console.error("[auth] JWT carryover check failed:", err);
+        }
+      }
+
+      // Subscriber allowlist gate. Only emails in the Subscribers tab of the
+      // admin sheet may sign in or create an account. Fails closed if the
+      // sheet is unreachable.
+      if (account?.provider === "google" && profile?.email) {
+        const allowed = await isSubscriber(profile.email);
+        if (!allowed) {
+          console.warn("[auth] Rejecting sign-in: not in Subscribers list:", profile.email);
+          return false;
         }
       }
 

@@ -12,6 +12,10 @@ function LoginContent() {
   // Optional login_hint via ?hint=email — kept for power-user URLs but no
   // longer surfaced in the UI now that the OAuth carryover bug is fixed.
   const hint = params.get("hint")?.trim() ?? "";
+  // NextAuth redirects to /login?error=AccessDenied when the signIn callback
+  // returns false (e.g. email isn't on the Subscribers allowlist).
+  const error = params.get("error");
+  const accessDenied = error === "AccessDenied";
 
   async function handleSignIn() {
     // Clear any stale session cookie first. Auth.js's OAuth callback
@@ -41,6 +45,14 @@ function LoginContent() {
         </div>
 
         <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-8 space-y-6">
+          {accessDenied && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <p className="text-sm text-red-200 font-medium">This email isn&apos;t on the subscriber list.</p>
+              <p className="text-xs text-red-200/70 leading-relaxed mt-1">
+                Dharma is currently invite-only. Join the waitlist on the homepage and we&apos;ll reach out when access opens.
+              </p>
+            </div>
+          )}
           <div className="space-y-1">
             <p className="text-sm text-white/70 font-medium">Sign in to continue</p>
             <p className="text-xs text-white/30 leading-relaxed">
