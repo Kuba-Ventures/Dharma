@@ -8,6 +8,15 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
 
+  // Add-on endpoints below carry their own `Authorization: GoogleBearer <token>`
+  // and verify the user inside the route handler. They must bypass middleware,
+  // which only understands NextAuth session cookies.
+  const isAddonEndpoint =
+    pathname.startsWith("/api/emails/thread-draft") ||
+    pathname.startsWith("/api/preferences/tone") ||
+    pathname === "/api/calendar/rsvp" ||
+    /^\/api\/emails\/[^/]+\/classify$/.test(pathname);
+
   const isPublic =
     pathname === "/" ||
     pathname === "/login" ||
@@ -16,7 +25,7 @@ export default auth((req) => {
     pathname === "/support" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
-    pathname.startsWith("/api/emails/thread-draft") ||
+    isAddonEndpoint ||
     pathname.startsWith("/api/user/me") ||
     pathname.startsWith("/api/user/preferences") ||
     pathname.startsWith("/api/waitlist/") ||
