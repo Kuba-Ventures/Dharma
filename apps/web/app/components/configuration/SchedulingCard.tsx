@@ -134,6 +134,51 @@ function summarizeHours(hours: MeetingHour[]): string | null {
     .join(", ");
 }
 
+// IANA zones grouped by continent for the timezone picker. Computed once
+// at module load.
+function getTimezoneOptions(): { group: string; zones: string[] }[] {
+  // Intl.supportedValuesOf is widely supported in modern browsers + Node 18+.
+  const all: string[] =
+    typeof Intl !== "undefined" &&
+    typeof (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
+      .supportedValuesOf === "function"
+      ? (Intl as unknown as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf(
+          "timeZone",
+        )
+      : [
+          "America/New_York",
+          "America/Chicago",
+          "America/Denver",
+          "America/Los_Angeles",
+          "America/Phoenix",
+          "America/Anchorage",
+          "Pacific/Honolulu",
+          "Europe/London",
+          "Europe/Paris",
+          "Europe/Berlin",
+          "Asia/Tokyo",
+          "Asia/Singapore",
+          "Australia/Sydney",
+          "UTC",
+        ];
+  const groups = new Map<string, string[]>();
+  for (const z of all) {
+    const continent = z.split("/")[0];
+    if (!groups.has(continent)) groups.set(continent, []);
+    groups.get(continent)!.push(z);
+  }
+  // Sort continents in a sensible order (Americas/Europe first, then the rest).
+  const order = ["America", "US", "Canada", "Europe", "Asia", "Australia", "Pacific", "Africa", "Atlantic", "Indian", "Antarctica", "Arctic", "Etc", "UTC"];
+  return [...groups.entries()]
+    .sort((a, b) => {
+      const ai = order.indexOf(a[0]);
+      const bi = order.indexOf(b[0]);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    })
+    .map(([group, zones]) => ({ group, zones: zones.sort() }));
+}
+const TZ_OPTIONS = getTimezoneOptions();
+
 export default function SchedulingCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [confirmingOff, setConfirmingOff] = useState(false);
@@ -143,11 +188,31 @@ export default function SchedulingCard({ initial }: Props) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   // Detect timezone if user has no value set yet (best-effort).
-  const tz =
-    initial.timezone ??
-    (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC");
+  const detectedTz =
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+  const [tz, setTz] = useState<string>(initial.timezone ?? detectedTz);
 
   const hoursSummary = summarizeHours(hours);
+
+  async function persistTimezone(next: string) {
+    setTz(next);
+    try {
+      const res = await fetch("/api/preferences/scheduling", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timezone: next }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { schedulingPreferences?: string | null };
+      // If the server re-reconciled mirrored blocks for the new tz, pick up
+      // any patched calendarEventIds.
+      if (typeof data.schedulingPreferences === "string") {
+        setPrefs(parsePrefs(data.schedulingPreferences));
+      }
+    } catch (err) {
+      console.error("[scheduling] persistTimezone failed:", err);
+    }
+  }
 
   async function persistPrefs(next: Prefs) {
     setPrefs(next);
@@ -295,14 +360,32 @@ export default function SchedulingCard({ initial }: Props) {
             )}
 
             <Card variant="elevated">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
                   Preferred meeting hours
                 </span>
-                <span className="text-[11px] text-white/40">
-                  {tz}
-                  {initial.homeCity ? ` · ${initial.homeCity}` : ""}
-                </span>
+                <div className="flex items-center gap-2 text-[11px] text-white/40">
+                  <select
+                    value={tz}
+                    onChange={(e) => persistTimezone(e.target.value)}
+                    className="max-w-[180px] truncate rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white"
+                    aria-label="Time zone"
+                  >
+                    {!initial.timezone && (
+                      <option value={detectedTz}>{detectedTz} (detected)</option>
+                    )}
+                    {TZ_OPTIONS.map((g) => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.zones.map((z) => (
+                          <option key={z} value={z}>
+                            {z}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {initial.homeCity ? <span>· {initial.homeCity}</span> : null}
+                </div>
               </div>
               <MeetingHoursGrid initialHours={hours} onChange={persistHours} />
             </Card>

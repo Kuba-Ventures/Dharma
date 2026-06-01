@@ -238,7 +238,11 @@ export async function POST(req: Request) {
   }
   const userId = session.user.id;
 
-  const body = (await req.json()) as { enabled?: boolean; schedulingPreferences?: string };
+  const body = (await req.json()) as {
+    enabled?: boolean;
+    schedulingPreferences?: string;
+    timezone?: string;
+  };
 
   // Pull current state so we can reconcile blocks against the old eventIds.
   const dbUser = await prisma.user.findUnique({
@@ -246,13 +250,31 @@ export async function POST(req: Request) {
     select: { schedulingPreferences: true, timezone: true },
   });
   const oldPrefs = safeParse(dbUser?.schedulingPreferences);
-  const tz = dbUser?.timezone ?? "America/New_York";
+  const oldTz = dbUser?.timezone ?? "America/New_York";
+  // Effective tz for this save = incoming if provided, else existing.
+  const tz =
+    typeof body.timezone === "string" && body.timezone.trim()
+      ? body.timezone.trim()
+      : oldTz;
+  const tzChanged = tz !== oldTz;
 
-  const data: { schedulingEnabled?: boolean; schedulingPreferences?: string } = {};
+  const data: {
+    schedulingEnabled?: boolean;
+    schedulingPreferences?: string;
+    timezone?: string;
+  } = {};
   if (typeof body.enabled === "boolean") data.schedulingEnabled = body.enabled;
+  if (typeof body.timezone === "string" && body.timezone.trim()) data.timezone = body.timezone.trim();
 
-  if (typeof body.schedulingPreferences === "string") {
-    const incoming = safeParse(body.schedulingPreferences);
+  // Either the prefs changed, or the timezone changed and existing blocks
+  // need their Calendar events re-anchored to the new tz. Treat both as
+  // triggers for the reconciler.
+  const prefsBody = typeof body.schedulingPreferences === "string"
+    ? safeParse(body.schedulingPreferences)
+    : oldPrefs;
+
+  if (typeof body.schedulingPreferences === "string" || tzChanged) {
+    const incoming = prefsBody;
     const oldBlocks = Array.isArray(oldPrefs.blockedWindows) ? oldPrefs.blockedWindows : [];
     const newBlocks = Array.isArray(incoming.blockedWindows) ? incoming.blockedWindows : [];
 
@@ -277,7 +299,11 @@ export async function POST(req: Request) {
       incoming.blockedWindows = reconciled;
     }
 
-    data.schedulingPreferences = JSON.stringify(incoming);
+    // Persist even when only tzChanged so the event-id-bearing prefs come
+    // back patched. Avoid clobbering with empty data when nothing changed.
+    if (typeof body.schedulingPreferences === "string" || needsCalendar) {
+      data.schedulingPreferences = JSON.stringify(incoming);
+    }
   }
 
   await prisma.user.update({ where: { id: userId }, data });
