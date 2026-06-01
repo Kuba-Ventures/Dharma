@@ -365,12 +365,21 @@ export default async function DashboardPage() {
                     <ul className="mt-2 space-y-1">
                       {upcomingMeetings.map((m) => {
                         const start = new Date(m.startISO);
+                        // Vercel functions run in UTC. Without an explicit
+                        // timeZone the dashboard renders 4 hours off in EDT.
+                        const displayTz = user.timezone ?? "America/New_York";
+                        const minuteInTz = Number(
+                          start.toLocaleString("en-US", {
+                            minute: "numeric",
+                            timeZone: displayTz,
+                          }),
+                        );
                         const when = start.toLocaleString("en-US", {
                           weekday: "short",
                           hour: "numeric",
-                          minute: start.getMinutes() === 0 ? undefined : "2-digit",
+                          minute: minuteInTz === 0 ? undefined : "2-digit",
                           hour12: true,
-                          timeZone: user.timezone ?? undefined,
+                          timeZone: displayTz,
                         });
                         return (
                           <li
