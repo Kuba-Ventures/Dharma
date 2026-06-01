@@ -177,6 +177,10 @@ model LabelPreset {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   preset       String   // "VC" | "PE" | "Legal" | "General" | "Custom"
   enabled      Boolean  @default(false)
+  // Catch-all label appended to every preset. When true, emails that match no
+  // other label are tagged "Uncategorized" instead of going unlabeled. The
+  // user can delete it (flips this false) and re-add it from the Labels card.
+  uncategorizedEnabled Boolean @default(true)
   // Only used when preset == "Custom":
   customName   String?  // e.g. "Kuba Ventures" — also used as Gmail label prefix
   customLabels Json?    // [{ shortName, colorKey, displayHex }]

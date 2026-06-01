@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
-import { HIGH_PRIORITY_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
+import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
 // Manual-invoke / debugging endpoint for label backfill across all connected
@@ -152,6 +152,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               preset: presetRow.preset,
               customName: presetRow.customName,
               customLabels: presetRow.customLabels,
+              includeUncategorized: presetRow.uncategorizedEnabled,
             });
             if (!spec || spec.labels.length === 0) continue;
 
@@ -162,7 +163,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
             const labelNames = spec.labels
               .map((l) => l.shortName)
-              .filter((n) => n !== "High-Priority");
+              .filter((n) => n !== HIGH_PRIORITY_NAME && n !== UNCATEGORIZED_NAME);
 
             const result = await classifyForPreset({
               displayName: spec.displayName,
@@ -174,9 +175,13 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               userId: googleCred.userId,
             });
 
-            const matched = result.label
-              ? spec.labels.find((l) => l.shortName === result.label)
-              : null;
+            // Fall back to the catch-all so nothing goes unlabeled.
+            const matched =
+              (result.label
+                ? spec.labels.find((l) => l.shortName === result.label)
+                : null) ??
+              spec.labels.find((l) => l.shortName === UNCATEGORIZED_NAME) ??
+              null;
 
             const labelNamesToApply: string[] = [];
             if (matched) labelNamesToApply.push(matched.name);

@@ -102,6 +102,7 @@ export default async function ConfigurationPage() {
             customName: labelPreset?.customName ?? null,
             customLabels: (labelPreset?.customLabels as unknown) ?? null,
             provisioned: mappingCount,
+            uncategorizedEnabled: labelPreset?.uncategorizedEnabled ?? true,
           }}
         />
 

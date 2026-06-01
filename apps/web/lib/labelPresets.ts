@@ -43,6 +43,36 @@ export interface PresetLabel {
 
 export const HIGH_PRIORITY_NAME = "High-Priority";
 
+// Catch-all label appended to every preset (built-in and custom). Emails that
+// match no other label are tagged with this instead of going unlabeled. It is
+// never offered to the classifier — it's applied purely as a no-match fallback.
+// Gray, so it reads as the "everything else" bucket in the Gmail sidebar.
+export const UNCATEGORIZED_NAME = "Uncategorized";
+const UNCATEGORIZED_COLOR_KEY: GmailColorKey = "gray";
+const UNCATEGORIZED_DISPLAY_HEX = "#999999";
+
+/** Build the Uncategorized PresetLabel, prefixed to match the preset's labels. */
+function uncategorizedLabel(labelPrefix: string): PresetLabel {
+  return {
+    name: labelPrefix ? `${labelPrefix}/${UNCATEGORIZED_NAME}` : UNCATEGORIZED_NAME,
+    shortName: UNCATEGORIZED_NAME,
+    colorKey: UNCATEGORIZED_COLOR_KEY,
+    displayHex: UNCATEGORIZED_DISPLAY_HEX,
+  };
+}
+
+/**
+ * Full Gmail name of the Uncategorized label for a preset — used by the toggle
+ * endpoint to provision/delete it without resolving the whole spec.
+ */
+export function uncategorizedLabelName(args: {
+  preset: string;
+  customName?: string | null;
+}): string {
+  const prefix = isBuiltInPresetKey(args.preset) ? "" : sanitizeLabelSegment(args.customName ?? "");
+  return uncategorizedLabel(prefix).name;
+}
+
 export const LABEL_PRESETS: Record<BuiltInPresetKey, PresetLabel[]> = {
   VC: [
     { name: "Portfolio",     shortName: "Portfolio",     colorKey: "green",  displayHex: "#16a765" },
@@ -103,12 +133,18 @@ export function resolvePresetSpec(args: {
   preset: string;
   customName?: string | null;
   customLabels?: unknown;
+  /** Append the "Uncategorized" catch-all label. Defaults to true. */
+  includeUncategorized?: boolean;
 }): PresetSpec | null {
+  const includeUncategorized = args.includeUncategorized ?? true;
+
   if (isBuiltInPresetKey(args.preset)) {
+    const labels = [...LABEL_PRESETS[args.preset]];
+    if (includeUncategorized) labels.push(uncategorizedLabel(""));
     return {
       displayName: args.preset,
       labelPrefix: "",
-      labels: LABEL_PRESETS[args.preset],
+      labels,
     };
   }
 
@@ -132,6 +168,8 @@ export function resolvePresetSpec(args: {
       } satisfies PresetLabel;
     })
     .filter((x): x is PresetLabel => x !== null);
+
+  if (includeUncategorized) labels.push(uncategorizedLabel(name));
 
   return { displayName: name || "Custom", labelPrefix: name, labels };
 }
