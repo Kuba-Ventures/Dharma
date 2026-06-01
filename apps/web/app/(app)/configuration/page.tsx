@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { google } from "googleapis";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { makeAuthForUser } from "../../../lib/gmail";
 import ToneCard from "../../components/configuration/ToneCard";
 import LabelsCard from "../../components/configuration/LabelsCard";
 import SchedulingCard from "../../components/configuration/SchedulingCard";
@@ -37,6 +39,36 @@ export default async function ConfigurationPage() {
   ]);
 
   if (!user) redirect("/login");
+
+  // Average meetings/week over the last 4 weeks. Wrapped in try/catch so a
+  // Calendar API blip doesn't break the config page render — we just pass
+  // null and the card hides the stat.
+  const averageMeetingsPerWeek = await (async (): Promise<number | null> => {
+    if (!user.schedulingEnabled) return null;
+    try {
+      const now = new Date();
+      const fourWeeksAgo = new Date(now);
+      fourWeeksAgo.setUTCDate(now.getUTCDate() - 28);
+
+      const { auth: oauthClient } = await makeAuthForUser(userId);
+      const calendar = google.calendar({ version: "v3", auth: oauthClient });
+      const res = await calendar.events.list({
+        calendarId: "primary",
+        timeMin: fourWeeksAgo.toISOString(),
+        timeMax: now.toISOString(),
+        maxResults: 2500,
+        singleEvents: true,
+        eventTypes: ["default"],
+      });
+      const count = (res.data.items ?? []).filter(
+        (e) => e.status !== "cancelled" && e.start?.dateTime,
+      ).length;
+      return Math.round((count / 4) * 10) / 10; // one decimal place
+    } catch (err) {
+      console.error("[configuration] avg meetings/week query failed:", err);
+      return null;
+    }
+  })();
 
   return (
     <div className="max-w-3xl">
@@ -80,6 +112,7 @@ export default async function ConfigurationPage() {
             timezone: user.timezone,
             homeCity: user.homeCity,
             hours,
+            averageMeetingsPerWeek,
           }}
         />
       </div>
