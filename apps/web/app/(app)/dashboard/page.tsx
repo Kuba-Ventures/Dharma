@@ -153,8 +153,12 @@ export default async function DashboardPage() {
   // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
   // try/catch so a Calendar API blip doesn't fail the whole dashboard
   // render — falls back to null and the tile shows a graceful "—".
-  const meetingsThisWeek = await (async (): Promise<number | null> => {
-    if (!user.schedulingEnabled) return null;
+  type UpcomingMeeting = { id: string; summary: string; startISO: string };
+  const { meetingsThisWeek, upcomingMeetings } = await (async (): Promise<{
+    meetingsThisWeek: number | null;
+    upcomingMeetings: UpcomingMeeting[];
+  }> => {
+    if (!user.schedulingEnabled) return { meetingsThisWeek: null, upcomingMeetings: [] };
     try {
       const now = new Date();
       const startOfWeek = new Date(
@@ -165,20 +169,43 @@ export default async function DashboardPage() {
 
       const { auth: oauthClient } = await makeAuthForUser(userId);
       const calendar = google.calendar({ version: "v3", auth: oauthClient });
-      const res = await calendar.events.list({
-        calendarId: "primary",
-        timeMin: startOfWeek.toISOString(),
-        timeMax: endOfWeek.toISOString(),
-        maxResults: 250,
-        singleEvents: true,
-        eventTypes: ["default"],
-      });
-      return (res.data.items ?? []).filter(
+
+      const [weekRes, upcomingRes] = await Promise.all([
+        calendar.events.list({
+          calendarId: "primary",
+          timeMin: startOfWeek.toISOString(),
+          timeMax: endOfWeek.toISOString(),
+          maxResults: 250,
+          singleEvents: true,
+          eventTypes: ["default"],
+        }),
+        calendar.events.list({
+          calendarId: "primary",
+          timeMin: now.toISOString(),
+          maxResults: 3,
+          singleEvents: true,
+          orderBy: "startTime",
+          eventTypes: ["default"],
+        }),
+      ]);
+
+      const count = (weekRes.data.items ?? []).filter(
         (e) => e.status !== "cancelled" && e.start?.dateTime,
       ).length;
+
+      const upcoming: UpcomingMeeting[] = (upcomingRes.data.items ?? [])
+        .filter((e) => e.status !== "cancelled" && e.start?.dateTime)
+        .slice(0, 3)
+        .map((e) => ({
+          id: e.id ?? `${e.start?.dateTime}-${e.summary}`,
+          summary: e.summary?.trim() || "(no title)",
+          startISO: e.start!.dateTime!,
+        }));
+
+      return { meetingsThisWeek: count, upcomingMeetings: upcoming };
     } catch (err) {
-      console.error("[dashboard] meetings-this-week query failed:", err);
-      return null;
+      console.error("[dashboard] calendar query failed:", err);
+      return { meetingsThisWeek: null, upcomingMeetings: [] };
     }
   })();
 
@@ -336,6 +363,33 @@ export default async function DashboardPage() {
                       ? "Meetings this week unavailable"
                       : `${meetingsThisWeek} meeting${meetingsThisWeek === 1 ? "" : "s"} this week`}
                   </p>
+                  {upcomingMeetings.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {upcomingMeetings.map((m) => {
+                        const start = new Date(m.startISO);
+                        const when = start.toLocaleString("en-US", {
+                          weekday: "short",
+                          hour: "numeric",
+                          minute: start.getMinutes() === 0 ? undefined : "2-digit",
+                          hour12: true,
+                          timeZone: user.timezone ?? undefined,
+                        });
+                        return (
+                          <li
+                            key={m.id}
+                            className="flex items-center gap-2 text-[11px]"
+                          >
+                            <span className="flex-1 truncate text-white/70">
+                              {m.summary}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-white/40">
+                              {when}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                   <ul className="mt-2 space-y-1">
                     <li className="flex items-center gap-2 text-[11px]">
                       <span className="flex-1 truncate text-white/70">
