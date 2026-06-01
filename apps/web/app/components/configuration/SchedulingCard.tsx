@@ -573,21 +573,45 @@ function PrefChip({
   options: number[];
   onChange: (v: number) => void;
 }) {
+  // Datalist gives the user both a click-to-pick dropdown (native UI shows
+  // a down-arrow on the input) and a free-form number entry. The id has to
+  // be stable+unique, so we derive it from the label.
+  const listId = `prefchip-${label.replace(/\W+/g, "-").toLowerCase()}-presets`;
+  const [draft, setDraft] = useState<string>(String(value));
+
+  // Keep the local input in sync if a parent prefs change overrides it.
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
   return (
     <Card variant="elevated" className="!p-3">
       <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">{label}</p>
-      <select
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value, 10))}
-        className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1.5 text-sm text-white"
-      >
+      <div className="mt-1 flex items-center gap-1">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          list={listId}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            const n = parseInt(draft, 10);
+            if (!Number.isNaN(n) && n >= 0 && n !== value) onChange(n);
+            else setDraft(String(value));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          className="w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1.5 text-sm text-white"
+        />
+        {unit && <span className="shrink-0 text-xs text-white/40">{unit}</span>}
+      </div>
+      <datalist id={listId}>
         {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-            {unit ? ` ${unit}` : ""}
-          </option>
+          <option key={o} value={o} />
         ))}
-      </select>
+      </datalist>
     </Card>
   );
 }
