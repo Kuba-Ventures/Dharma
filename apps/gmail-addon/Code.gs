@@ -1,4 +1,17 @@
 var DHARMA_API = 'https://dharma-lake.vercel.app';
+var BRAND_PRIMARY = '#7F77DD';   // brand-400 — same purple as web
+var BRAND_SECONDARY = '#534AB7'; // brand-600 — supporting actions
+var BRAND_ACCENT = '#AFA9EC';    // brand-200 — section accents
+var LOGO_URL = DHARMA_API + '/logo.png';
+
+function dharmaHeader(title, subtitle) {
+  var h = CardService.newCardHeader()
+    .setTitle(title || 'Dharma')
+    .setImageUrl(LOGO_URL)
+    .setImageStyle(CardService.ImageStyle.CIRCLE);
+  if (subtitle) h.setSubtitle(subtitle);
+  return h;
+}
 
 function onHomepage(e) {
   return buildWelcomeCard();
@@ -32,20 +45,31 @@ function classifyMessage(messageId) {
 }
 
 function buildInviteCard(messageId, invite) {
-  var section = CardService.newCardSection();
+  var headerLabel = invite.isCancellation ? 'Canceled meeting' : 'Calendar invite';
+  var section = CardService.newCardSection().setHeader(headerLabel);
 
   var headline = invite.isCancellation
-    ? 'This meeting was canceled.'
-    : (invite.summary ? '<b>' + invite.summary + '</b>' : 'Calendar invite');
+    ? '<b>This meeting was canceled.</b>'
+    : (invite.summary ? '<b>' + invite.summary + '</b>' : '<b>Calendar invite</b>');
   section.addWidget(CardService.newTextParagraph().setText(headline));
 
   if (invite.start) {
-    section.addWidget(CardService.newTextParagraph()
-      .setText('<font color="#888">When: ' + invite.start + '</font>'));
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CLOCK))
+        .setTopLabel('When')
+        .setText(invite.start)
+        .setWrapText(true)
+    );
   }
   if (invite.organizer) {
-    section.addWidget(CardService.newTextParagraph()
-      .setText('<font color="#888">From: ' + invite.organizer + '</font>'));
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+        .setTopLabel('From')
+        .setText(invite.organizer)
+        .setWrapText(true)
+    );
   }
 
   section.addWidget(CardService.newDivider());
@@ -55,12 +79,12 @@ function buildInviteCard(messageId, invite) {
     section.addWidget(CardService.newTextButton()
       .setText('Draft a reply')
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setBackgroundColor('#b57bff')
+      .setBackgroundColor(BRAND_PRIMARY)
       .setOnClickAction(CardService.newAction()
         .setFunctionName('forceDraftReply')
         .setParameters({ messageId: messageId })));
     return CardService.newCardBuilder()
-      .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+      .setHeader(dharmaHeader('Dharma'))
       .addSection(buildToneStatusSection())
       .addSection(section)
       .build();
@@ -94,7 +118,7 @@ function buildInviteCard(messageId, invite) {
   section.addWidget(CardService.newTextButton()
     .setText('Reschedule')
     .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-    .setBackgroundColor('#b57bff')
+    .setBackgroundColor(BRAND_PRIMARY)
     .setOnClickAction(CardService.newAction()
       .setFunctionName('rsvpReschedule')
       .setParameters(params)));
@@ -110,7 +134,7 @@ function buildInviteCard(messageId, invite) {
       .setParameters({ messageId: messageId })));
 
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+    .setHeader(dharmaHeader('Dharma'))
     .addSection(buildToneStatusSection())
     .addSection(section)
     .build();
@@ -197,12 +221,13 @@ function rsvpReschedule(e) {
     var cacheKey = 'draft_' + (p.messageId || 'reschedule_' + Date.now());
     CacheService.getUserCache().put(cacheKey, data.text || '', 600);
 
-    var section = CardService.newCardSection()
+    var section = CardService.newCardSection().setHeader('Suggested reply')
       .addWidget(CardService.newTextParagraph().setText(data.text || ''))
+      .addWidget(CardService.newDivider())
       .addWidget(CardService.newTextButton()
-        .setText('Save as Draft in Gmail')
+        .setText('Save as draft')
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#b57bff')
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(CardService.newAction()
           .setFunctionName('saveRescheduleDraft')
           .setParameters({
@@ -213,7 +238,7 @@ function rsvpReschedule(e) {
     return CardService.newActionResponseBuilder()
       .setNavigation(CardService.newNavigation().pushCard(
         CardService.newCardBuilder()
-          .setHeader(CardService.newCardHeader().setTitle('Reschedule draft'))
+          .setHeader(dharmaHeader('Reschedule draft'))
           .addSection(section)
           .build()
       ))
@@ -243,27 +268,25 @@ function onComposeOpen(e) {
 
 function buildWelcomeCard() {
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader()
-      .setTitle('Dharma')
-      .setSubtitle('AI Email Assistant'))
+    .setHeader(dharmaHeader('Dharma', 'Replies in your voice'))
     .addSection(buildToneStatusSection())
     .addSection(
-      CardService.newCardSection()
+      CardService.newCardSection().setHeader('Get started')
         .addWidget(CardService.newTextParagraph()
-          .setText('Open an email to generate a draft reply with AI.'))
+          .setText('Open an email and Dharma will draft a reply in your voice. <font color="' + BRAND_SECONDARY + '">Tap a tone</font> — My Tone, Concise, Formal / Legal, or Scheduling.'))
     )
     .build();
 }
 
 function buildMainCard(messageId) {
   var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
-  var section = CardService.newCardSection();
+  var section = CardService.newCardSection().setHeader('Quick reply');
   for (var i = 0; i < tones.length; i++) {
     section.addWidget(
       CardService.newTextButton()
         .setText(tones[i])
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#b57bff')
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('generateDraft')
@@ -272,7 +295,7 @@ function buildMainCard(messageId) {
     );
   }
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+    .setHeader(dharmaHeader('Dharma'))
     .addSection(buildToneStatusSection())
     .addSection(section)
     .build();
@@ -282,15 +305,13 @@ function buildMainCard(messageId) {
 function buildComposeToneCard(subject, threadId) {
   var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
 
-  var section = CardService.newCardSection()
-    .addWidget(CardService.newTextParagraph().setText('Generate a reply:'));
-
+  var replySection = CardService.newCardSection().setHeader('Quick reply');
   for (var i = 0; i < tones.length; i++) {
-    section.addWidget(
+    replySection.addWidget(
       CardService.newTextButton()
         .setText(tones[i])
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#b57bff')
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('generateFromCompose')
@@ -299,24 +320,25 @@ function buildComposeToneCard(subject, threadId) {
     );
   }
 
-  // Polish Draft separator + button
-  section.addWidget(CardService.newDivider());
-  section.addWidget(CardService.newTextParagraph().setText('Already have a draft?'));
-  section.addWidget(
-    CardService.newTextButton()
-      .setText('Polish Draft')
-      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setBackgroundColor('#9e9e9e')
-      .setOnClickAction(
-        CardService.newAction()
-          .setFunctionName('polishDraft')
-          .setParameters({ subject: subject })
-      )
-  );
+  var polishSection = CardService.newCardSection().setHeader('Have a draft?')
+    .addWidget(CardService.newTextParagraph()
+      .setText('Dharma will rewrite it in your voice without changing the meaning.'))
+    .addWidget(
+      CardService.newTextButton()
+        .setText('Polish draft')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor(BRAND_SECONDARY)
+        .setOnClickAction(
+          CardService.newAction()
+            .setFunctionName('polishDraft')
+            .setParameters({ subject: subject })
+        )
+    );
 
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
-    .addSection(section)
+    .setHeader(dharmaHeader('Dharma'))
+    .addSection(replySection)
+    .addSection(polishSection)
     .build();
 }
 
@@ -335,7 +357,7 @@ function buildToneMenuCard(actionFunction, baseParams) {
       CardService.newTextButton()
         .setText(tone)
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#b57bff')
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName(actionFunction)
@@ -345,7 +367,7 @@ function buildToneMenuCard(actionFunction, baseParams) {
   }
 
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Dharma'))
+    .setHeader(dharmaHeader('Dharma'))
     .addSection(section)
     .build();
 }
@@ -527,13 +549,14 @@ function polishDraftInner(e) {
   var cachePayload = JSON.stringify({ text: data.text, meta: foundMeta });
   CacheService.getUserCache().put(cacheKey, cachePayload, 600);
 
-  var resultSection = CardService.newCardSection()
+  var resultSection = CardService.newCardSection().setHeader('Polished version')
     .addWidget(CardService.newTextParagraph().setText(data.text))
     .addWidget(CardService.newDivider())
     .addWidget(
       CardService.newTextButton()
-        .setText('Insert into Draft')
+        .setText('Insert into draft')
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('insertPolishedDraft')
@@ -542,7 +565,7 @@ function polishDraftInner(e) {
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('Try Again')
+        .setText('Try again')
         .setOnClickAction(CardService.newAction().setFunctionName('popCard'))
     );
 
@@ -550,7 +573,7 @@ function polishDraftInner(e) {
     .setNavigation(
       CardService.newNavigation().pushCard(
         CardService.newCardBuilder()
-          .setHeader(CardService.newCardHeader().setTitle('Polished Draft'))
+          .setHeader(dharmaHeader('Polished draft'))
           .addSection(resultSection)
           .build()
       )
@@ -717,12 +740,14 @@ function generateDraft(e) {
   var cacheKey = 'draft_' + Utilities.getUuid();
   CacheService.getUserCache().put(cacheKey, data.text, 600);
 
-  var resultSection = CardService.newCardSection()
+  var resultSection = CardService.newCardSection().setHeader('Suggested reply')
     .addWidget(CardService.newTextParagraph().setText(data.text))
+    .addWidget(CardService.newDivider())
     .addWidget(
       CardService.newTextButton()
-        .setText('Save as Draft in Gmail')
+        .setText('Save as draft')
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor(BRAND_PRIMARY)
         .setOnClickAction(
           CardService.newAction()
             .setFunctionName('saveDraft')
@@ -739,7 +764,7 @@ function generateDraft(e) {
     .setNavigation(
       CardService.newNavigation().pushCard(
         CardService.newCardBuilder()
-          .setHeader(CardService.newCardHeader().setTitle('Draft Reply'))
+          .setHeader(dharmaHeader('Draft reply'))
           .addSection(resultSection)
           .build()
       )
@@ -864,27 +889,39 @@ function fetchToneProfile() {
 
 function buildToneStatusSection() {
   var profile = fetchToneProfile();
-  var section = CardService.newCardSection().setHeader('My Tone');
+  var section = CardService.newCardSection().setHeader('Your voice');
 
   if (!profile || !profile.toneProfile) {
-    section.addWidget(CardService.newTextParagraph()
-      .setText('Dharma can analyze your last 15 sent emails and draft replies in your voice. No setup happens until you click below.'));
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+        .setTopLabel('Not set up')
+        .setText('<b><font color="' + BRAND_SECONDARY + '">Teach Dharma how you write</font></b>')
+        .setBottomLabel('Analyzes your last 15 sent emails. Nothing runs until you tap below.')
+        .setWrapText(true)
+    );
     section.addWidget(CardService.newTextButton()
       .setText('Set up My Tone')
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setBackgroundColor('#b57bff')
+      .setBackgroundColor(BRAND_PRIMARY)
       .setOnClickAction(CardService.newAction().setFunctionName('setupTone')));
   } else {
-    var summary = profile.toneProfile.length > 110
-      ? profile.toneProfile.substring(0, 110) + '...'
+    var summary = profile.toneProfile.length > 140
+      ? profile.toneProfile.substring(0, 140) + '...'
       : profile.toneProfile;
-    section.addWidget(CardService.newTextParagraph().setText(summary));
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.PERSON))
+        .setTopLabel('Style summary')
+        .setText('<font color="' + BRAND_SECONDARY + '">' + summary + '</font>')
+        .setWrapText(true)
+    );
     section.addWidget(CardService.newTextButton()
       .setText('Edit tone')
       .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
       .setOnClickAction(CardService.newAction().setFunctionName('editTone')));
     section.addWidget(CardService.newTextButton()
-      .setText('Refresh my tone')
+      .setText('Refresh from sent mail')
       .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
       .setOnClickAction(CardService.newAction().setFunctionName('setupTone')));
   }
@@ -965,11 +1002,11 @@ function buildToneEditCard(profile) {
   section.addWidget(CardService.newTextButton()
     .setText('Save')
     .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-    .setBackgroundColor('#b57bff')
+    .setBackgroundColor(BRAND_PRIMARY)
     .setOnClickAction(CardService.newAction().setFunctionName('saveToneEdits')));
 
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('My Tone'))
+    .setHeader(dharmaHeader('My tone'))
     .addSection(section)
     .build();
 }
