@@ -153,6 +153,7 @@ export async function POST(req: Request) {
       email: true,
       tone: true,
       toneProfile: true,
+      toneSummary: true,
       toneExample: true,
       inferredIntro: true,
       inferredSignOff: true,
@@ -160,6 +161,9 @@ export async function POST(req: Request) {
       schedulingEnabled: true,
     },
   });
+  // Dashboard saves to `toneSummary`; older flows wrote to `toneProfile`.
+  // Prefer the newer column so dashboard-only users still get a tone-matched draft.
+  const effectiveTone = dbUser?.toneSummary ?? dbUser?.toneProfile ?? null;
   const fullName = dbUser?.name?.trim() || dbUser?.email?.split("@")[0] || "the sender";
   const firstName = fullName.split(/\s+/)[0];
 
@@ -180,8 +184,8 @@ export async function POST(req: Request) {
 
   if (draftText) {
     // Polish mode — no thread needed
-    const toneBlock = dbUser?.toneProfile
-      ? `Writing style to match exactly: ${dbUser.toneProfile}${dbUser.toneExample ? `\n\nExample:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
+    const toneBlock = effectiveTone
+      ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural, professional tone.";
 
     prompt = `You are polishing a draft email on behalf of ${fullName}. Rewrite their notes into a clean, complete email in their exact writing style.
@@ -266,8 +270,8 @@ Polished email:`;
       })
       .join("\n") || "No events in this window";
 
-    const toneBlock = dbUser?.toneProfile
-      ? `Writing style to match exactly: ${dbUser.toneProfile}${dbUser.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
+    const toneBlock = effectiveTone
+      ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural tone.";
 
     const prefsLine = dbUser?.schedulingPreferences

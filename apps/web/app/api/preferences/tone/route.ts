@@ -42,16 +42,23 @@ export async function GET(req: NextRequest) {
     select: {
       tone: true,
       toneProfile: true,
+      toneSummary: true,
       toneExample: true,
       inferredIntro: true,
       inferredSignOff: true,
     },
   });
 
+  // Dashboard writes the current style to `toneSummary`; the legacy column is
+  // `toneProfile`. Resolve to whichever is populated so the add-on (and any
+  // other consumer) sees a single canonical value.
+  const resolvedTone = user?.toneSummary ?? user?.toneProfile ?? null;
+
   return NextResponse.json(
     {
       tone: user?.tone ?? "Concise",
-      toneProfile: user?.toneProfile ?? null,
+      toneProfile: resolvedTone,
+      toneSummary: user?.toneSummary ?? null,
       toneExample: user?.toneExample ?? null,
       inferredIntro: user?.inferredIntro ?? null,
       inferredSignOff: user?.inferredSignOff ?? null,

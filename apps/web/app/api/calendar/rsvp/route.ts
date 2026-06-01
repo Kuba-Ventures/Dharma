@@ -75,10 +75,11 @@ export async function POST(req: NextRequest) {
 
     const dbUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, email: true, toneProfile: true, toneExample: true, inferredSignOff: true },
+      select: { name: true, email: true, toneProfile: true, toneSummary: true, toneExample: true, inferredSignOff: true },
     });
     const fullName = dbUser?.name?.trim() || dbUser?.email?.split("@")[0] || "the sender";
     const firstName = fullName.split(/\s+/)[0];
+    const effectiveTone = dbUser?.toneSummary ?? dbUser?.toneProfile ?? null;
 
     const now = new Date();
     const prettyToday = now.toLocaleString("en-US", {
@@ -87,8 +88,8 @@ export async function POST(req: NextRequest) {
     });
     const isoToday = now.toISOString().slice(0, 10);
 
-    const toneBlock = dbUser?.toneProfile
-      ? `Writing style to match exactly: ${dbUser.toneProfile}`
+    const toneBlock = effectiveTone
+      ? `Writing style to match exactly: ${effectiveTone}`
       : "Write in a direct, natural tone.";
     const signOffBlock = dbUser?.inferredSignOff?.trim()
       ? `End with exactly:\n${dbUser.inferredSignOff}`
