@@ -20,7 +20,11 @@ export async function POST(req: Request) {
   }
 
   const userAgent = req.headers.get("user-agent") ?? "";
-  const sourcePage = body.sourcePage ?? "/";
+  // The homepage lives at "/"; label it "Landing page" for readability. Any
+  // other entry point keeps its real path (e.g. "/pricing") so the column
+  // still distinguishes future signup sources.
+  const rawSource = body.sourcePage?.trim() || "/";
+  const sourcePage = rawSource === "/" ? "Landing page" : rawSource;
   const signedUpAt = new Date().toISOString();
 
   await appendRow("Waitlist", [
