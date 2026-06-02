@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { tierFor } from "../../../../lib/tiers";
+import { tierFor, TIER_IDS, tierRank } from "../../../../lib/tiers";
 import { BADGES, IDENTITY_BADGE_IDS, getBadge } from "../../../../lib/badges";
 import {
   effectiveMilestones,
@@ -8,6 +8,7 @@ import {
 } from "../../../../lib/milestoneResolution";
 import {
   appendRow,
+  batchUpdateCells,
   ensureHeaders,
   readRows,
   setColumnDropdown,
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
     ensureHeaders("Debugging"),
   ]);
   await setColumnDropdown("Users", "E", IDENTITY_BADGE_IDS);
+  await setColumnDropdown("Users", "B", TIER_IDS);
 
   // --- Pass 1: cumulative seconds + tier + milestone persistence ---
   const users = await prisma.user.findMany({
@@ -50,6 +52,9 @@ export async function GET(req: Request) {
   });
   let milestonesAwarded = 0;
   const errors: Array<{ email: string | null; step: string; message: string }> = [];
+  // email -> { id, earned tier } so Pass 2.7 can mirror/comp tiers without
+  // recomputing seconds.
+  const tierByEmail = new Map<string, { id: string; earned: string }>();
   for (const u of users) {
     try {
       const [draftCount, tagCount] = await Promise.all([
@@ -62,6 +67,7 @@ export async function GET(req: Request) {
         where: { id: u.id },
         data: { cumulativeSecondsSaved, tier },
       });
+      if (u.email) tierByEmail.set(u.email.toLowerCase(), { id: u.id, earned: tier });
 
       const unlockedIds = await effectiveUnlockedMilestoneIds(
         cumulativeSecondsSaved,
@@ -175,6 +181,32 @@ export async function GET(req: Request) {
   // Sheet columns: email | tier | started_at | stripe_customer_id | badges | notes
   // Re-read after backfill so the new rows are included in the badge pass.
   const rows = await readRows("Users");
+
+  // --- Pass 2.7: two-way tier sync (comp-up, single column) ---
+  // The Users tab's Tier column (B) mirrors each user's current tier. An admin
+  // can pick a HIGHER tier to comp a user up — that sticks because we take the
+  // higher of (earned, sheet). A same/lower/blank value reverts to earned, so
+  // a stale mirror can never silently demote anyone.
+  const tierCellUpdates: { range: string; value: string }[] = [];
+  let tiersComped = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const email = (rows[i][0] ?? "").trim().toLowerCase();
+    if (!email) continue;
+    const entry = tierByEmail.get(email);
+    if (!entry) continue; // sheet row without a matching user
+    const sheetTier = (rows[i][1] ?? "").trim();
+    const effective =
+      tierRank(sheetTier) > tierRank(entry.earned) ? sheetTier : entry.earned;
+    if (effective !== entry.earned) {
+      await prisma.user.update({ where: { id: entry.id }, data: { tier: effective } });
+      tiersComped += 1;
+    }
+    if ((rows[i][1] ?? "") !== effective) {
+      tierCellUpdates.push({ range: `Users!B${i + 2}`, value: effective });
+    }
+  }
+  await batchUpdateCells(tierCellUpdates);
+
   const emailToBadgeIds = new Map<string, string[]>();
   for (const r of rows) {
     const email = (r[0] ?? "").trim().toLowerCase();
@@ -211,6 +243,7 @@ export async function GET(req: Request) {
     subscribersBackfilled: backfilled,
     sheetRows: rows.length,
     badgesGranted: grantedCount,
+    tiersComped,
     milestonesAwarded,
     errors: errors.length > 0 ? errors : undefined,
   });

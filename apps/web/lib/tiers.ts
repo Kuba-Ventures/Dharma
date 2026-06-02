@@ -30,6 +30,15 @@ export function tierFor(secondsSaved: number): Tier {
   return current;
 }
 
+// All tier ids in ladder order — used to populate the Users-tab dropdown.
+export const TIER_IDS: string[] = TIERS.map((t) => t.id);
+
+// Ladder position of a tier id (0 = Apprentice). Unknown/blank ids return -1,
+// so an invalid sheet value always ranks below a real earned tier.
+export function tierRank(id: string): number {
+  return TIERS.findIndex((t) => t.id === id);
+}
+
 export function nextTier(currentTier: Tier): TierSpec | null {
   const idx = TIERS.findIndex((t) => t.id === currentTier);
   if (idx === -1 || idx === TIERS.length - 1) return null;

@@ -273,6 +273,29 @@ export async function setColumnDropdown(
   }
 }
 
+// Write individual cells in one round-trip. Each update is { range, value }
+// where range is an A1 reference like "Users!B5". RAW input, never throws —
+// no-op if env is unset or there's nothing to write.
+export async function batchUpdateCells(
+  updates: { range: string; value: string }[],
+): Promise<void> {
+  const sheets = client();
+  const id = sheetId();
+  if (!sheets || !id || updates.length === 0) return;
+
+  try {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: id,
+      requestBody: {
+        valueInputOption: "RAW",
+        data: updates.map((u) => ({ range: u.range, values: [[u.value]] })),
+      },
+    });
+  } catch (err) {
+    console.error("[adminSheet] batchUpdateCells failed:", err);
+  }
+}
+
 // Mark a Waitlist row as converted (sets column E to the timestamp). Used
 // when a waitlist email gets promoted to a Users row. No-op if the
 // email isn't on the waitlist.
