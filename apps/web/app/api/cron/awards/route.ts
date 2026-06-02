@@ -20,7 +20,7 @@ import { timeSavedSeconds } from "../../../../lib/timeSaved";
 //
 // 1. Walk every user, recompute cumulativeSecondsSaved from UsageEvent +
 //    ClassifiedThread totals, update tier accordingly.
-// 2. Sync identity badges from the Subscribers tab of the admin sheet. The
+// 2. Sync identity badges from the Users tab of the admin sheet. The
 //    `badges` column (E) holds a comma-separated list of badge_ids per row.
 //    The cron upserts matching UserBadge rows so the Profile page reflects
 //    sheet edits the next day. Achievement badges remain derived at render
@@ -34,15 +34,15 @@ export async function GET(req: Request) {
 
   // --- Pass 0: stamp tab headers so the sheet shows expected columns even
   // before any traffic. Idempotent — only writes if row 1 is empty.
-  // Also apply the identity-badge dropdown to Subscribers!E so admins pick
+  // Also apply the identity-badge dropdown to Users!E so admins pick
   // from a valid list instead of free-typing. Non-strict mode allows
   // comma-separated overrides like "founder,advisor". ---
   await Promise.all([
     ensureHeaders("Waitlist"),
-    ensureHeaders("Subscribers"),
+    ensureHeaders("Users"),
     ensureHeaders("Debugging"),
   ]);
-  await setColumnDropdown("Subscribers", "E", IDENTITY_BADGE_IDS);
+  await setColumnDropdown("Users", "E", IDENTITY_BADGE_IDS);
 
   // --- Pass 1: cumulative seconds + tier + milestone persistence ---
   const users = await prisma.user.findMany({
@@ -146,13 +146,13 @@ export async function GET(req: Request) {
     });
   }
 
-  // --- Pass 2.5: ensure every User has a Subscribers row ---
-  // The Subscribers tab is "all tracked users" — so every DB user should be
+  // --- Pass 2.5: ensure every User has a Users row ---
+  // The Users tab is "all tracked users" — so every DB user should be
   // there. Append-only: existing rows are left untouched so admin edits to
   // tier / badges / notes survive across runs.
-  const existingSubscribersRows = await readRows("Subscribers");
+  const existingUsersRows = await readRows("Users");
   const existingEmails = new Set(
-    existingSubscribersRows
+    existingUsersRows
       .map((r) => (r[0] ?? "").trim().toLowerCase())
       .filter(Boolean),
   );
@@ -160,7 +160,7 @@ export async function GET(req: Request) {
   for (const u of users) {
     if (!u.email) continue;
     if (existingEmails.has(u.email.toLowerCase())) continue;
-    await appendRow("Subscribers", [
+    await appendRow("Users", [
       u.email,
       "", // tier — admin fills in (client/team/prospect/partner/etc)
       u.createdAt.toISOString(),
@@ -171,10 +171,10 @@ export async function GET(req: Request) {
     backfilled += 1;
   }
 
-  // --- Pass 3: sync identity badges from Subscribers sheet ---
+  // --- Pass 3: sync identity badges from Users sheet ---
   // Sheet columns: email | tier | started_at | stripe_customer_id | badges | notes
   // Re-read after backfill so the new rows are included in the badge pass.
-  const rows = await readRows("Subscribers");
+  const rows = await readRows("Users");
   const emailToBadgeIds = new Map<string, string[]>();
   for (const r of rows) {
     const email = (r[0] ?? "").trim().toLowerCase();

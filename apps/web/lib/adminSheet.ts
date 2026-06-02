@@ -12,11 +12,11 @@ import { JWT } from "google-auth-library";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
-export type TabName = "Waitlist" | "Subscribers" | "Debugging";
+export type TabName = "Waitlist" | "Users" | "Debugging";
 
 export const TAB_HEADERS: Record<TabName, string[]> = {
   Waitlist: ["email", "source_page", "signed_up_at", "user_agent", "converted_at"],
-  Subscribers: ["email", "tier", "started_at", "stripe_customer_id", "badges", "notes"],
+  Users: ["email", "tier", "started_at", "stripe_customer_id", "badges", "notes"],
   Debugging: ["submitted_by_email", "page", "kind", "message", "severity", "submitted_at"],
 };
 
@@ -109,7 +109,7 @@ export async function appendRow(tab: TabName, values: (string | number | null)[]
   }
 }
 
-// Sign-in allowlist gate. The Subscribers tab is the source of truth for who
+// Sign-in allowlist gate. The Users tab is the source of truth for who
 // can create an account. Cached for 60s to avoid a Sheets API call on every
 // OAuth callback. Fails closed (rejects sign-in) if the sheet is unreachable.
 let subscriberCache: { emails: Set<string>; expiresAt: number } | null = null;
@@ -134,7 +134,7 @@ export async function isSubscriber(email: string | null | undefined): Promise<bo
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: id,
-      range: "Subscribers!A2:A",
+      range: "Users!A2:A",
     });
     const emails = new Set(
       ((res.data.values ?? []) as string[][])
@@ -144,13 +144,13 @@ export async function isSubscriber(email: string | null | undefined): Promise<bo
     subscriberCache = { emails, expiresAt: Date.now() + SUBSCRIBER_CACHE_TTL_MS };
     return emails.has(normalized);
   } catch (err) {
-    console.error("[adminSheet] isSubscriber: Subscribers read failed:", err);
+    console.error("[adminSheet] isSubscriber: Users read failed:", err);
     return false;
   }
 }
 
 // Read every row below the header. Returns rows as arrays of strings in the
-// order they appear in the sheet. Used by the cron to walk Subscribers and
+// order they appear in the sheet. Used by the cron to walk Users and
 // award badges.
 export async function readRows(tab: TabName): Promise<string[][]> {
   const sheets = client();
@@ -221,7 +221,7 @@ export async function setColumnDropdown(
 }
 
 // Mark a Waitlist row as converted (sets column E to the timestamp). Used
-// when a waitlist email gets promoted to a Subscribers row. No-op if the
+// when a waitlist email gets promoted to a Users row. No-op if the
 // email isn't on the waitlist.
 export async function markWaitlistConverted(email: string): Promise<void> {
   const sheets = client();

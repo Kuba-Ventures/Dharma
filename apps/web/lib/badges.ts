@@ -46,7 +46,7 @@ export const BADGES: Badge[] = [
   { id: "mountain-mover", title: "Mountain mover", description: "Unlocked your first geographic milestone.", kind: "achievement", icon: "mountain", color: "brand" },
 ];
 
-// Identity badge IDs only — used to populate the Subscribers sheet dropdown.
+// Identity badge IDs only — used to populate the Users sheet dropdown.
 // Achievement badges are derived from user state, never manually granted.
 export const IDENTITY_BADGE_IDS: string[] = BADGES.filter((b) => b.kind === "identity").map((b) => b.id);
 

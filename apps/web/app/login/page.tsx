@@ -13,7 +13,7 @@ function LoginContent() {
   // longer surfaced in the UI now that the OAuth carryover bug is fixed.
   const hint = params.get("hint")?.trim() ?? "";
   // NextAuth redirects to /login?error=AccessDenied when the signIn callback
-  // returns false (e.g. email isn't on the Subscribers allowlist).
+  // returns false (e.g. email isn't on the Users allowlist).
   const error = params.get("error");
   const accessDenied = error === "AccessDenied";
 

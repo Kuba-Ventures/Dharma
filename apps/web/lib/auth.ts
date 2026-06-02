@@ -111,13 +111,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
         }
       }
 
-      // Subscriber allowlist gate. Only emails in the Subscribers tab of the
+      // Subscriber allowlist gate. Only emails in the Users tab of the
       // admin sheet may sign in or create an account. Fails closed if the
       // sheet is unreachable.
       if (account?.provider === "google" && profile?.email) {
         const allowed = await isSubscriber(profile.email);
         if (!allowed) {
-          console.warn("[auth] Rejecting sign-in: not in Subscribers list:", profile.email);
+          console.warn("[auth] Rejecting sign-in: not in Users list:", profile.email);
           return false;
         }
       }
