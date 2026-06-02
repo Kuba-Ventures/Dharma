@@ -248,9 +248,17 @@ export default async function DashboardPage() {
 
       {/* Running for you */}
       <section>
-        <p className="mb-3 text-[11px] uppercase tracking-[0.08em] text-brand-200">
-          Running for you
-        </p>
+        <div className="mb-3 flex items-baseline justify-between">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
+            Running for you
+          </p>
+          <Link
+            href="/configuration"
+            className="text-[11px] text-white/50 hover:text-white/80"
+          >
+            Click to expand →
+          </Link>
+        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <ConfigStatusCard
             icon={TONE_ICON}
