@@ -8,12 +8,13 @@ import {
 } from "../../../../lib/labelPresets";
 
 // GET /api/metrics/by-label?days=30
-// → { rows: [{ labelName, color, tagged, drafted, draftRate }], totalTagged, days }
+// → { rows: [{ labelName, color, tagged, share }], totalTagged, days }
 //
-// Per-label volume + draft-generation rate within the window. Reply rate
-// proper (recipient actually replied) is still a v2 follow-up — that requires
-// per-thread Gmail polling — but draftRate (drafts ÷ tagged) is a useful
-// signal of which categories Dharma is engaging with.
+// Per-label volume within the window. `share` is the label's portion of all
+// labeled volume (rows sum to ~100%) — a distribution view of which categories
+// dominate. (A draft-generation rate lived here previously but depended on
+// per-thread draft tracking that didn't reliably link up, so it always read
+// 0%; volume share is computed straight from the counts and is exact.)
 //
 // The label set is resolved from the user's active LabelPreset via
 // resolvePresetSpec — the SAME source the classifier uses to write
@@ -55,40 +56,29 @@ export async function GET(req: Request) {
   // Group classified threads by labelName within the window.
   const threadsInWindow = await prisma.classifiedThread.findMany({
     where: { userId, classifiedAt: { gte: since } },
-    select: { labelName: true, draftCreated: true },
+    select: { labelName: true },
   });
 
   const totalTagged = threadsInWindow.length;
-  const taggedBy = new Map<string, { tagged: number; drafted: number }>();
-  let unlabeledTagged = 0;
-  let unlabeledDrafted = 0;
+  const taggedBy = new Map<string, number>();
   for (const t of threadsInWindow) {
-    if (!t.labelName) {
-      unlabeledTagged += 1;
-      if (t.draftCreated) unlabeledDrafted += 1;
-      continue;
-    }
-    const entry = taggedBy.get(t.labelName) ?? { tagged: 0, drafted: 0 };
-    entry.tagged += 1;
-    if (t.draftCreated) entry.drafted += 1;
-    taggedBy.set(t.labelName, entry);
+    if (!t.labelName) continue;
+    taggedBy.set(t.labelName, (taggedBy.get(t.labelName) ?? 0) + 1);
   }
 
-  const rows = activeLabels.map((l) => {
-    const stats = taggedBy.get(l.name) ?? { tagged: 0, drafted: 0 };
-    return {
-      labelName: l.shortName,
-      color: l.color,
-      tagged: stats.tagged,
-      drafted: stats.drafted,
-      draftRate: stats.tagged > 0 ? stats.drafted / stats.tagged : 0,
-    };
-  });
+  const counted = activeLabels.map((l) => ({
+    labelName: l.shortName,
+    color: l.color,
+    tagged: taggedBy.get(l.name) ?? 0,
+  }));
+  // Share is each label's portion of total *labeled* volume, so the rows sum
+  // to ~100% (threads tagged under old/retired labels aren't shown and fall
+  // outside this denominator).
+  const labeledTotal = counted.reduce((sum, r) => sum + r.tagged, 0);
+  const rows = counted.map((r) => ({
+    ...r,
+    share: labeledTotal > 0 ? r.tagged / labeledTotal : 0,
+  }));
 
-  return NextResponse.json({
-    rows,
-    totalTagged,
-    unlabeled: { tagged: unlabeledTagged, drafted: unlabeledDrafted },
-    days,
-  });
+  return NextResponse.json({ rows, totalTagged, labeledTotal, days });
 }
