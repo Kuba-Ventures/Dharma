@@ -46,8 +46,6 @@ export default async function DashboardPage() {
     labelPreset,
     mappingCount,
     draftCount,
-    recentSignals,
-    unreadSignalCount,
     activity,
     classifiedThisWeek,
   ] = await Promise.all([
@@ -69,19 +67,6 @@ export default async function DashboardPage() {
     prisma.labelPreset.findUnique({ where: { userId } }),
     prisma.labelMapping.count({ where: { userId } }),
     prisma.usageEvent.count({ where: { userId, eventType: "draft" } }),
-    prisma.signal.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 3,
-      select: {
-        id: true,
-        kind: true,
-        createdAt: true,
-        threadId: true,
-        payload: true,
-      },
-    }),
-    prisma.signal.count({ where: { userId, readAt: null } }),
     getRecentActivity(userId, 10),
     prisma.classifiedThread.findMany({
       where: { userId, classifiedAt: { gte: weekAgo } },
@@ -448,8 +433,9 @@ export default async function DashboardPage() {
         <ActivityFeed events={activity} />
       </section>
 
-      {/* Worth your attention */}
-      <SignalsPeek signals={recentSignals} unreadCount={unreadSignalCount} />
+      {/* Worth your attention. Signal producers aren't live yet, so this shows
+          the coming-soon state rather than seeded rows. */}
+      <SignalsPeek signals={[]} unreadCount={0} />
     </div>
   );
 }

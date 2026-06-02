@@ -59,6 +59,7 @@ Other constraints:
 - Spread the 6 milestones across the threshold range — at least one short (under 5400s) and one long (over 40000s)
 - Titles in lowercase sentence form, JUST the action (e.g. "summit Mt. Mitchell" or "walk the Brooklyn Bridge round trip"), no leading "{firstName}, you saved enough time to..."
 - Descriptions: 1-2 sentences with a specific fact about the landmark + how the saved time relates
+- Never use em-dashes (the "—" character). Use commas, colons, or separate sentences instead.
 
 Output JSON array of 6 entries, exact shape:
 [

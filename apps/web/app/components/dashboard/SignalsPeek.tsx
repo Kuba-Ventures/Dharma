@@ -66,8 +66,12 @@ export default function SignalsPeek({ signals, unreadCount }: Props) {
       {signals.length === 0 ? (
         <div className="rounded-card border border-dashed border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5 text-center">
           <p className="text-sm text-white/50">
-            No signals yet. Dharma will surface deal, term-sheet, and buried-intent
-            cues here as they come in.
+            Coming soon. Dharma will surface buried intent and cold threads here
+            as they come in.{" "}
+            <Link href="/signals" className="text-brand-200 hover:text-brand-100">
+              See examples
+            </Link>
+            .
           </p>
         </div>
       ) : (

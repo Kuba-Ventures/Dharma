@@ -128,7 +128,7 @@ export default function MilestoneHero() {
               </span>
             </div>
             <h2 className="mt-3 font-display text-2xl text-white">
-              Keep going — your first milestone is on the way.
+              Keep going. Your first milestone is on the way.
             </h2>
             <p className="mt-2 max-w-xl text-sm text-white/70">
               As you save time replying and triaging, Dharma will surface
@@ -194,7 +194,7 @@ export default function MilestoneHero() {
             {remaining > 0 && (
               <span className="text-brand-200">
                 {" "}
-                — {formatHours(remaining)} to go.
+                {formatHours(remaining)} to go.
               </span>
             )}
           </p>

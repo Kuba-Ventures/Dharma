@@ -48,10 +48,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
   }
 
-  const [signalCount, emailsTagged, userBadges] = await Promise.all([
-    prisma.signal.count({
-      where: { userId: session.user.id, readAt: null },
-    }),
+  // Signal producers aren't live yet, so the sidebar badge would only ever
+  // reflect seeded test rows. Omit the count until the Signals surface ships.
+  const [emailsTagged, userBadges] = await Promise.all([
     prisma.classifiedThread.count({ where: { userId: session.user.id } }),
     prisma.userBadge.findMany({
       where: { userId: session.user.id },
@@ -94,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Image src="/logo.png" alt="Dharma" width={26} height={26} priority />
           <span className="text-sm font-bold text-white">Dharma</span>
         </Link>
-        <Sidebar locked={locked} signalCount={signalCount} />
+        <Sidebar locked={locked} />
         <div className="mt-auto space-y-1">
           <FeedbackButton />
           <ProfileChip user={user} displayBadge={displayBadge} />

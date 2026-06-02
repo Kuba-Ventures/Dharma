@@ -149,7 +149,7 @@ export async function GET(
               color: "rgba(255,255,255,0.6)",
             }}
           >
-            Dharma — AI email that gives you your time back.
+            Dharma. AI email that gives you your time back.
           </div>
           <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
             <div

@@ -58,8 +58,8 @@ export default function SignalDetectionCard({ initial }: Props) {
               </StatusPill>
             </div>
             <p className="mt-2 max-w-md text-[12px] text-white/55">
-              Surfaces emails worth your attention — buried intent and cold
-              threads — in the Signals tab. Costs ≈ $0.001 per classified
+              Surfaces emails worth your attention (buried intent and cold
+              threads) in the Signals tab. Costs ≈ $0.001 per classified
               thread and is capped daily per user.
             </p>
           </div>

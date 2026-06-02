@@ -41,7 +41,7 @@ export default function NpsPrompt({ firstName }: Props) {
     return (
       <div className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/10 px-5 py-4">
         <p className="text-sm text-white">
-          Thanks, {firstName} — that's helpful. We'll be back in a month.
+          Thanks, {firstName}. That's helpful, and we'll be back in a month.
         </p>
       </div>
     );

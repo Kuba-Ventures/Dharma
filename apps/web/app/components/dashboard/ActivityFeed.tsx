@@ -88,7 +88,7 @@ export default function ActivityFeed({ events }: Props) {
     return (
       <div className="rounded-card border border-dashed border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-6 text-center">
         <p className="text-sm text-white/50">
-          Nothing yet — activity will show here as Dharma drafts, classifies, and
+          Nothing yet. Activity will show here as Dharma drafts, classifies, and
           spots signals.
         </p>
       </div>

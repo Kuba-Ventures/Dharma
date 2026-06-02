@@ -276,14 +276,14 @@ export default function PresetLabelsPanel() {
               type="text"
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              placeholder="e.g. Kuba Ventures — leave blank for top-level labels"
+              placeholder="e.g. Kuba Ventures (leave blank for top-level labels)"
               className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-white/25"
             />
             <p className="text-[10px] text-white/25">
               {customName.trim() ? (
                 <>Used as the Gmail folder prefix: <code className="text-white/40">{customName.trim()}/Label-Name</code></>
               ) : (
-                <>No prefix — labels are created at the top level of your Gmail sidebar.</>
+                <>No prefix. Labels are created at the top level of your Gmail sidebar.</>
               )}
             </p>
           </div>

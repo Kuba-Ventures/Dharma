@@ -198,10 +198,10 @@ export default function LabelsCard({ initial }: Props) {
             : `Labeled ${tagged} of ${scanned} recent threads. Check your inbox.`
         );
       } else {
-        setBackfillStatus("Backfill skipped — labels still apply to new mail.");
+        setBackfillStatus("Backfill skipped. Labels still apply to new mail.");
       }
     } catch {
-      setBackfillStatus("Backfill skipped — labels still apply to new mail.");
+      setBackfillStatus("Backfill skipped. Labels still apply to new mail.");
     }
   }
 
@@ -538,7 +538,7 @@ export default function LabelsCard({ initial }: Props) {
       <ConfirmModal
         open={confirmingOff}
         title="Pause Labels?"
-        description="Dharma will stop classifying new mail. Existing Gmail labels stay in place — you can re-enable anytime."
+        description="Dharma will stop classifying new mail. Existing Gmail labels stay in place, and you can re-enable anytime."
         confirmLabel="Pause"
         onConfirm={confirmPause}
         onCancel={() => setConfirmingOff(false)}

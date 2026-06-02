@@ -157,7 +157,7 @@ export default function IdentityCard({
             <button
               type="button"
               onClick={() => setShowBadgePicker((v) => !v)}
-              aria-label={`Change display badge — currently ${chosenBadge.title}`}
+              aria-label={`Change display badge (currently ${chosenBadge.title})`}
               className={`absolute -bottom-3 -right-3 transition-transform hover:scale-110 ${chosenBadge.color === "yellow" ? "" : BADGE_COLOR_BG[chosenBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
             >
               {chosenBadge.iconImage ? (
@@ -296,7 +296,7 @@ export default function IdentityCard({
             )}
             {cityQuery.trim() && cityMatches.length === 0 && cityQuery !== user.homeCity && (
               <p className="mt-1 text-[11px] text-white/50">
-                Not in our list — press Enter or tab away to save{" "}
+                Not in our list. Press Enter or tab away to save{" "}
                 <span className="text-brand-200">{cityQuery}</span> as typed.
               </p>
             )}
@@ -325,7 +325,7 @@ export default function IdentityCard({
       )}
 
       <p className="mt-4 rounded-btn border border-[color:var(--border-brand)] bg-brand-400/8 px-3 py-2 text-[11px] text-white/60">
-        Dharma never shares your name, email, or city. Local data only — used to personalize milestones.
+        Dharma never shares your name, email, or city. Local data only, used to personalize milestones.
       </p>
     </div>
   );

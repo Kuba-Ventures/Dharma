@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import HiddenStatsList from "./HiddenStatsList";
+import SettingsBackLink from "../../../components/settings/SettingsBackLink";
 
 const TILE_LABELS: Record<string, string> = {
   "metric-drafts-week": "Drafts this week",
@@ -37,6 +38,7 @@ export default async function HiddenStatsPage() {
 
   return (
     <div className="max-w-3xl">
+      <SettingsBackLink />
       <header className="mb-6">
         <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-brand-200">
           Hidden stats

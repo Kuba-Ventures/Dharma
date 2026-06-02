@@ -31,7 +31,7 @@ export const MILESTONES: Milestone[] = [
     id: "first-30-min",
     category: "intro",
     title: "30 minutes saved.",
-    description: "Half an hour back in your week. Keep going — your first city milestone is close.",
+    description: "Half an hour back in your week. Keep going; your first city milestone is close.",
     threshold: 1_800,
     gradient: G_TEAL,
   },
@@ -43,12 +43,12 @@ export const MILESTONES: Milestone[] = [
     threshold: 3_600,
     gradient: G_TEAL,
   },
-  // City-tagged milestones — earned only when user's homeCity matches.
+  // City-tagged milestones, earned only when user's homeCity matches.
   {
     id: "summit-mt-tam",
     category: "peak",
     title: "Enough time to summit Mt. Tamalpais.",
-    description: "{firstName}, you've saved enough time to climb Mt. Tam's east peak — a Bay Area classic at 2,571 ft.",
+    description: "{firstName}, you've saved enough time to climb Mt. Tam's east peak, a Bay Area classic at 2,571 ft.",
     threshold: 14_400, // 4h
     requiredCity: "San Francisco, CA",
     gradient: G_CORAL,
@@ -56,7 +56,7 @@ export const MILESTONES: Milestone[] = [
   {
     id: "walk-brooklyn-bridge",
     category: "trail",
-    title: "Walk the Brooklyn Bridge — round trip.",
+    title: "Walk the Brooklyn Bridge, round trip.",
     description: "You've saved enough time to walk the bridge and back, twice, with coffee.",
     threshold: 7_200, // 2h
     requiredCity: "New York, NY",
@@ -66,7 +66,7 @@ export const MILESTONES: Milestone[] = [
     id: "summit-mt-mitchell",
     category: "peak",
     title: "Enough time to summit Mt. Mitchell.",
-    description: "Eastern US's tallest peak — 6,684 ft. You'd need ~5h round-trip from the parking lot. You've earned it.",
+    description: "Eastern US's tallest peak at 6,684 ft. You'd need ~5h round-trip from the parking lot. You've earned it.",
     threshold: 18_000, // 5h
     requiredCity: "Charlotte, NC",
     gradient: G_CORAL,
@@ -84,7 +84,7 @@ export const MILESTONES: Milestone[] = [
     id: "boston-marathon-route",
     category: "trail",
     title: "Walk a quarter of the Boston Marathon route.",
-    description: "Hopkinton to Wellesley — 6.5 miles. You've saved the equivalent of a brisk Saturday morning.",
+    description: "Hopkinton to Wellesley, 6.5 miles. You've saved the equivalent of a brisk Saturday morning.",
     threshold: 10_800, // 3h
     requiredCity: "Boston, MA",
     gradient: G_TEAL,
@@ -112,13 +112,22 @@ export function getMilestone(id: string): Milestone | undefined {
   return MILESTONES.find((m) => m.id === id);
 }
 
+// Milestone copy never uses em-dashes. Static entries above are written
+// without them; this strips any that slip through DB-generated city
+// milestones (lib/milestoneGenerator.ts) so the rendered copy stays clean.
+export function stripEmDashes(text: string): string {
+  return text.replace(/\s*—\s*/g, ", ");
+}
+
 export function applyTemplate(
   text: string,
   vars: { firstName?: string | null; city?: string | null },
 ): string {
-  return text
-    .replace(/\{firstName\}/g, vars.firstName ?? "you")
-    .replace(/\{city\}/g, vars.city ?? "your city");
+  return stripEmDashes(
+    text
+      .replace(/\{firstName\}/g, vars.firstName ?? "you")
+      .replace(/\{city\}/g, vars.city ?? "your city"),
+  );
 }
 
 export function unlockedMilestoneIds(

@@ -1,8 +1,10 @@
 import ExtensionTokenCard from "../../../components/settings/ExtensionTokenCard";
+import SettingsBackLink from "../../../components/settings/SettingsBackLink";
 
 export default function AdvancedSettingsPage() {
   return (
     <div className="max-w-3xl space-y-4">
+      <SettingsBackLink />
       <header className="mb-2">
         <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-brand-200">
           Advanced

@@ -71,7 +71,7 @@ export default function CityPicker({ initial, detectedTimezone }: Props) {
             setQuery(e.target.value);
             setSelected(null);
           }}
-          placeholder="Start typing — e.g. San Francisco, Boston, Austin"
+          placeholder="Start typing, e.g. San Francisco, Boston, Austin"
           className="mt-2 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
         />
       </label>
@@ -98,7 +98,7 @@ export default function CityPicker({ initial, detectedTimezone }: Props) {
       <p className="mt-3 text-[11px] text-white/40">
         We detected your timezone as{" "}
         <span className="text-brand-200">{detectedTimezone}</span>. Pick a city
-        to confirm — you can change this any time in Settings → Profile.
+        to confirm. You can change this any time in Settings → Profile.
       </p>
     </Card>
   );
