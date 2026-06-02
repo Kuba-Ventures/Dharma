@@ -285,14 +285,14 @@ export default async function DashboardPage() {
             status={toneActive ? "Active" : "Paused"}
             stat={
               toneActive ? (
-                <div>
+                <div className="flex flex-1 flex-col">
                   <p className="text-[11px] text-white/50">
                     {toneTotal > 0
                       ? `${toneTotal} draft${toneTotal === 1 ? "" : "s"} this week`
                       : `Using "${user.tone}" preset`}
                   </p>
                   {toneBreakdown.length > 0 ? (
-                    <div className="mt-3 flex items-end gap-3">
+                    <div className="mt-3 flex min-h-[7rem] flex-1 gap-3">
                       {TONE_MODES.map((mode) => {
                         const stat = toneByKey.get(mode.key);
                         const count = stat?.count ?? 0;
@@ -307,7 +307,7 @@ export default async function DashboardPage() {
                             <span className="text-[10px] tabular-nums text-white/45">
                               {pct}%
                             </span>
-                            <div className="flex h-24 w-full items-end overflow-hidden rounded-sm bg-white/[0.04]">
+                            <div className="flex w-full flex-1 items-end overflow-hidden rounded-sm bg-white/[0.04]">
                               <div
                                 className={`w-full ${active ? "bg-brand-400" : "bg-white/20"}`}
                                 style={{ height: `${(count / toneMax) * 100}%` }}

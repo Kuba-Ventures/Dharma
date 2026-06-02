@@ -21,7 +21,7 @@ export default function ConfigStatusCard({
   return (
     <Link
       href="/configuration"
-      className="block rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-4 transition-colors hover:bg-[color:var(--bg-card-elevated)]"
+      className="flex flex-col rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-4 transition-colors hover:bg-[color:var(--bg-card-elevated)]"
     >
       <div className="mb-3 flex items-center gap-3">
         <IconTile tone={iconTone} size="lg">
@@ -52,7 +52,7 @@ export default function ConfigStatusCard({
       {typeof stat === "string" ? (
         <p className="text-[11px] text-white/50">{stat}</p>
       ) : (
-        stat
+        <div className="flex flex-1 flex-col">{stat}</div>
       )}
     </Link>
   );
