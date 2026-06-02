@@ -12,6 +12,7 @@ import {
   effectiveUnlockedMilestoneIds,
 } from "../../../lib/milestoneResolution";
 import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
+import { effectiveTier } from "../../../lib/effectiveTier";
 import IdentityCard from "../../components/profile/IdentityCard";
 import TierLadder from "../../components/profile/TierLadder";
 import BadgeCase from "../../components/profile/BadgeCase";
@@ -50,10 +51,11 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [unlocked, allMilestones, sheetBadgeIds] = await Promise.all([
+  const [unlocked, allMilestones, sheetBadgeIds, tierLabel] = await Promise.all([
     effectiveUnlockedMilestoneIds(user.cumulativeSecondsSaved, user.homeCity),
     effectiveMilestones(user.homeCity),
     sheetIdentityBadgesForEmail(user.email),
+    effectiveTier(user.cumulativeSecondsSaved, user.email),
   ]);
   const geoMilestoneAchieved = unlocked.some((id) => {
     const m = allMilestones.find((m) => m.id === id);
@@ -107,7 +109,7 @@ export default async function ProfilePage() {
           email: user.email,
           homeCity: user.homeCity,
           timezone: user.timezone,
-          tier: user.tier,
+          tier: tierLabel,
           createdAt: user.createdAt.toISOString(),
         }}
         earnedBadges={earnedBadgeObjects}
@@ -125,7 +127,7 @@ export default async function ProfilePage() {
         secondsSaved={user.cumulativeSecondsSaved}
         homeCity={user.homeCity}
         firstName={firstName}
-        tier={user.tier}
+        tier={tierLabel}
         milestones={allMilestones}
       />
     </div>

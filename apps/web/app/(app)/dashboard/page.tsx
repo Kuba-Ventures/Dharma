@@ -10,6 +10,7 @@ import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
 import TierStrip from "../../components/dashboard/TierStrip";
+import { effectiveTier } from "../../../lib/effectiveTier";
 import SyncInboxButton from "../../components/dashboard/SyncInboxButton";
 import NextMilestoneStrip from "../../components/dashboard/NextMilestoneStrip";
 import ActivityFeed from "../../components/dashboard/ActivityFeed";
@@ -141,6 +142,9 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
+  // Live tier with the sheet comp-up override applied (~60s cache).
+  const tierLabel = await effectiveTier(user.cumulativeSecondsSaved, user.email);
+
   // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
   // try/catch so a Calendar API blip doesn't fail the whole dashboard
   // render — falls back to null and the tile shows a graceful "—".
@@ -261,7 +265,10 @@ export default async function DashboardPage() {
             <SyncInboxButton />
           </div>
         </div>
-        <TierStrip cumulativeSecondsSaved={user.cumulativeSecondsSaved} />
+        <TierStrip
+          cumulativeSecondsSaved={user.cumulativeSecondsSaved}
+          displayTier={tierLabel}
+        />
       </header>
 
       {/* Running for you */}

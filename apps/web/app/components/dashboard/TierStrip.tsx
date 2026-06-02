@@ -5,6 +5,9 @@ import { progressToNext } from "../../../lib/tiers";
 
 type Props = {
   cumulativeSecondsSaved: number;
+  // Optional admin comp from the Users sheet; shown as the tier name when set
+  // higher than the earned tier. Progress below stays seconds-based.
+  displayTier?: string;
 };
 
 function formatShort(seconds: number): string {
@@ -16,7 +19,7 @@ function formatShort(seconds: number): string {
   return remMin === 0 ? `${hours}h` : `${hours}h ${remMin}m`;
 }
 
-export default function TierStrip({ cumulativeSecondsSaved }: Props) {
+export default function TierStrip({ cumulativeSecondsSaved, displayTier }: Props) {
   const { current, next, progress } = progressToNext(cumulativeSecondsSaved);
   const remainingSeconds = next ? Math.max(0, next.threshold - cumulativeSecondsSaved) : 0;
 
@@ -24,7 +27,7 @@ export default function TierStrip({ cumulativeSecondsSaved }: Props) {
     <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] px-4 py-2.5">
       <div className="flex items-center gap-3">
         <span className="text-[10px] uppercase tracking-[0.12em] text-brand-200">
-          {current}
+          {displayTier ?? current}
         </span>
         <div className="relative h-1 flex-1 overflow-hidden rounded-full bg-white/8">
           <div

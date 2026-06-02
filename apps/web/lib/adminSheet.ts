@@ -150,17 +150,18 @@ export async function isSubscriber(email: string | null | undefined): Promise<bo
   }
 }
 
-// Cached email -> badge-ids map from the Users tab, so admin-assigned identity
-// badges show on the profile within ~60s instead of waiting for the nightly
-// awards cron. Same 60s TTL as the subscriber cache. Fails open (returns an
-// empty map) if the sheet is unreachable — badges just won't appear live.
-let badgeCache: { map: Map<string, string[]>; expiresAt: number } | null = null;
-const BADGE_CACHE_TTL_MS = 60_000;
+// Cached email -> { badges, tier } from the Users tab, so admin edits show on
+// the profile/sidebar within ~60s instead of waiting for the nightly awards
+// cron. 60s TTL; one read serves both badges and tier. Fails open (empty map)
+// if the sheet is unreachable — sheet-driven display just won't appear live.
+type SheetUser = { badges: string[]; tier: string };
+let userCache: { map: Map<string, SheetUser>; expiresAt: number } | null = null;
+const USER_CACHE_TTL_MS = 60_000;
 
-async function loadSheetBadges(): Promise<Map<string, string[]>> {
-  if (badgeCache && Date.now() < badgeCache.expiresAt) return badgeCache.map;
+async function loadSheetUsers(): Promise<Map<string, SheetUser>> {
+  if (userCache && Date.now() < userCache.expiresAt) return userCache.map;
 
-  const map = new Map<string, string[]>();
+  const map = new Map<string, SheetUser>();
   const sheets = client();
   const id = sheetId();
   if (!sheets || !id) return map;
@@ -173,15 +174,16 @@ async function loadSheetBadges(): Promise<Map<string, string[]>> {
     for (const row of (res.data.values ?? []) as string[][]) {
       const email = (row[0] ?? "").trim().toLowerCase();
       if (!email) continue;
-      const ids = (row[4] ?? "")
+      const tier = (row[1] ?? "").trim();
+      const badges = (row[4] ?? "")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      if (ids.length > 0) map.set(email, ids);
+      map.set(email, { badges, tier });
     }
-    badgeCache = { map, expiresAt: Date.now() + BADGE_CACHE_TTL_MS };
+    userCache = { map, expiresAt: Date.now() + USER_CACHE_TTL_MS };
   } catch (err) {
-    console.error("[adminSheet] loadSheetBadges failed:", err);
+    console.error("[adminSheet] loadSheetUsers failed:", err);
   }
   return map;
 }
@@ -196,10 +198,22 @@ export async function sheetIdentityBadgesForEmail(
   if (!email) return [];
   const normalized = email.trim().toLowerCase();
   if (!normalized) return [];
-  const map = await loadSheetBadges();
-  return (map.get(normalized) ?? []).filter(
+  const rec = (await loadSheetUsers()).get(normalized);
+  return (rec?.badges ?? []).filter(
     (badgeId) => getBadge(badgeId)?.kind === "identity",
   );
+}
+
+// The tier set for this email in the Users tab's Tier column (B), or "" if
+// blank/absent. Used by lib/effectiveTier for the live comp-up override.
+export async function sheetTierForEmail(
+  email: string | null | undefined,
+): Promise<string> {
+  if (!email) return "";
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return "";
+  const rec = (await loadSheetUsers()).get(normalized);
+  return rec?.tier ?? "";
 }
 
 // Read every row below the header. Returns rows as arrays of strings in the

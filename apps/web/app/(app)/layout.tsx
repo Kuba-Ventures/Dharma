@@ -10,6 +10,7 @@ import {
   earnedAchievementBadges,
 } from "../../lib/badges";
 import { sheetIdentityBadgesForEmail } from "../../lib/adminSheet";
+import { effectiveTier } from "../../lib/effectiveTier";
 import Sidebar from "../components/Sidebar";
 import ProfileChip from "../components/ProfileChip";
 import FeedbackButton from "../components/ui/FeedbackButton";
@@ -51,13 +52,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Signal producers aren't live yet, so the sidebar badge would only ever
   // reflect seeded test rows. Omit the count until the Signals surface ships.
-  const [emailsTagged, userBadges, sheetBadgeIds] = await Promise.all([
+  const [emailsTagged, userBadges, sheetBadgeIds, tierLabel] = await Promise.all([
     prisma.classifiedThread.count({ where: { userId: session.user.id } }),
     prisma.userBadge.findMany({
       where: { userId: session.user.id },
       select: { badgeId: true },
     }),
     sheetIdentityBadgesForEmail(user.email),
+    effectiveTier(user.cumulativeSecondsSaved, user.email),
   ]);
 
   // Compute the display badge for the sidebar avatar. Same logic as the
@@ -99,7 +101,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar locked={locked} />
         <div className="mt-auto space-y-1">
           <FeedbackButton />
-          <ProfileChip user={user} displayBadge={displayBadge} />
+          <ProfileChip user={{ ...user, tier: tierLabel }} displayBadge={displayBadge} />
         </div>
       </aside>
 
