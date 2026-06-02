@@ -173,7 +173,7 @@ export default async function DashboardPage() {
         calendar.events.list({
           calendarId: "primary",
           timeMin: now.toISOString(),
-          maxResults: 5,
+          maxResults: 25, // headroom so cancelled-event filtering still yields 10
           singleEvents: true,
           orderBy: "startTime",
           eventTypes: ["default"],
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
 
       const upcoming: UpcomingMeeting[] = (upcomingRes.data.items ?? [])
         .filter((e) => e.status !== "cancelled" && e.start?.dateTime)
-        .slice(0, 5)
+        .slice(0, 10)
         .map((e) => ({
           id: e.id ?? `${e.start?.dateTime}-${e.summary}`,
           summary: e.summary?.trim() || "(no title)",
@@ -394,7 +394,7 @@ export default async function DashboardPage() {
             status={schedulingActive ? "Active" : "Paused"}
             stat={
               schedulingActive ? (
-                <div>
+                <div className="flex flex-1 flex-col">
                   <p className="text-[11px] text-white/50">
                     {meetingsThisWeek === null
                       ? "Meetings this week unavailable"
@@ -436,7 +436,7 @@ export default async function DashboardPage() {
                       })}
                     </ul>
                   )}
-                  <ul className="mt-6 border-t border-white/[0.06] pt-4">
+                  <ul className="mt-auto border-t border-white/[0.06] pt-4">
                     <li className="flex items-center gap-2 text-[11px]">
                       <span className="flex-1 truncate text-white/70">
                         Scheduled with Dharma
