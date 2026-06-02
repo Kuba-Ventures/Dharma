@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     sourcePage,
     signedUpAt,
     userAgent,
-    "", // converted_at — empty until they subscribe
+    "not yet", // converted status — admin flips to "yes"/"denied" in the sheet
   ]);
 
   return NextResponse.json({ ok: true });
