@@ -213,6 +213,15 @@ export default async function DashboardPage() {
     .sort((a, b) => b.count - a.count);
   // Tallest bar normalizes the vertical bar chart on the Tone card.
   const toneMax = Math.max(1, ...toneBreakdown.map((r) => r.count));
+  // Every selectable tone mode (mirrors TONE_CARDS in ToneCard) so the chart
+  // shows all four side by side, used or not. Short labels fit four columns.
+  const TONE_MODES: { key: string; label: string }[] = [
+    { key: "My Tone", label: "My tone" },
+    { key: "Concise", label: "Concise" },
+    { key: "Formal / Legal", label: "Formal" },
+    { key: "Scheduling", label: "Sched." },
+  ];
+  const toneByKey = new Map(toneBreakdown.map((r) => [r.tone, r]));
 
   const firstName =
     user.firstName ?? user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "there";
@@ -283,26 +292,29 @@ export default async function DashboardPage() {
                       : `Using "${user.tone}" preset`}
                   </p>
                   {toneBreakdown.length > 0 ? (
-                    <div className="mt-3 flex items-end gap-2">
-                      {toneBreakdown.map((row) => {
-                        const active = row.tone === user.tone;
+                    <div className="mt-3 flex items-end gap-3">
+                      {TONE_MODES.map((mode) => {
+                        const stat = toneByKey.get(mode.key);
+                        const count = stat?.count ?? 0;
+                        const pct = stat?.pct ?? 0;
+                        const active = mode.key === user.tone;
                         return (
                           <div
-                            key={row.tone}
+                            key={mode.key}
                             className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                            title={`${row.tone}: ${row.count} draft${row.count === 1 ? "" : "s"} · ${row.pct}%`}
+                            title={`${mode.label}: ${count} draft${count === 1 ? "" : "s"} · ${pct}%`}
                           >
                             <span className="text-[10px] tabular-nums text-white/45">
-                              {row.pct}%
+                              {pct}%
                             </span>
-                            <div className="flex h-24 w-full items-end">
+                            <div className="flex h-24 w-full items-end overflow-hidden rounded-sm bg-white/[0.04]">
                               <div
-                                className={`w-full rounded-t-sm ${active ? "bg-brand-400" : "bg-white/15"}`}
-                                style={{ height: `${Math.max((row.count / toneMax) * 100, 6)}%` }}
+                                className={`w-full ${active ? "bg-brand-400" : "bg-white/20"}`}
+                                style={{ height: `${(count / toneMax) * 100}%` }}
                               />
                             </div>
                             <span className="w-full truncate text-center text-[10px] text-white/60">
-                              {row.tone}
+                              {mode.label}
                             </span>
                           </div>
                         );
