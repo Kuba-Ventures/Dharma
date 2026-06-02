@@ -11,6 +11,7 @@ import {
   effectiveMilestones,
   effectiveUnlockedMilestoneIds,
 } from "../../../lib/milestoneResolution";
+import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
 import IdentityCard from "../../components/profile/IdentityCard";
 import TierLadder from "../../components/profile/TierLadder";
 import BadgeCase from "../../components/profile/BadgeCase";
@@ -49,9 +50,10 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [unlocked, allMilestones] = await Promise.all([
+  const [unlocked, allMilestones, sheetBadgeIds] = await Promise.all([
     effectiveUnlockedMilestoneIds(user.cumulativeSecondsSaved, user.homeCity),
     effectiveMilestones(user.homeCity),
+    sheetIdentityBadgesForEmail(user.email),
   ]);
   const geoMilestoneAchieved = unlocked.some((id) => {
     const m = allMilestones.find((m) => m.id === id);
@@ -62,6 +64,7 @@ export default async function ProfilePage() {
     new Set([
       ...userBadges.map((b) => b.badgeId),
       ...identityBadgesForEmail(user.email),
+      ...sheetBadgeIds,
       ...earnedAchievementBadges({
         onboardingComplete: !!user.onboardingCompletedAt,
         hasToneSummary: !!(user.toneSummary || user.toneProfile),

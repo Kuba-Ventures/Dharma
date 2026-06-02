@@ -9,6 +9,7 @@
 
 import { google, type sheets_v4 } from "googleapis";
 import { JWT } from "google-auth-library";
+import { getBadge } from "./badges";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -147,6 +148,58 @@ export async function isSubscriber(email: string | null | undefined): Promise<bo
     console.error("[adminSheet] isSubscriber: Users read failed:", err);
     return false;
   }
+}
+
+// Cached email -> badge-ids map from the Users tab, so admin-assigned identity
+// badges show on the profile within ~60s instead of waiting for the nightly
+// awards cron. Same 60s TTL as the subscriber cache. Fails open (returns an
+// empty map) if the sheet is unreachable — badges just won't appear live.
+let badgeCache: { map: Map<string, string[]>; expiresAt: number } | null = null;
+const BADGE_CACHE_TTL_MS = 60_000;
+
+async function loadSheetBadges(): Promise<Map<string, string[]>> {
+  if (badgeCache && Date.now() < badgeCache.expiresAt) return badgeCache.map;
+
+  const map = new Map<string, string[]>();
+  const sheets = client();
+  const id = sheetId();
+  if (!sheets || !id) return map;
+
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: id,
+      range: "Users!A2:E",
+    });
+    for (const row of (res.data.values ?? []) as string[][]) {
+      const email = (row[0] ?? "").trim().toLowerCase();
+      if (!email) continue;
+      const ids = (row[4] ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (ids.length > 0) map.set(email, ids);
+    }
+    badgeCache = { map, expiresAt: Date.now() + BADGE_CACHE_TTL_MS };
+  } catch (err) {
+    console.error("[adminSheet] loadSheetBadges failed:", err);
+  }
+  return map;
+}
+
+// Identity badges assigned to this email in the Users tab's Badges column.
+// Achievement ids typed into the sheet are ignored — those are earned, not
+// granted. Used by the Profile page and sidebar chip for live badge display,
+// so a badge set in the sheet shows up within ~60s without the cron.
+export async function sheetIdentityBadgesForEmail(
+  email: string | null | undefined,
+): Promise<string[]> {
+  if (!email) return [];
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return [];
+  const map = await loadSheetBadges();
+  return (map.get(normalized) ?? []).filter(
+    (badgeId) => getBadge(badgeId)?.kind === "identity",
+  );
 }
 
 // Read every row below the header. Returns rows as arrays of strings in the
