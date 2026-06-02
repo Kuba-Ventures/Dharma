@@ -211,6 +211,8 @@ export default async function DashboardPage() {
       pct: toneTotal > 0 ? Math.round((row._count._all / toneTotal) * 100) : 0,
     }))
     .sort((a, b) => b.count - a.count);
+  // Tallest bar normalizes the vertical bar chart on the Tone card.
+  const toneMax = Math.max(1, ...toneBreakdown.map((r) => r.count));
 
   const firstName =
     user.firstName ?? user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "there";
@@ -281,21 +283,31 @@ export default async function DashboardPage() {
                       : `Using "${user.tone}" preset`}
                   </p>
                   {toneBreakdown.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
-                      {toneBreakdown.map((row) => (
-                        <li
-                          key={row.tone}
-                          className="flex items-center gap-2 text-[11px]"
-                        >
-                          <span className="flex-1 truncate text-white/70">
-                            {row.tone === user.tone ? `${row.tone} (active)` : row.tone}
-                          </span>
-                          <span className="shrink-0 tabular-nums text-white/40">
-                            {row.count} · {row.pct}%
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-3 flex items-end gap-2">
+                      {toneBreakdown.map((row) => {
+                        const active = row.tone === user.tone;
+                        return (
+                          <div
+                            key={row.tone}
+                            className="flex min-w-0 flex-1 flex-col items-center gap-1"
+                            title={`${row.tone}: ${row.count} draft${row.count === 1 ? "" : "s"} · ${row.pct}%`}
+                          >
+                            <span className="text-[10px] tabular-nums text-white/45">
+                              {row.pct}%
+                            </span>
+                            <div className="flex h-24 w-full items-end">
+                              <div
+                                className={`w-full rounded-t-sm ${active ? "bg-brand-400" : "bg-white/15"}`}
+                                style={{ height: `${Math.max((row.count / toneMax) * 100, 6)}%` }}
+                              />
+                            </div>
+                            <span className="w-full truncate text-center text-[10px] text-white/60">
+                              {row.tone}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
                     <p className="mt-2 text-[11px] text-white/30">
                       Tone usage shows up once you generate drafts.
