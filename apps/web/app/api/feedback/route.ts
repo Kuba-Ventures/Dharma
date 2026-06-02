@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { appendRow } from "../../../lib/adminSheet";
@@ -54,7 +55,10 @@ export async function POST(req: Request) {
     });
   }
 
-  // Best-effort sheet append for triage.
+  // Best-effort sheet append for triage. Use waitUntil so the Google Sheets
+  // write survives past the response — a bare fire-and-forget (void) gets
+  // frozen and killed when the serverless function returns, which silently
+  // dropped feedback rows from the Debugging tab.
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { email: true },
@@ -62,7 +66,7 @@ export async function POST(req: Request) {
   const submittedByEmail = user?.email ?? "";
   const messageOrScore =
     kind === "nps" ? `score=${body.score}` : (body.message?.trim() ?? "");
-  void appendRow("Debugging", [
+  const sheetAppend = appendRow("Debugging", [
     submittedByEmail,
     body.page ?? "",
     kind,
@@ -70,6 +74,12 @@ export async function POST(req: Request) {
     body.severity ?? "",
     new Date().toISOString(),
   ]);
+  try {
+    waitUntil(sheetAppend);
+  } catch {
+    // waitUntil not available in dev — await so the write still completes.
+    await sheetAppend;
+  }
 
   return NextResponse.json({ success: true });
 }
