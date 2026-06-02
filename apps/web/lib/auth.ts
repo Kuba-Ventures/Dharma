@@ -8,7 +8,15 @@ import { prisma } from "./prisma";
 import { makeResilientAdapter } from "./adapter";
 import { isSubscriber } from "./adminSheet";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+// Config is passed as a FUNCTION, not a static object. With an object,
+// next-auth runs setEnvDefaults once at module-eval (cold start) and the
+// `handlers`/`signIn`/`signOut` close over that frozen config — so any env
+// value not resolved at first import (the intermittent cold-start race behind
+// `/api/auth/error?error=Configuration`) sticks for the life of that instance.
+// The function form re-resolves config per request, closing that gap. (`auth`
+// already re-resolves per call, which is why page/middleware reads never hit
+// this error while the /api/auth/* handlers occasionally did.)
+export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   ...authConfig,
   logger: {
     error(code, ...message) { console.error("[nextauth error]", code, JSON.stringify(message)); },
@@ -173,4 +181,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
-});
+}));
