@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
+import {
+  resolvePresetSpec,
+  isPresetKey,
+  HIGH_PRIORITY_NAME,
+} from "../../../../lib/labelPresets";
 
 // GET /api/metrics/by-label?days=30
 // → { rows: [{ labelName, color, tagged, drafted, draftRate }], totalTagged, days }
@@ -9,6 +14,13 @@ import { prisma } from "../../../../lib/prisma";
 // proper (recipient actually replied) is still a v2 follow-up — that requires
 // per-thread Gmail polling — but draftRate (drafts ÷ tagged) is a useful
 // signal of which categories Dharma is engaging with.
+//
+// The label set is resolved from the user's active LabelPreset via
+// resolvePresetSpec — the SAME source the classifier uses to write
+// ClassifiedThread.labelName (the full prefixed name, e.g. "KV/Internal").
+// The legacy Label table is not consulted: it can hold stale rows from a
+// previous preset whose names no longer match what gets tagged, which is why
+// reading it produced an active-label list that never matched any count.
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id)
@@ -22,11 +34,23 @@ export async function GET(req: Request) {
   );
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const labels = await prisma.label.findMany({
-    where: { userId },
-    select: { name: true, color: true },
-    orderBy: { order: "asc" },
-  });
+  // Resolve the active label set the same way the classifier does. Each label
+  // carries the full prefixed `name` (matches ClassifiedThread.labelName) and a
+  // `shortName` for display. High-Priority is a secondary tag that's never the
+  // primary matched label, so it would always read 0 — drop it from the chart.
+  const presetRow = await prisma.labelPreset.findUnique({ where: { userId } });
+  const spec =
+    presetRow && isPresetKey(presetRow.preset)
+      ? resolvePresetSpec({
+          preset: presetRow.preset,
+          customName: presetRow.customName,
+          customLabels: presetRow.customLabels,
+          includeUncategorized: presetRow.uncategorizedEnabled,
+        })
+      : null;
+  const activeLabels = (spec?.labels ?? [])
+    .filter((l) => l.shortName !== HIGH_PRIORITY_NAME)
+    .map((l) => ({ name: l.name, shortName: l.shortName, color: l.displayHex }));
 
   // Group classified threads by labelName within the window.
   const threadsInWindow = await prisma.classifiedThread.findMany({
@@ -50,10 +74,10 @@ export async function GET(req: Request) {
     taggedBy.set(t.labelName, entry);
   }
 
-  const rows = labels.map((l) => {
+  const rows = activeLabels.map((l) => {
     const stats = taggedBy.get(l.name) ?? { tagged: 0, drafted: 0 };
     return {
-      labelName: l.name,
+      labelName: l.shortName,
       color: l.color,
       tagged: stats.tagged,
       drafted: stats.drafted,
