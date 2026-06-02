@@ -7,7 +7,7 @@ import { makeAuthForUser } from "../../../lib/gmail";
 import { effectiveNextLockedMilestone } from "../../../lib/milestoneResolution";
 import { applyTemplate } from "../../../lib/milestones";
 import { getRecentActivity } from "../../../lib/recentActivity";
-import { resolvePresetSpec } from "../../../lib/labelPresets";
+import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
 import TierStrip from "../../components/dashboard/TierStrip";
 import SyncInboxButton from "../../components/dashboard/SyncInboxButton";
@@ -126,11 +126,18 @@ export default async function DashboardPage() {
         includeUncategorized: labelPreset.uncategorizedEnabled,
       })
     : null;
-  const labelBreakdown = (presetSpec?.labels ?? []).map((l) => ({
-    name: l.shortName,           // user-readable, no prefix
-    color: l.displayHex,
-    tagged: taggedByLabel.get(l.name) ?? 0,   // ClassifiedThread stores full Gmail name
-  }));
+  const labelBreakdown = (presetSpec?.labels ?? [])
+    .filter((l) => l.shortName !== HIGH_PRIORITY_NAME) // never a primary tag → always 0
+    .map((l) => ({
+      name: l.shortName,           // user-readable, no prefix
+      color: l.displayHex,
+      tagged: taggedByLabel.get(l.name) ?? 0,   // ClassifiedThread stores full Gmail name
+    }));
+  // For the condensed bar chart on the Labels card: longest bar normalizes the
+  // widths; share is each label's portion of labeled volume this week (rows
+  // sum to ~100%), mirroring the Metrics "Volume by label" chart.
+  const labelMaxTagged = Math.max(1, ...labelBreakdown.map((r) => r.tagged));
+  const labelLabeledTotal = labelBreakdown.reduce((sum, r) => sum + r.tagged, 0);
 
   if (!user) redirect("/login");
 
@@ -316,7 +323,7 @@ export default async function DashboardPage() {
                     {mappingCount} provisioned · {taggedThisWeek} tagged this week
                   </p>
                   {labelBreakdown.length > 0 && (
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-2 space-y-1.5">
                       {labelBreakdown.map((row) => (
                         <li
                           key={row.name}
@@ -326,11 +333,25 @@ export default async function DashboardPage() {
                             className="h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: row.color }}
                           />
-                          <span className="flex-1 truncate text-white/70">
+                          <span className="w-20 shrink-0 truncate text-white/70">
                             {row.name}
                           </span>
-                          <span className="shrink-0 text-white/40">
-                            {row.tagged} tagged
+                          <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
+                            <span
+                              className="absolute left-0 top-0 h-full rounded-full"
+                              style={{
+                                width: `${(row.tagged / labelMaxTagged) * 100}%`,
+                                backgroundColor: row.color,
+                              }}
+                            />
+                          </span>
+                          <span className="w-14 shrink-0 text-right text-white/40">
+                            {row.tagged}
+                            {row.tagged > 0 && (
+                              <span className="ml-1 text-white/25">
+                                · {Math.round((row.tagged / labelLabeledTotal) * 100)}%
+                              </span>
+                            )}
                           </span>
                         </li>
                       ))}
