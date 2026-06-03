@@ -28,12 +28,21 @@ const CAL_ICON = (
   </svg>
 );
 
+type Recurrence = {
+  freq: "none" | "daily" | "weekly" | "monthly";
+  interval?: number; // every N; default 1
+  days?: number[];   // 0=Sun..6=Sat — used when freq === "weekly"
+  date?: string;     // "YYYY-MM-DD" — one-off date / optional anchor
+  until?: string;    // "YYYY-MM-DD" — optional end date
+};
+
 type BlockedWindow = {
   start: string;
   end: string;
   label?: string;
   mirrorToCalendar?: boolean;
   calendarEventId?: string;
+  recurrence?: Recurrence;
 };
 
 type Prefs = {
@@ -65,6 +74,9 @@ function parsePrefs(raw: string | null): Prefs {
           ...(typeof obj.label === "string" && obj.label.trim() ? { label: obj.label.trim() } : {}),
           ...(obj.mirrorToCalendar ? { mirrorToCalendar: true } : {}),
           ...(typeof obj.calendarEventId === "string" ? { calendarEventId: obj.calendarEventId } : {}),
+          ...(obj.recurrence && typeof obj.recurrence === "object"
+            ? { recurrence: sanitizeRecurrence(obj.recurrence as Partial<Recurrence>) }
+            : {}),
         };
       })
       .filter((b): b is BlockedWindow => b !== null);
@@ -132,6 +144,76 @@ function summarizeHours(hours: MeetingHour[]): string | null {
       return `${dayLabel} ${to12h(r.start)}–${to12h(r.end)}`;
     })
     .join(", ");
+}
+
+// ── Recurrence helpers ───────────────────────────────────────────────────────
+const WD_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WD_INITIAL = ["S", "M", "T", "W", "T", "F", "S"];
+const FREQ_LABELS: Record<Recurrence["freq"], string> = {
+  none: "Does not repeat",
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+};
+
+function sanitizeRecurrence(r: Partial<Recurrence>): Recurrence {
+  const freq: Recurrence["freq"] =
+    r.freq === "none" || r.freq === "daily" || r.freq === "weekly" || r.freq === "monthly"
+      ? r.freq
+      : "weekly";
+  const days = Array.isArray(r.days)
+    ? [...new Set(r.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b)
+    : undefined;
+  return {
+    freq,
+    ...(typeof r.interval === "number" && r.interval > 0 ? { interval: Math.floor(r.interval) } : {}),
+    ...(days && days.length ? { days } : {}),
+    ...(typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? { date: r.date } : {}),
+    ...(typeof r.until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.until) ? { until: r.until } : {}),
+  };
+}
+
+function defaultRecurrence(activeDays: number[]): Recurrence {
+  const days = activeDays.length ? [...activeDays].sort((a, b) => a - b) : [1, 2, 3, 4, 5];
+  return { freq: "weekly", interval: 1, days };
+}
+
+// "HH:MM" -> "12:00 PM"
+function fmtTime(hhmm: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return hhmm;
+  let h = Number(m[1]);
+  const min = m[2];
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${min} ${ap}`;
+}
+
+// "YYYY-MM-DD" -> "Tue, Jun 3"
+function prettyDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+// Whether a recurrence is complete enough to create a calendar event.
+function recurrenceValid(rec: Recurrence): boolean {
+  if (rec.freq === "none") return !!rec.date;
+  if (rec.freq === "weekly") return !!rec.days && rec.days.length > 0;
+  return true;
+}
+
+// One-line, human-readable summary used in the confirm dialog and the row.
+function recurrenceSummary(rec: Recurrence): string {
+  const n = rec.interval && rec.interval > 1 ? rec.interval : 1;
+  if (rec.freq === "none") return rec.date ? `once on ${prettyDate(rec.date)}` : "once (pick a date)";
+  if (rec.freq === "daily") return n > 1 ? `every ${n} days` : "every day";
+  if (rec.freq === "monthly") return n > 1 ? `every ${n} months` : "monthly";
+  // weekly
+  const dayList = (rec.days ?? []).slice().sort((a, b) => a - b).map((d) => WD_FULL[d]).join(", ");
+  const every = n > 1 ? `every ${n} weeks` : "weekly";
+  return dayList ? `${every} on ${dayList}` : every;
 }
 
 // Curated timezone list grouped by UTC offset. Each entry maps a
@@ -216,6 +298,11 @@ export default function SchedulingCard({ initial }: Props) {
   const [hours, setHours] = useState<MeetingHour[]>(initial.hours);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  // Index of the block awaiting "Add to calendar" confirmation, or null.
+  const [confirmAddIdx, setConfirmAddIdx] = useState<number | null>(null);
+
+  // Days the user takes meetings — the default day-set for a new block.
+  const activeDays = [...new Set(hours.map((h) => h.dayOfWeek))].sort((a, b) => a - b);
 
   // Detect timezone if user has no value set yet (best-effort).
   const detectedTz =
@@ -452,7 +539,12 @@ export default function SchedulingCard({ initial }: Props) {
                       ...prefs,
                       blockedWindows: [
                         ...prefs.blockedWindows,
-                        { start: "12:00", end: "13:00", label: "" },
+                        {
+                          start: "12:00",
+                          end: "13:00",
+                          label: "",
+                          recurrence: defaultRecurrence(activeDays),
+                        },
                       ],
                     })
                   }
@@ -463,78 +555,28 @@ export default function SchedulingCard({ initial }: Props) {
               </div>
               {prefs.blockedWindows.length === 0 ? (
                 <p className="text-[11px] text-white/40">
-                  Recurring blocks like lunch or focus time. Toggle <span className="text-white/60">Show on calendar</span> to
-                  also create a recurring event in your Google Calendar on active days.
+                  Recurring blocks like lunch, the gym, or a standing meeting. Set how each one
+                  repeats, then <span className="text-white/60">Add to calendar</span> to create the
+                  event in your Google Calendar.
                 </p>
               ) : (
                 <ul className="space-y-3">
                   {prefs.blockedWindows.map((b, idx) => (
-                    <li key={idx} className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="time"
-                          value={b.start}
-                          onChange={(e) => {
-                            const next = [...prefs.blockedWindows];
-                            next[idx] = { ...next[idx], start: e.target.value };
-                            persistPrefs({ ...prefs, blockedWindows: next });
-                          }}
-                          className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
-                        />
-                        <span className="text-white/40 text-xs">to</span>
-                        <input
-                          type="time"
-                          value={b.end}
-                          onChange={(e) => {
-                            const next = [...prefs.blockedWindows];
-                            next[idx] = { ...next[idx], end: e.target.value };
-                            persistPrefs({ ...prefs, blockedWindows: next });
-                          }}
-                          className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Lunch, focus, …"
-                          value={b.label ?? ""}
-                          onChange={(e) => {
-                            const next = [...prefs.blockedWindows];
-                            next[idx] = { ...next[idx], label: e.target.value };
-                            persistPrefs({ ...prefs, blockedWindows: next });
-                          }}
-                          className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white placeholder:text-white/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = prefs.blockedWindows.filter((_, i) => i !== idx);
-                            persistPrefs({ ...prefs, blockedWindows: next });
-                          }}
-                          className="text-white/40 hover:text-white/80 text-sm leading-none px-1"
-                          aria-label="Remove block"
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <label className="ml-1 inline-flex items-center gap-2 text-[11px] text-white/60 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!b.mirrorToCalendar}
-                          onChange={(e) => {
-                            const next = [...prefs.blockedWindows];
-                            next[idx] = { ...next[idx], mirrorToCalendar: e.target.checked };
-                            persistPrefs({ ...prefs, blockedWindows: next });
-                          }}
-                          className="accent-brand-400"
-                        />
-                        Show on calendar
-                        {b.mirrorToCalendar && b.calendarEventId && (
-                          <span className="text-white/30">· synced</span>
-                        )}
-                        {b.mirrorToCalendar && !b.calendarEventId && (
-                          <span className="text-white/30">· syncing…</span>
-                        )}
-                      </label>
-                    </li>
+                    <BlockRow
+                      key={idx}
+                      block={b}
+                      activeDays={activeDays}
+                      onChange={(nb) => {
+                        const next = [...prefs.blockedWindows];
+                        next[idx] = nb;
+                        persistPrefs({ ...prefs, blockedWindows: next });
+                      }}
+                      onRemove={() => {
+                        const next = prefs.blockedWindows.filter((_, i) => i !== idx);
+                        persistPrefs({ ...prefs, blockedWindows: next });
+                      }}
+                      onRequestAdd={() => setConfirmAddIdx(idx)}
+                    />
                   ))}
                 </ul>
               )}
@@ -556,7 +598,237 @@ export default function SchedulingCard({ initial }: Props) {
         onConfirm={confirmPause}
         onCancel={() => setConfirmingOff(false)}
       />
+
+      {(() => {
+        const idx = confirmAddIdx;
+        const block = idx !== null ? prefs.blockedWindows[idx] : null;
+        const rec = block ? block.recurrence ?? defaultRecurrence(activeDays) : null;
+        return (
+          <ConfirmModal
+            open={idx !== null && !!block && !!rec}
+            title="Add to Google Calendar?"
+            description={
+              block && rec
+                ? `This will create “${block.label?.trim() || "Dharma block"}” — ${fmtTime(
+                    block.start,
+                  )}–${fmtTime(block.end)}, ${recurrenceSummary(rec)}${
+                    rec.until ? `, until ${prettyDate(rec.until)}` : ""
+                  }. You can edit or remove it anytime.`
+                : undefined
+            }
+            confirmLabel="Add to calendar"
+            onConfirm={() => {
+              if (idx === null) return;
+              const next = [...prefs.blockedWindows];
+              const cur = next[idx];
+              next[idx] = {
+                ...cur,
+                mirrorToCalendar: true,
+                recurrence: cur.recurrence ?? defaultRecurrence(activeDays),
+              };
+              persistPrefs({ ...prefs, blockedWindows: next });
+              setConfirmAddIdx(null);
+            }}
+            onCancel={() => setConfirmAddIdx(null)}
+          />
+        );
+      })()}
     </>
+  );
+}
+
+function BlockRow({
+  block,
+  activeDays,
+  onChange,
+  onRemove,
+  onRequestAdd,
+}: {
+  block: BlockedWindow;
+  activeDays: number[];
+  onChange: (b: BlockedWindow) => void;
+  onRemove: () => void;
+  onRequestAdd: () => void;
+}) {
+  const rec = block.recurrence ?? defaultRecurrence(activeDays);
+  const onCal = !!block.mirrorToCalendar;
+  const synced = onCal && !!block.calendarEventId;
+
+  function setRec(patch: Partial<Recurrence>) {
+    onChange({ ...block, recurrence: sanitizeRecurrence({ ...rec, ...patch }) });
+  }
+  function toggleDay(d: number) {
+    const set = new Set(rec.days ?? []);
+    if (set.has(d)) set.delete(d);
+    else set.add(d);
+    setRec({ days: [...set].sort((a, b) => a - b) });
+  }
+
+  const intervalUnit =
+    rec.freq === "daily" ? "day(s)" : rec.freq === "weekly" ? "week(s)" : "month(s)";
+  const inputCls =
+    "rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-sm text-white";
+  const miniInputCls =
+    "rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-xs text-white";
+
+  return (
+    <li className="rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] p-3 space-y-2.5">
+      {/* time + label + remove */}
+      <div className="flex items-center gap-2">
+        <input
+          type="time"
+          value={block.start}
+          onChange={(e) => onChange({ ...block, start: e.target.value })}
+          className={inputCls}
+        />
+        <span className="text-white/40 text-xs">to</span>
+        <input
+          type="time"
+          value={block.end}
+          onChange={(e) => onChange({ ...block, end: e.target.value })}
+          className={inputCls}
+        />
+        <input
+          type="text"
+          placeholder="Lunch, gym, …"
+          value={block.label ?? ""}
+          onChange={(e) => onChange({ ...block, label: e.target.value })}
+          className={`flex-1 ${inputCls} placeholder:text-white/30`}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-white/40 hover:text-white/80 text-sm leading-none px-1"
+          aria-label="Remove block"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* repeat mode + interval */}
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
+        <span className="uppercase tracking-[0.06em] text-white/35">Repeat</span>
+        <select
+          value={rec.freq}
+          onChange={(e) => setRec({ freq: e.target.value as Recurrence["freq"] })}
+          className={miniInputCls}
+          aria-label="Repeat frequency"
+        >
+          {(["none", "daily", "weekly", "monthly"] as const).map((f) => (
+            <option key={f} value={f}>
+              {FREQ_LABELS[f]}
+            </option>
+          ))}
+        </select>
+        {rec.freq !== "none" && (
+          <span className="flex items-center gap-1">
+            every
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={rec.interval ?? 1}
+              onChange={(e) => setRec({ interval: Math.max(1, parseInt(e.target.value || "1", 10)) })}
+              className={`w-14 ${miniInputCls}`}
+              aria-label="Repeat interval"
+            />
+            {intervalUnit}
+          </span>
+        )}
+      </div>
+
+      {/* weekly day chips */}
+      {rec.freq === "weekly" && (
+        <div className="flex items-center gap-1">
+          {WD_INITIAL.map((lbl, d) => {
+            const on = (rec.days ?? []).includes(d);
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => toggleDay(d)}
+                aria-pressed={on}
+                aria-label={WD_FULL[d]}
+                className={`h-7 w-7 rounded-full text-[11px] transition-colors ${
+                  on
+                    ? "bg-brand-400 text-black font-medium"
+                    : "border border-[color:var(--border-subtle)] bg-white/[0.04] text-white/55 hover:bg-white/[0.09]"
+                }`}
+              >
+                {lbl}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* one-off date */}
+      {rec.freq === "none" && (
+        <div className="flex items-center gap-2 text-[11px] text-white/60">
+          <span className="uppercase tracking-[0.06em] text-white/35">On</span>
+          <input
+            type="date"
+            value={rec.date ?? ""}
+            onChange={(e) => setRec({ date: e.target.value })}
+            className={miniInputCls}
+            aria-label="Block date"
+          />
+        </div>
+      )}
+
+      {/* optional end date for recurring blocks */}
+      {rec.freq !== "none" && (
+        <div className="flex items-center gap-2 text-[11px] text-white/55">
+          <span className="uppercase tracking-[0.06em] text-white/35">Ends</span>
+          <input
+            type="date"
+            value={rec.until ?? ""}
+            onChange={(e) => setRec({ until: e.target.value || undefined })}
+            className={miniInputCls}
+            aria-label="Recurrence end date"
+          />
+          {rec.until ? (
+            <button
+              type="button"
+              onClick={() => setRec({ until: undefined })}
+              className="text-white/40 hover:text-white/70"
+            >
+              clear
+            </button>
+          ) : (
+            <span className="text-white/30">never</span>
+          )}
+        </div>
+      )}
+
+      {/* status + actions */}
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        <span className="text-[11px] text-white/40">{recurrenceSummary(rec)}</span>
+        {synced ? (
+          <span className="flex items-center gap-2 text-[11px]">
+            <span className="text-brand-200">✓ On your calendar</span>
+            <button
+              type="button"
+              onClick={() => onChange({ ...block, mirrorToCalendar: false })}
+              className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-white/60 hover:bg-white/[0.09]"
+            >
+              Remove from calendar
+            </button>
+          </span>
+        ) : onCal ? (
+          <span className="text-[11px] text-white/40">Adding…</span>
+        ) : (
+          <button
+            type="button"
+            disabled={!recurrenceValid(rec)}
+            onClick={onRequestAdd}
+            className="rounded-btn border border-[color:var(--border-brand)] bg-brand-400/10 px-2.5 py-0.5 text-[11px] text-brand-100 hover:bg-brand-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Add to calendar
+          </button>
+        )}
+      </div>
+    </li>
   );
 }
 

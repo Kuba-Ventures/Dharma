@@ -4,6 +4,16 @@ import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../lib/gmail";
 
+// Per-block recurrence — gives each block event-like control over how it
+// repeats, instead of auto-deriving the schedule from the user's meeting days.
+type Recurrence = {
+  freq: "none" | "daily" | "weekly" | "monthly";
+  interval?: number; // every N (days/weeks/months); default 1
+  days?: number[];   // 0=Sun..6=Sat — used when freq === "weekly"
+  date?: string;     // "YYYY-MM-DD" — required for one-off ("none"), optional anchor otherwise
+  until?: string;    // "YYYY-MM-DD" — optional end date (inclusive)
+};
+
 // Mirrored block shape — round-tripped through `schedulingPreferences`.
 type BlockedWindow = {
   start: string;            // "HH:MM"
@@ -11,6 +21,7 @@ type BlockedWindow = {
   label?: string;
   mirrorToCalendar?: boolean;
   calendarEventId?: string; // present once the block has been synced to Calendar
+  recurrence?: Recurrence;  // how the mirrored event repeats
 };
 
 type Prefs = {
@@ -43,37 +54,58 @@ function parseHHMM(s: string): { h: number; m: number } | null {
   return { h, m: min };
 }
 
-// Build the first event instance for a recurring block. Picks the next
-// upcoming active day so the recurrence anchors sensibly.
-function nextOccurrence(activeDays: Set<number>, startHHMM: string, tz: string): string | null {
-  const start = parseHHMM(startHHMM);
-  if (!start) return null;
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+// "YYYY-MM-DD" -> local Date (midnight). Returns null if malformed.
+function parseDate(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+// Legacy blocks (saved before recurrence existed) mirror as weekly on the
+// user's active meeting days — preserving the old behavior.
+function effectiveRecurrence(block: BlockedWindow, activeDays: Set<number>): Recurrence {
+  if (block.recurrence) return block.recurrence;
+  return { freq: "weekly", interval: 1, days: [...activeDays] };
+}
+
+// Resolve the anchor date the first event instance lands on. Explicit `date`
+// wins; otherwise we pick the next upcoming day that matches (for weekly, the
+// next selected weekday; otherwise today).
+function resolveAnchor(rec: Recurrence): Date | null {
+  if (rec.date) return parseDate(rec.date);
   const now = new Date();
-  for (let i = 0; i < 7; i++) {
+  const wantDays =
+    rec.freq === "weekly" && rec.days && rec.days.length ? new Set(rec.days) : null;
+  for (let i = 0; i < 14; i++) {
     const cand = new Date(now);
     cand.setDate(now.getDate() + i);
-    if (!activeDays.has(cand.getDay())) continue;
-    // Format YYYY-MM-DDTHH:MM:SS (Calendar API treats as local with the
-    // sibling timeZone field).
-    const y = cand.getFullYear();
-    const mo = String(cand.getMonth() + 1).padStart(2, "0");
-    const d = String(cand.getDate()).padStart(2, "0");
-    const hh = String(start.h).padStart(2, "0");
-    const mm = String(start.m).padStart(2, "0");
-    // For "today", skip if start has already passed in the user's timezone-ish
-    // local — we approximate using server time. Worst case: the block starts
-    // a few hours in the past on the first day, which Calendar accepts.
-    if (i === 0) {
-      const startToday = new Date(cand);
-      startToday.setHours(start.h, start.m, 0, 0);
-      if (startToday < now) continue;
-    }
-    // Suppressing the explicit tz here; Calendar API takes the dateTime
-    // local + timeZone separately, so this string is wall-clock.
-    return `${y}-${mo}-${d}T${hh}:${mm}:00`;
-    tz; // silence unused-warning in some lint configs
+    if (wantDays && !wantDays.has(cand.getDay())) continue;
+    return cand;
   }
   return null;
+}
+
+// Build an RRULE string from a recurrence, or null for a one-off.
+function buildRRule(rec: Recurrence): string | null {
+  if (rec.freq === "none") return null;
+  const interval = rec.interval && rec.interval > 0 ? rec.interval : 1;
+  let rule = `RRULE:FREQ=${rec.freq.toUpperCase()};INTERVAL=${interval}`;
+  if (rec.freq === "weekly" && rec.days && rec.days.length > 0 && rec.days.length < 7) {
+    const codes = [...rec.days].sort((a, b) => a - b).map((d) => DAY_RRULE_CODES[d]);
+    rule += `;BYDAY=${codes.join(",")}`;
+  }
+  if (rec.until) {
+    const end = parseDate(rec.until);
+    if (end) {
+      // Inclusive end-of-day in UTC. Approximation is fine for whole-day bounds.
+      rule += `;UNTIL=${end.getFullYear()}${pad(end.getMonth() + 1)}${pad(end.getDate())}T235959Z`;
+    }
+  }
+  return rule;
 }
 
 function buildEventBody(
@@ -81,26 +113,32 @@ function buildEventBody(
   activeDays: Set<number>,
   tz: string,
 ): calendar_v3.Schema$Event | null {
-  const startDT = nextOccurrence(activeDays, block.start, tz);
-  if (!startDT) return null;
-  const endDT = nextOccurrence(activeDays, block.end, tz);
-  if (!endDT) return null;
+  const rec = effectiveRecurrence(block, activeDays);
+  const start = parseHHMM(block.start);
+  const end = parseHHMM(block.end);
+  if (!start || !end) return null;
+  const anchor = resolveAnchor(rec);
+  if (!anchor) return null;
 
-  // BYDAY list from active days (skip if all 7 — then no BYDAY clause).
-  const codes = [...activeDays].sort().map((d) => DAY_RRULE_CODES[d]);
-  const byday = codes.length === 7 ? "" : `;BYDAY=${codes.join(",")}`;
+  const dateStr = `${anchor.getFullYear()}-${pad(anchor.getMonth() + 1)}-${pad(anchor.getDate())}`;
+  // Calendar API takes wall-clock dateTime + a sibling timeZone field.
+  const startDT = `${dateStr}T${pad(start.h)}:${pad(start.m)}:00`;
+  const endDT = `${dateStr}T${pad(end.h)}:${pad(end.m)}:00`;
 
   const summary = block.label?.trim() ? block.label.trim() : "Dharma block";
 
-  return {
+  const event: calendar_v3.Schema$Event = {
     summary,
     description: BLOCK_DESCRIPTION,
     start: { dateTime: startDT, timeZone: tz },
     end: { dateTime: endDT, timeZone: tz },
-    recurrence: [`RRULE:FREQ=WEEKLY${byday}`],
     transparency: "opaque",
     reminders: { useDefault: false, overrides: [] },
   };
+
+  const rrule = buildRRule(rec);
+  if (rrule) event.recurrence = [rrule];
+  return event;
 }
 
 // Reconcile the new blocks against the previous DB state by mirroring to
