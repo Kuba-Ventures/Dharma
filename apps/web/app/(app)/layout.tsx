@@ -15,6 +15,7 @@ import { effectiveTier } from "../../lib/effectiveTier";
 import Sidebar from "../components/Sidebar";
 import ProfileChip from "../components/ProfileChip";
 import FeedbackButton from "../components/ui/FeedbackButton";
+import AppShell from "../components/AppShell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -100,26 +101,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     null;
   const locked = false;
 
-  return (
-    <div className="flex min-h-screen bg-[color:var(--bg-app)]">
-      <aside className="flex w-52 shrink-0 flex-col border-r border-[color:var(--border-subtle)] bg-[color:var(--bg-sidebar)] px-3 py-7">
-        <Link
-          href="/"
-          className="mb-8 flex items-center gap-2.5 px-3 transition-opacity hover:opacity-80"
-        >
-          <Image src="/logo.png" alt="Dharma" width={26} height={26} priority />
-          <span className="text-sm font-bold text-white">Dharma</span>
-        </Link>
-        <Sidebar locked={locked} />
-        <div className="mt-auto space-y-1">
-          <FeedbackButton />
-          <ProfileChip user={{ ...user, tier: tierLabel }} displayBadge={displayBadge} />
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex-1 px-10 py-8">{children}</main>
+  const sidebar = (
+    <>
+      <Link
+        href="/"
+        className="mb-8 flex items-center gap-2.5 px-3 transition-opacity hover:opacity-80"
+      >
+        <Image src="/logo.png" alt="Dharma" width={26} height={26} priority />
+        <span className="text-sm font-bold text-white">Dharma</span>
+      </Link>
+      <Sidebar locked={locked} />
+      <div className="mt-auto space-y-1">
+        <FeedbackButton />
+        <ProfileChip user={{ ...user, tier: tierLabel }} displayBadge={displayBadge} />
       </div>
-    </div>
+    </>
   );
+
+  return <AppShell sidebar={sidebar}>{children}</AppShell>;
 }
