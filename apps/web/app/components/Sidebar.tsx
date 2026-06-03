@@ -147,6 +147,7 @@ export default function Sidebar({ locked, signalCount }: Props) {
           <Link
             key={item.href}
             href={item.href}
+            data-tour={item.href === "/configuration" ? "nav-config" : undefined}
             className={`flex items-center gap-2.5 rounded-btn border px-3 py-2 text-sm transition-colors ${
               active
                 ? "border-brand-400/30 bg-brand-400/15 text-white"

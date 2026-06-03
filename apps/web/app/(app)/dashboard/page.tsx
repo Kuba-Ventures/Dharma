@@ -19,6 +19,7 @@ import DashboardMetrics from "../../components/dashboard/DashboardMetrics";
 import ConfigStatusCard from "../../components/dashboard/ConfigStatusCard";
 import NpsPrompt from "../../components/dashboard/NpsPrompt";
 import InstallNudge from "../../components/dashboard/InstallNudge";
+import ProductTour from "../../components/dashboard/ProductTour";
 
 const TONE_ICON = (
   <svg width="56" height="56" viewBox="0 0 14 14" fill="none">
@@ -257,6 +258,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <ProductTour />
       {/* Header: greeting + Sync inbox + tier strip */}
       <header className="space-y-3">
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -277,7 +279,7 @@ export default async function DashboardPage() {
       <InstallNudge />
 
       {/* Running for you */}
-      <section>
+      <section data-tour="config">
         <div className="mb-3 flex items-baseline justify-between">
           <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
             Running for you

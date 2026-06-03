@@ -71,6 +71,7 @@ export default function SyncInboxButton() {
   return (
     <button
       type="button"
+      data-tour="sync"
       onClick={sync}
       disabled={state === "syncing"}
       className={`flex items-center gap-2 rounded-btn border px-3 py-1.5 text-sm transition-colors ${

@@ -36,7 +36,10 @@ export default function InstallNudge() {
   if (!visible) return null;
 
   return (
-    <div className="flex items-start gap-3 rounded-card border border-[color:var(--border-brand)] bg-brand-400/[0.06] px-4 py-3">
+    <div
+      data-tour="install"
+      className="flex items-start gap-3 rounded-card border border-[color:var(--border-brand)] bg-brand-400/[0.06] px-4 py-3"
+    >
       <span className="mt-0.5 shrink-0 text-brand-200" aria-hidden="true">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <rect x="2" y="3.5" width="14" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
