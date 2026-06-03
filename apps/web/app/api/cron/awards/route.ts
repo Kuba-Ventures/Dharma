@@ -64,6 +64,25 @@ export async function GET(req: Request) {
   // email -> { id, earned tier } so Pass 2.7 can mirror/comp tiers without
   // recomputing seconds.
   const tierByEmail = new Map<string, { id: string; earned: string }>();
+
+  // --- Catalogue: ensure BadgeDef rows exist BEFORE any awards ---
+  // UserBadge has a FK to BadgeDef, so the catalogue must exist before the
+  // per-user loop below creates achievement UserBadge rows. The library is the
+  // source of truth; the BadgeDef table is a queryable mirror.
+  for (const b of BADGES) {
+    const criteria = {
+      group: b.group ?? null,
+      tier: b.tier ?? null,
+      metric: b.metric ?? null,
+      threshold: b.threshold ?? null,
+    };
+    await prisma.badgeDef.upsert({
+      where: { id: b.id },
+      create: { id: b.id, title: b.title, description: b.description, kind: b.kind, criteria },
+      update: { title: b.title, description: b.description, kind: b.kind, criteria },
+    });
+  }
+
   for (const u of users) {
     try {
       const [draftCount, tagCount] = await Promise.all([
@@ -151,34 +170,6 @@ export async function GET(req: Request) {
       });
       console.error(`[cron] user pass failed for ${u.email}:`, err);
     }
-  }
-
-  // --- Pass 2: ensure BadgeDef rows exist for everything in lib/badges.ts ---
-  // UserBadge has a FK to BadgeDef, so we upsert the catalogue before linking.
-  // The library is the source of truth; the table is a queryable mirror.
-  for (const b of BADGES) {
-    const criteria = {
-      group: b.group ?? null,
-      tier: b.tier ?? null,
-      metric: b.metric ?? null,
-      threshold: b.threshold ?? null,
-    };
-    await prisma.badgeDef.upsert({
-      where: { id: b.id },
-      create: {
-        id: b.id,
-        title: b.title,
-        description: b.description,
-        kind: b.kind,
-        criteria,
-      },
-      update: {
-        title: b.title,
-        description: b.description,
-        kind: b.kind,
-        criteria,
-      },
-    });
   }
 
   // --- Pass 2.5: ensure every User has a Users row ---
