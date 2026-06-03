@@ -4,10 +4,27 @@ import TimeSavedChart from "../../components/metrics/TimeSavedChart";
 import ReplyRateByLabel from "../../components/metrics/ReplyRateByLabel";
 import MilestoneTimelineStrip from "../../components/metrics/MilestoneTimelineStrip";
 import MetricsCard from "../../components/MetricsCard";
+import GuidedTour, { type TourStep } from "../../components/GuidedTour";
+
+const METRICS_TOUR: TourStep[] = [
+  {
+    selector: '[data-tour="metrics-reply-rate"]',
+    title: "Reply rate",
+    description:
+      "How consistently you're replying, and how mail breaks down by label — your at-a-glance health check.",
+  },
+  {
+    selector: '[data-tour="metrics-time-saved"]',
+    title: "Time saved",
+    description:
+      "The hours Dharma has saved you drafting and sorting. This is what drives your tier as it climbs.",
+  },
+];
 
 export default function MetricsPage() {
   return (
     <div className="max-w-4xl space-y-5">
+      <GuidedTour id="metrics" steps={METRICS_TOUR} />
       <header className="mb-4">
         <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-brand-200">
           Metrics
@@ -19,13 +36,17 @@ export default function MetricsPage() {
         </p>
       </header>
 
-      <Suspense>
-        <ReplyRateHero />
-      </Suspense>
+      <div data-tour="metrics-reply-rate">
+        <Suspense>
+          <ReplyRateHero />
+        </Suspense>
+      </div>
 
-      <Suspense>
-        <TimeSavedChart days={30} />
-      </Suspense>
+      <div data-tour="metrics-time-saved">
+        <Suspense>
+          <TimeSavedChart days={30} />
+        </Suspense>
+      </div>
 
       <Suspense>
         <ReplyRateByLabel />

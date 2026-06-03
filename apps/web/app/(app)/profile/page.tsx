@@ -18,6 +18,22 @@ import IdentityCard from "../../components/profile/IdentityCard";
 import TierLadder from "../../components/profile/TierLadder";
 import BadgeCase from "../../components/profile/BadgeCase";
 import MilestoneLibrary from "../../components/profile/MilestoneLibrary";
+import GuidedTour, { type TourStep } from "../../components/GuidedTour";
+
+const PROFILE_TOUR: TourStep[] = [
+  {
+    selector: '[data-tour="profile-tier"]',
+    title: "Your tier",
+    description:
+      "Tiers level up as Dharma saves you more time. Here's where you are and what's next on the ladder.",
+  },
+  {
+    selector: '[data-tour="profile-badges"]',
+    title: "Badges",
+    description:
+      "Earn badges for milestones — training your tone, labeling mail, hitting time-saved goals, and more.",
+  },
+];
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -110,13 +126,19 @@ export default async function ProfilePage() {
         displayBadge={displayBadge}
       />
 
-      <TierLadder secondsSaved={user.cumulativeSecondsSaved} />
+      <GuidedTour id="profile" steps={PROFILE_TOUR} />
 
-      <BadgeCase
-        earnedIds={earnedBadges}
-        displayBadgeId={resolvedDisplayId}
-        groupProgress={badgeGroups}
-      />
+      <div data-tour="profile-tier">
+        <TierLadder secondsSaved={user.cumulativeSecondsSaved} />
+      </div>
+
+      <div data-tour="profile-badges">
+        <BadgeCase
+          earnedIds={earnedBadges}
+          displayBadgeId={resolvedDisplayId}
+          groupProgress={badgeGroups}
+        />
+      </div>
 
       <MilestoneLibrary
         secondsSaved={user.cumulativeSecondsSaved}

@@ -37,6 +37,7 @@ model User {
   onboardingStep           Int                  @default(0)
   onboardingCompletedAt    DateTime?
   tourCompletedAt          DateTime?
+  toursSeen                String[]             @default([])
   dismissedTiles           String[]             @default([])
 
   // Progression

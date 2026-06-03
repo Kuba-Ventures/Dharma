@@ -6,8 +6,30 @@ import { makeAuthForUser } from "../../../lib/gmail";
 import ToneCard from "../../components/configuration/ToneCard";
 import LabelsCard from "../../components/configuration/LabelsCard";
 import SchedulingCard from "../../components/configuration/SchedulingCard";
+import GuidedTour, { type TourStep } from "../../components/GuidedTour";
 
 type Preset = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
+
+const CONFIG_TOUR: TourStep[] = [
+  {
+    selector: '[data-tour="config-tone"]',
+    title: "Your writing tone",
+    description:
+      "Dharma drafts replies in your voice. Pick a preset or let it learn from your sent mail, and tweak the summary anytime.",
+  },
+  {
+    selector: '[data-tour="config-labels"]',
+    title: "Labels & tabs",
+    description:
+      "Choose a preset (VC, Personal, and so on) and Dharma auto-sorts new mail into these labels in your own Gmail.",
+  },
+  {
+    selector: '[data-tour="config-scheduling"]',
+    title: "Scheduling",
+    description:
+      "Turn back-and-forth scheduling threads into ready-to-send time proposals pulled from your calendar.",
+  },
+];
 
 export default async function ConfigurationPage() {
   const session = await auth();
@@ -84,38 +106,46 @@ export default async function ConfigurationPage() {
         </p>
       </header>
 
+      <GuidedTour id="config" steps={CONFIG_TOUR} />
+
       <div className="space-y-5">
-        <ToneCard
-          initial={{
-            tone: user.tone,
-            toneProfile: user.toneProfile,
-            toneSummary: user.toneSummary,
-            toneExample: user.toneExample,
-            inferredSignOff: user.inferredSignOff,
-          }}
-        />
+        <div data-tour="config-tone">
+          <ToneCard
+            initial={{
+              tone: user.tone,
+              toneProfile: user.toneProfile,
+              toneSummary: user.toneSummary,
+              toneExample: user.toneExample,
+              inferredSignOff: user.inferredSignOff,
+            }}
+          />
+        </div>
 
-        <LabelsCard
-          initial={{
-            preset: (labelPreset?.preset as Preset | undefined) ?? null,
-            enabled: labelPreset?.enabled ?? false,
-            customName: labelPreset?.customName ?? null,
-            customLabels: (labelPreset?.customLabels as unknown) ?? null,
-            provisioned: mappingCount,
-            uncategorizedEnabled: labelPreset?.uncategorizedEnabled ?? true,
-          }}
-        />
+        <div data-tour="config-labels">
+          <LabelsCard
+            initial={{
+              preset: (labelPreset?.preset as Preset | undefined) ?? null,
+              enabled: labelPreset?.enabled ?? false,
+              customName: labelPreset?.customName ?? null,
+              customLabels: (labelPreset?.customLabels as unknown) ?? null,
+              provisioned: mappingCount,
+              uncategorizedEnabled: labelPreset?.uncategorizedEnabled ?? true,
+            }}
+          />
+        </div>
 
-        <SchedulingCard
-          initial={{
-            enabled: user.schedulingEnabled,
-            schedulingPreferences: user.schedulingPreferences,
-            timezone: user.timezone,
-            homeCity: user.homeCity,
-            hours,
-            averageMeetingsPerWeek,
-          }}
-        />
+        <div data-tour="config-scheduling">
+          <SchedulingCard
+            initial={{
+              enabled: user.schedulingEnabled,
+              schedulingPreferences: user.schedulingPreferences,
+              timezone: user.timezone,
+              homeCity: user.homeCity,
+              hours,
+              averageMeetingsPerWeek,
+            }}
+          />
+        </div>
       </div>
     </div>
   );
