@@ -4,15 +4,15 @@ import { useEffect } from "react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 
-// One coachmark walkthrough of the dashboard, shown once per browser (and to
-// every user on their next dashboard load — new users land here right after the
-// setup wizard). Append ?tour=1 to the dashboard URL to replay it anytime.
+// One coachmark walkthrough of the dashboard, shown exactly once per account
+// (gated by the user's tourCompletedAt flag — new users land here right after
+// the setup wizard; existing users see it on their next visit until they
+// complete it). Append ?tour=1 to the dashboard URL to replay it anytime
+// (Settings → "Replay the product tour" does this).
 //
 // Steps anchor to real dashboard elements via data-tour attributes. Any step
 // whose target isn't on the page (e.g. the install nudge after it's dismissed)
 // is skipped, so the tour never points at nothing.
-const TOUR_KEY = "dharma.tour.v1";
-
 type Step = { selector?: string; title: string; description: string };
 
 const STEPS: Step[] = [
@@ -47,16 +47,10 @@ const STEPS: Step[] = [
   },
 ];
 
-export default function ProductTour() {
+export default function ProductTour({ completed }: { completed: boolean }) {
   useEffect(() => {
     const forced = new URLSearchParams(window.location.search).has("tour");
-    let seen = false;
-    try {
-      seen = localStorage.getItem(TOUR_KEY) != null;
-    } catch {
-      /* storage unavailable — treat as not-yet-seen */
-    }
-    if (seen && !forced) return;
+    if (completed && !forced) return;
 
     const steps = STEPS.filter(
       (s) => !s.selector || document.querySelector(s.selector),
@@ -64,15 +58,13 @@ export default function ProductTour() {
       element: s.selector,
       popover: { title: s.title, description: s.description },
     }));
-    // Need at least the welcome step plus one anchored step to be worthwhile.
+    // Need the welcome step plus at least one anchored step to be worthwhile.
     if (steps.length < 2) return;
 
+    // Persist completion so it won't auto-show again (stays replayable via
+    // ?tour=1). Fire-and-forget; failure just means it may show once more.
     const markSeen = () => {
-      try {
-        localStorage.setItem(TOUR_KEY, new Date().toISOString());
-      } catch {
-        /* ignore */
-      }
+      void fetch("/api/user/tour-complete", { method: "POST" }).catch(() => {});
     };
 
     const d = driver({
@@ -93,7 +85,7 @@ export default function ProductTour() {
       clearTimeout(t);
       d.destroy();
     };
-  }, []);
+  }, [completed]);
 
   return null;
 }

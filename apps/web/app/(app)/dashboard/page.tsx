@@ -65,6 +65,7 @@ export default async function DashboardPage() {
         nextNpsPromptAt: true,
         cumulativeSecondsSaved: true,
         homeCity: true,
+        tourCompletedAt: true,
       },
     }),
     prisma.labelPreset.findUnique({ where: { userId } }),
@@ -258,7 +259,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <ProductTour />
+      <ProductTour completed={!!user.tourCompletedAt} />
       {/* Header: greeting + Sync inbox + tier strip */}
       <header className="space-y-3">
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">

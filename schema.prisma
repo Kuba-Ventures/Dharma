@@ -36,6 +36,7 @@ model User {
   // Onboarding + UI state
   onboardingStep           Int                  @default(0)
   onboardingCompletedAt    DateTime?
+  tourCompletedAt          DateTime?
   dismissedTiles           String[]             @default([])
 
   // Progression
