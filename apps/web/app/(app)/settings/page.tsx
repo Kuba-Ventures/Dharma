@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+// Live Google Workspace Marketplace listing for the Dharma Gmail add-on.
+const MARKETPLACE_URL =
+  "https://workspace.google.com/marketplace/app/dharma/63757021962";
+
 const SECTIONS = [
   {
     href: "/settings/hidden-stats",
@@ -22,6 +26,43 @@ export default function SettingsPage() {
         </p>
         <h1 className="font-display text-3xl text-white">Account and preferences</h1>
       </header>
+
+      <section className="mb-4 rounded-card border border-[color:var(--border-brand)] bg-brand-400/[0.06] p-5">
+        <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
+          Get Dharma in Gmail
+        </p>
+        <h2 className="mt-1 font-display text-base text-white">
+          Install the Gmail add-on
+        </h2>
+        <p className="mt-1 text-[12px] text-white/55">
+          Draft replies right inside Gmail&apos;s sidebar. Labeling and sorting
+          already run automatically — this adds the in-Gmail compose experience.
+        </p>
+        <ol className="mt-3 space-y-1.5 text-[12px] text-white/50">
+          <li>
+            1. Open the Workspace Marketplace listing, click{" "}
+            <span className="text-white/70">Install</span>, and approve the Google
+            permissions.
+          </li>
+          <li>2. Reload Gmail — the Dharma icon appears in the right sidebar.</li>
+        </ol>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <a
+            href={MARKETPLACE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-btn border border-[color:var(--border-brand)] bg-brand-400/15 px-4 py-2 text-sm font-medium text-brand-100 transition-colors hover:bg-brand-400/25"
+          >
+            Install the Gmail add-on ↗
+          </a>
+          <Link
+            href="/settings/advanced"
+            className="text-[12px] text-white/40 transition-colors hover:text-white/70"
+          >
+            Using the Chrome extension instead? →
+          </Link>
+        </div>
+      </section>
 
       <div className="space-y-2">
         {SECTIONS.map((s) => (
