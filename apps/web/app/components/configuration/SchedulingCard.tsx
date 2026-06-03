@@ -700,6 +700,15 @@ function BlockRow({
   const rec = block.recurrence ?? defaultRecurrence(activeDays);
   const onCal = !!block.mirrorToCalendar;
   const synced = onCal && !!block.calendarEventId;
+  const colorHex =
+    GOOGLE_EVENT_COLORS.find((c) => c.id === (block.colorId ?? DEFAULT_COLOR_ID))?.hex ?? "#7986CB";
+
+  // Expansion: a block defaults to the editor until it's on the calendar, then
+  // collapses to a condensed summary. `override` lets the user toggle, and
+  // resets whenever sync state flips (add → collapse, remove → reopen).
+  const [override, setOverride] = useState<boolean | null>(null);
+  useEffect(() => setOverride(null), [synced]);
+  const expanded = override ?? !synced;
 
   function setRec(patch: Partial<Recurrence>) {
     onChange({ ...block, recurrence: sanitizeRecurrence({ ...rec, ...patch }) });
@@ -718,8 +727,71 @@ function BlockRow({
   const miniInputCls =
     "rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-xs text-white";
 
+  // Condensed summary — shown once a block is on the calendar.
+  if (!expanded) {
+    return (
+      <li className="rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <span
+            className="h-3 w-3 shrink-0 rounded-full"
+            style={{ backgroundColor: colorHex }}
+            aria-hidden
+          />
+          <button
+            type="button"
+            onClick={() => setOverride(true)}
+            className="min-w-0 flex-1 text-left"
+            aria-label="Edit block"
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="truncate text-sm text-white">
+                {block.label?.trim() || "Untitled block"}
+              </span>
+              <span className="shrink-0 text-[11px] text-white/45">
+                {fmtTime(block.start)}–{fmtTime(block.end)}
+              </span>
+            </div>
+            <div className="truncate text-[11px] text-white/40">
+              {recurrenceSummary(rec)}
+              {onCal ? " · ✓ on your calendar" : " · not on calendar"}
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOverride(true)}
+            className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/[0.09]"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-white/40 hover:text-white/80 text-sm leading-none px-1"
+            aria-label="Remove block"
+          >
+            ×
+          </button>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li className="rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] p-3 space-y-2.5">
+      {synced && (
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] uppercase tracking-[0.06em] text-brand-200/70">
+            Editing block
+          </span>
+          <button
+            type="button"
+            onClick={() => setOverride(false)}
+            className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/[0.09]"
+          >
+            Done
+          </button>
+        </div>
+      )}
       {/* time + label + remove */}
       <div className="flex items-center gap-2">
         <input
