@@ -18,6 +18,7 @@ import SignalsPeek from "../../components/dashboard/SignalsPeek";
 import DashboardMetrics from "../../components/dashboard/DashboardMetrics";
 import ConfigStatusCard from "../../components/dashboard/ConfigStatusCard";
 import NpsPrompt from "../../components/dashboard/NpsPrompt";
+import InstallNudge from "../../components/dashboard/InstallNudge";
 
 const TONE_ICON = (
   <svg width="56" height="56" viewBox="0 0 14 14" fill="none">
@@ -270,6 +271,10 @@ export default async function DashboardPage() {
           displayTier={tierLabel}
         />
       </header>
+
+      {/* Dismissible nudge to install the Gmail add-on (existing users who
+          never went through the onboarding install step). */}
+      <InstallNudge />
 
       {/* Running for you */}
       <section>
