@@ -21,6 +21,16 @@ export const BADGE_ICON_PATHS: Record<Badge["icon"], string> = {
   mountain: "M2 12L6 4l3 5 2-3 3 6z",
   running: "M5 5l2-2 2 3 2 1-2 4-2-3-3 1",
   radar: "M7 7m-4 0a4 4 0 1 0 8 0 4 4 0 1 0-8 0M7 7L4 3",
+  // Bar chart — three rising columns (investor).
+  chart: "M2 12V8M2 12h10M6 12V5M10 12V2",
+  // Compass — diamond needle in a ring (advisor).
+  compass: "M7 1a6 6 0 1 0 0 12A6 6 0 0 0 7 1zM7 4l1.6 3.4L7 10 5.4 7.4 7 4z",
+  // Hourglass — pinched waist, sand crossing (waitlist / Early Access).
+  hourglass: "M3 2h8M3 12h8M4 2c0 3 6 3 6 5s-6 2-6 5M10 2c0 3-6 3-6 5s6 2 6 5",
+  // Graduation cap — mortarboard + tassel (alumni).
+  cap: "M1 5l6-2.5L13 5l-6 2.5L1 5zM4 6.5V9.5c0 1 6 1 6 0V6.5M13 5v3",
+  // Microphone — capsule on a stand (press).
+  mic: "M7 1a2 2 0 0 0-2 2v3a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2zM3.5 6.5A3.5 3.5 0 0 0 10.5 6.5M7 10v3M5 13h4",
 };
 
 export const BADGE_COLOR_BG: Record<Badge["color"], string> = {

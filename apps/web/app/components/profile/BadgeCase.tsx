@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BADGES, type Badge } from "../../../lib/badges";
+import { BADGES, type Badge, type GroupProgress } from "../../../lib/badges";
 import {
   BADGE_COLOR_BG,
   BADGE_ICON_PATHS,
@@ -12,10 +12,12 @@ import {
   JEWEL_STROKE,
 } from "../../../lib/badgeIcons";
 import Modal from "../ui/Modal";
+import BadgeProgressRing from "./BadgeProgressRing";
 
 type Props = {
   earnedIds: string[];
   displayBadgeId: string | null;
+  groupProgress?: GroupProgress[];
 };
 
 const COLLAPSED_LIMIT = 10;
@@ -23,6 +25,7 @@ const COLLAPSED_LIMIT = 10;
 export default function BadgeCase({
   earnedIds,
   displayBadgeId: initialDisplayId,
+  groupProgress = [],
 }: Props) {
   const router = useRouter();
   const [showAll, setShowAll] = useState(false);
@@ -30,6 +33,12 @@ export default function BadgeCase({
   const earnedSet = new Set(earnedIds);
   const earned = BADGES.filter((b) => earnedSet.has(b.id));
   const locked = BADGES.filter((b) => !earnedSet.has(b.id));
+
+  // The next unearned tiered badge in each group gets a progress ring.
+  const nextPctById = new Map<string, number>();
+  for (const g of groupProgress) {
+    if (g.next && g.threshold != null) nextPctById.set(g.next.id, g.pct);
+  }
 
   async function setDisplay(badgeId: string) {
     setDisplayBadgeId(badgeId);
@@ -52,6 +61,7 @@ export default function BadgeCase({
         badge={b}
         earned={earnedSet.has(b.id)}
         isDisplay={b.id === displayBadgeId}
+        pct={nextPctById.get(b.id)}
         onSetDisplay={
           earnedSet.has(b.id) && b.id !== displayBadgeId
             ? () => setDisplay(b.id)
@@ -110,44 +120,58 @@ function BadgeChip({
   badge,
   earned,
   isDisplay,
+  pct,
   onSetDisplay,
 }: {
   badge: Badge;
   earned: boolean;
   isDisplay: boolean;
+  pct?: number;
   onSetDisplay?: () => void;
 }) {
   const basquiat = earned && badge.color === "yellow";
+  const showRing = !earned && pct !== undefined;
+  const pctLabel = showRing ? ` (${Math.round((pct ?? 0) * 100)}%)` : "";
+  const icon = badge.iconImage ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={badge.iconImage}
+      alt=""
+      width={40}
+      height={40}
+      className={earned ? "" : "opacity-40 grayscale"}
+    />
+  ) : (
+    <svg width="40" height="40" viewBox="0 0 14 14" fill="none">
+      <path
+        d={BADGE_ICON_PATHS[badge.icon]}
+        stroke={earned ? JEWEL_STROKE[badge.color] : "currentColor"}
+        strokeWidth={basquiat ? 1.6 : earned ? 1.3 : 1.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={earned ? JEWEL_FILL[badge.color] : "none"}
+        fillOpacity={earned ? 1 : 0}
+      />
+    </svg>
+  );
   return (
     <div
       className={`group relative flex flex-col items-center rounded-card border p-4 transition-opacity ${
         earned
           ? BADGE_COLOR_BG[badge.color]
-          : "border-dashed border-[color:var(--border-subtle)] bg-white/[0.02] text-white/30 opacity-60"
+          : showRing
+            ? "border-[color:var(--border-subtle)] bg-white/[0.02] text-white/40"
+            : "border-dashed border-[color:var(--border-subtle)] bg-white/[0.02] text-white/30 opacity-60"
       } ${isDisplay ? "ring-2 ring-brand-400" : ""}`}
-      title={`${badge.title} — ${earned ? "Earned" : "Locked"}: ${badge.description}`}
+      title={`${badge.title} — ${earned ? "Earned" : "Locked"}${pctLabel}: ${badge.description}`}
     >
-      {badge.iconImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={badge.iconImage}
-          alt=""
-          width={40}
-          height={40}
-          className={earned ? "" : "opacity-40 grayscale"}
-        />
+      {showRing ? (
+        <div className="relative flex h-12 w-12 items-center justify-center">
+          <BadgeProgressRing pct={pct ?? 0} color={JEWEL_FILL[badge.color]} size={48} />
+          {icon}
+        </div>
       ) : (
-        <svg width="40" height="40" viewBox="0 0 14 14" fill="none">
-          <path
-            d={BADGE_ICON_PATHS[badge.icon]}
-            stroke={earned ? JEWEL_STROKE[badge.color] : "currentColor"}
-            strokeWidth={basquiat ? 1.6 : earned ? 1.3 : 1.2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill={earned ? JEWEL_FILL[badge.color] : "none"}
-            fillOpacity={earned ? 1 : 0}
-          />
-        </svg>
+        icon
       )}
       <p className={`mt-2 text-center text-[11px] ${earned ? "" : "text-white/40"}`}>
         {badge.title}
@@ -157,7 +181,7 @@ function BadgeChip({
           earned ? "text-white/45" : "text-white/30"
         }`}
       >
-        {badge.description}
+        {showRing ? `${Math.round((pct ?? 0) * 100)}% there` : badge.description}
       </p>
       {isDisplay && (
         <span className="absolute -top-1.5 -right-1.5 rounded-full bg-brand-400 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">

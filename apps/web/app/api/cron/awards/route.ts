@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { tierFor, TIER_IDS, tierRank } from "../../../../lib/tiers";
-import { BADGES, IDENTITY_BADGE_IDS, getBadge } from "../../../../lib/badges";
+import {
+  BADGES,
+  IDENTITY_BADGE_IDS,
+  getBadge,
+  earnedAchievementBadges,
+} from "../../../../lib/badges";
+import { buildSnapshot, foundingCohortIds } from "../../../../lib/badgeSnapshot";
 import {
   effectiveMilestones,
   effectiveUnlockedMilestoneIds,
@@ -51,6 +57,9 @@ export async function GET(req: Request) {
     select: { id: true, email: true, createdAt: true, homeCity: true },
   });
   let milestonesAwarded = 0;
+  let achievementsAwarded = 0;
+  // First-100-by-signup cohort, computed once and reused per user.
+  const foundingIds = await foundingCohortIds();
   const errors: Array<{ email: string | null; step: string; message: string }> = [];
   // email -> { id, earned tier } so Pass 2.7 can mirror/comp tiers without
   // recomputing seconds.
@@ -121,6 +130,19 @@ export async function GET(req: Request) {
           );
         }
       }
+
+      // --- Pass 1.5: award achievement badges from a derived snapshot ---
+      // Idempotent: skip ids already granted (the unique constraint backstops).
+      const snapshot = await buildSnapshot(u.id, { foundingIds });
+      for (const badgeId of earnedAchievementBadges(snapshot)) {
+        const existing = await prisma.userBadge.findUnique({
+          where: { userId_badgeId: { userId: u.id, badgeId } },
+          select: { id: true },
+        });
+        if (existing) continue;
+        await prisma.userBadge.create({ data: { userId: u.id, badgeId } });
+        achievementsAwarded += 1;
+      }
     } catch (err) {
       errors.push({
         email: u.email,
@@ -135,6 +157,12 @@ export async function GET(req: Request) {
   // UserBadge has a FK to BadgeDef, so we upsert the catalogue before linking.
   // The library is the source of truth; the table is a queryable mirror.
   for (const b of BADGES) {
+    const criteria = {
+      group: b.group ?? null,
+      tier: b.tier ?? null,
+      metric: b.metric ?? null,
+      threshold: b.threshold ?? null,
+    };
     await prisma.badgeDef.upsert({
       where: { id: b.id },
       create: {
@@ -142,12 +170,13 @@ export async function GET(req: Request) {
         title: b.title,
         description: b.description,
         kind: b.kind,
-        criteria: {},
+        criteria,
       },
       update: {
         title: b.title,
         description: b.description,
         kind: b.kind,
+        criteria,
       },
     });
   }
@@ -243,6 +272,7 @@ export async function GET(req: Request) {
     subscribersBackfilled: backfilled,
     sheetRows: rows.length,
     badgesGranted: grantedCount,
+    achievementsAwarded,
     tiersComped,
     milestonesAwarded,
     errors: errors.length > 0 ? errors : undefined,

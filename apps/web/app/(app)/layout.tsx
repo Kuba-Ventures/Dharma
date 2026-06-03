@@ -8,6 +8,7 @@ import {
   getBadge,
   identityBadgesForEmail,
   earnedAchievementBadges,
+  resolveBadgeId,
 } from "../../lib/badges";
 import { sheetIdentityBadgesForEmail } from "../../lib/adminSheet";
 import { effectiveTier } from "../../lib/effectiveTier";
@@ -64,25 +65,36 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Compute the display badge for the sidebar avatar. Same logic as the
   // Profile page so what the user picks there reflects in the chip too.
-  const earnedIds = new Set([
-    ...userBadges.map((b) => b.badgeId),
-    ...identityBadgesForEmail(user.email),
-    ...sheetBadgeIds,
-    ...earnedAchievementBadges({
-      onboardingComplete: !!user.onboardingCompletedAt,
-      hasToneSummary: !!(user.toneSummary || user.toneProfile),
-      emailsTaggedTotal: emailsTagged,
-      cumulativeSecondsSaved: user.cumulativeSecondsSaved,
-      // homeCity drives geographic milestone derivation; we don't run that
-      // full resolution here, so this approximation is conservative.
-      achievedGeographicMilestone: false,
-    }),
-  ]);
+  // Conservative snapshot — the sidebar only needs to pick the display badge,
+  // and persisted UserBadge rows already supply earned achievements after the
+  // awards cron. We avoid the extra per-request queries buildSnapshot would run
+  // and leave the unfetched metrics at their conservative defaults.
+  const earnedIds = new Set(
+    [
+      ...userBadges.map((b) => b.badgeId),
+      ...identityBadgesForEmail(user.email),
+      ...sheetBadgeIds,
+      ...earnedAchievementBadges({
+        draftsGenerated: 0,
+        timeSavedSec: user.cumulativeSecondsSaved,
+        threadsLabeled: emailsTagged,
+        toneModesUsed: 0,
+        gmailConnected: false,
+        calendarConnected: false,
+        toneTrained: !!(user.toneSummary || user.toneProfile),
+        onboardingComplete: !!user.onboardingCompletedAt,
+        dealHawk: false,
+        dayOne: false,
+        founding100: false,
+        oneYear: false,
+        geoMilestone: false,
+      }),
+    ].map(resolveBadgeId),
+  );
+  const resolvedDisplayId = user.displayBadgeId ? resolveBadgeId(user.displayBadgeId) : null;
   const displayBadge =
-    (user.displayBadgeId &&
-    getBadge(user.displayBadgeId) &&
-    earnedIds.has(user.displayBadgeId)
-      ? getBadge(user.displayBadgeId)
+    (resolvedDisplayId && getBadge(resolvedDisplayId) && earnedIds.has(resolvedDisplayId)
+      ? getBadge(resolvedDisplayId)
       : null) ??
     BADGES.find((b) => b.kind === "identity" && earnedIds.has(b.id)) ??
     null;

@@ -6,11 +6,12 @@ import {
   getBadge,
   identityBadgesForEmail,
   earnedAchievementBadges,
+  groupProgress,
+  resolveBadgeId,
+  type BadgeGroup,
 } from "../../../lib/badges";
-import {
-  effectiveMilestones,
-  effectiveUnlockedMilestoneIds,
-} from "../../../lib/milestoneResolution";
+import { buildSnapshot } from "../../../lib/badgeSnapshot";
+import { effectiveMilestones } from "../../../lib/milestoneResolution";
 import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
 import { effectiveTier } from "../../../lib/effectiveTier";
 import IdentityCard from "../../components/profile/IdentityCard";
@@ -23,7 +24,7 @@ export default async function ProfilePage() {
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
-  const [user, emailsTagged, userBadges] = await Promise.all([
+  const [user, userBadges] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -36,13 +37,9 @@ export default async function ProfilePage() {
         tier: true,
         displayBadgeId: true,
         cumulativeSecondsSaved: true,
-        toneSummary: true,
-        toneProfile: true,
-        onboardingCompletedAt: true,
         createdAt: true,
       },
     }),
-    prisma.classifiedThread.count({ where: { userId } }),
     prisma.userBadge.findMany({
       where: { userId },
       select: { badgeId: true },
@@ -51,42 +48,39 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [unlocked, allMilestones, sheetBadgeIds, tierLabel] = await Promise.all([
-    effectiveUnlockedMilestoneIds(user.cumulativeSecondsSaved, user.homeCity),
+  const [allMilestones, sheetBadgeIds, tierLabel, snapshot] = await Promise.all([
     effectiveMilestones(user.homeCity),
     sheetIdentityBadgesForEmail(user.email),
     effectiveTier(user.cumulativeSecondsSaved, user.email),
+    buildSnapshot(userId),
   ]);
-  const geoMilestoneAchieved = unlocked.some((id) => {
-    const m = allMilestones.find((m) => m.id === id);
-    return !!m?.requiredCity;
-  });
 
+  // Merge persisted (sheet identity + prior awards), live env identity, and
+  // freshly derived achievements; map retired ids forward.
   const earnedBadges = Array.from(
-    new Set([
-      ...userBadges.map((b) => b.badgeId),
-      ...identityBadgesForEmail(user.email),
-      ...sheetBadgeIds,
-      ...earnedAchievementBadges({
-        onboardingComplete: !!user.onboardingCompletedAt,
-        hasToneSummary: !!(user.toneSummary || user.toneProfile),
-        emailsTaggedTotal: emailsTagged,
-        cumulativeSecondsSaved: user.cumulativeSecondsSaved,
-        achievedGeographicMilestone: geoMilestoneAchieved,
-      }),
-    ]),
+    new Set(
+      [
+        ...userBadges.map((b) => b.badgeId),
+        ...identityBadgesForEmail(user.email),
+        ...sheetBadgeIds,
+        ...earnedAchievementBadges(snapshot),
+      ].map(resolveBadgeId),
+    ),
   );
+
+  const badgeGroups = (
+    ["drafts", "time_saved", "organization", "tone", "onboarding", "tenure", "geo"] as BadgeGroup[]
+  ).map((g) => groupProgress(g, snapshot));
 
   const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
 
   // Resolve which badge to highlight on the avatar.
   const earnedSet = new Set(earnedBadges);
   const earnedBadgeObjects = BADGES.filter((b) => earnedSet.has(b.id));
+  const resolvedDisplayId = user.displayBadgeId ? resolveBadgeId(user.displayBadgeId) : null;
   const displayBadge =
-    (user.displayBadgeId &&
-    getBadge(user.displayBadgeId) &&
-    earnedSet.has(user.displayBadgeId)
-      ? getBadge(user.displayBadgeId)
+    (resolvedDisplayId && getBadge(resolvedDisplayId) && earnedSet.has(resolvedDisplayId)
+      ? getBadge(resolvedDisplayId)
       : null) ??
     // Default: highest-priority earned identity badge
     BADGES.find((b) => b.kind === "identity" && earnedSet.has(b.id)) ??
@@ -120,7 +114,8 @@ export default async function ProfilePage() {
 
       <BadgeCase
         earnedIds={earnedBadges}
-        displayBadgeId={user.displayBadgeId}
+        displayBadgeId={resolvedDisplayId}
+        groupProgress={badgeGroups}
       />
 
       <MilestoneLibrary
