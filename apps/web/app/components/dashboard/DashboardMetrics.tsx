@@ -22,13 +22,6 @@ function formatDuration(seconds: number): string {
   return `${hours}h ${mins}m`;
 }
 
-function formatUsd(n: number): string {
-  if (n === 0) return "$0";
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  if (n < 1) return `$${n.toFixed(3)}`;
-  return `$${n.toFixed(2)}`;
-}
-
 export default function DashboardMetrics() {
   const [data, setData] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,7 +64,6 @@ export default function DashboardMetrics() {
         dismissId="metric-time-saved"
         label="Time saved (week)"
         value={formatDuration(data?.timeSavedSecondsThisWeek ?? 0)}
-        sub={`Avg ${formatUsd(data?.avgCostPerDraft ?? 0)} per draft`}
       />
     </div>
   );
