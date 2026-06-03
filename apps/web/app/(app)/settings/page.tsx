@@ -60,12 +60,6 @@ export default function SettingsPage() {
           >
             Install the Gmail add-on ↗
           </a>
-          <Link
-            href="/settings/advanced"
-            className="text-[12px] text-white/40 transition-colors hover:text-white/70"
-          >
-            Using the Chrome extension instead? →
-          </Link>
         </div>
       </section>
 
