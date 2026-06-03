@@ -46,11 +46,7 @@ export type Badge = {
     | "mountain"
     | "running"
     | "radar"
-    | "chart"
-    | "compass"
-    | "hourglass"
-    | "cap"
-    | "mic";
+    | "hourglass";
   color: "amber" | "violet" | "blue" | "teal" | "brand" | "yellow";
   // When set, renderers show this image instead of the path-based SVG icon.
   // Path must be under /public so Next can serve it.
@@ -71,11 +67,6 @@ export const BADGES: Badge[] = [
   { id: "team", title: "Team", description: "Internal staff.", kind: "identity", icon: "users", color: "brand" },
   { id: "prospect", title: "Prospect", description: "Qualified lead in the pipeline.", kind: "identity", icon: "target", color: "violet" },
   { id: "partner", title: "Partner", description: "Referral or distribution partner.", kind: "identity", icon: "handshake", color: "amber" },
-  { id: "investor", title: "Investor", description: "Backs Dharma.", kind: "identity", icon: "chart", color: "amber" },
-  { id: "advisor", title: "Advisor", description: "Advisory access.", kind: "identity", icon: "compass", color: "violet" },
-  { id: "waitlist", title: "Early Access", description: "In before activation.", kind: "identity", icon: "hourglass", color: "blue" },
-  { id: "alumni", title: "Alumni", description: "Former client.", kind: "identity", icon: "cap", color: "teal" },
-  { id: "press", title: "Press", description: "Media or analyst.", kind: "identity", icon: "mic", color: "brand" },
 
   // ── Achievement: onboarding (one-time) ─────────────────────────────────────
   { id: "first_draft", title: "First Draft", description: "Generated your first draft.", kind: "achievement", icon: "sparkles", color: "brand", group: "onboarding", metric: "draftsGenerated", threshold: 1, flavorText: "The first of many." },
@@ -149,11 +140,6 @@ export function identityBadgesForEmail(email: string | null): string[] {
     ["team", process.env.TEAM_EMAILS],
     ["prospect", process.env.PROSPECT_EMAILS],
     ["partner", process.env.PARTNER_EMAILS],
-    ["investor", process.env.INVESTOR_EMAILS],
-    ["advisor", process.env.ADVISOR_EMAILS],
-    ["waitlist", process.env.WAITLIST_EMAILS],
-    ["alumni", process.env.ALUMNI_EMAILS],
-    ["press", process.env.PRESS_EMAILS],
   ];
   for (const [badge, raw] of lists) {
     if (!raw) continue;
