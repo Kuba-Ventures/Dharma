@@ -18,7 +18,7 @@ export type TabName = "Waitlist" | "Users" | "Debugging";
 export const TAB_HEADERS: Record<TabName, string[]> = {
   Waitlist: ["email", "source_page", "signed_up_at", "user_agent", "converted_at"],
   Users: ["email", "tier", "started_at", "stripe_customer_id", "badges", "notes"],
-  Debugging: ["submitted_by_email", "page", "kind", "message", "severity", "submitted_at"],
+  Debugging: ["submitted_by_email", "page", "kind", "message", "severity", "submitted_at", "status"],
 };
 
 let cachedClient: sheets_v4.Sheets | null = null;
@@ -100,7 +100,13 @@ export async function appendRow(tab: TabName, values: (string | number | null)[]
       spreadsheetId: id,
       range: `${tab}!A:Z`,
       valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
+      // OVERWRITE (not INSERT_ROWS): write values into the next already-existing
+      // empty row instead of inserting a fresh row at the bottom. The admin
+      // sheet pre-formats blank rows (alternating-color banding + the column-G
+      // status dropdown), so filling them preserves that formatting — inserting
+      // new rows would drop it. The table only ever grows, so there's no data
+      // below the last row to clobber.
+      insertDataOption: "OVERWRITE",
       requestBody: { values: [values.map((v) => v ?? "")] },
     });
     return true;

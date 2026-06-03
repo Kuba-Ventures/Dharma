@@ -73,6 +73,10 @@ export async function POST(req: Request) {
     messageOrScore,
     body.severity ?? "",
     new Date().toISOString(),
+    // Column G ("Resolved?") — seed the triage dropdown so every new row starts
+    // at "Not Yet Started". Must match the dropdown option text exactly for the
+    // colored chip to render.
+    "Not Yet Started",
   ]);
   try {
     waitUntil(sheetAppend);
