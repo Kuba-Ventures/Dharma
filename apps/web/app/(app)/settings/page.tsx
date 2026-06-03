@@ -6,6 +6,11 @@ const MARKETPLACE_URL =
 
 const SECTIONS = [
   {
+    href: "/dashboard?tour=1",
+    title: "Replay the product tour",
+    description: "Walk through the dashboard features again for a refresher.",
+  },
+  {
     href: "/settings/hidden-stats",
     title: "Hidden stats",
     description: "Restore dashboard tiles you've dismissed.",
