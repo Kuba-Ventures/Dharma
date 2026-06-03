@@ -10,8 +10,8 @@ type Props = {
 
 export default function MetricTile({ dismissId, label, value, sub }: Props) {
   return (
-    <DismissibleCard dismissId={dismissId}>
-      <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] px-4 py-4">
+    <DismissibleCard dismissId={dismissId} className="h-full">
+      <div className="h-full rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] px-4 py-4">
         <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">
           {label}
         </p>
