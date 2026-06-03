@@ -125,7 +125,7 @@ function BadgeChip({
           ? BADGE_COLOR_BG[badge.color]
           : "border-dashed border-[color:var(--border-subtle)] bg-white/[0.02] text-white/30 opacity-60"
       } ${isDisplay ? "ring-2 ring-brand-400" : ""}`}
-      title={`${badge.title}: ${badge.description}`}
+      title={`${badge.title} — ${earned ? "Earned" : "Locked"}: ${badge.description}`}
     >
       {badge.iconImage ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -151,6 +151,13 @@ function BadgeChip({
       )}
       <p className={`mt-2 text-center text-[11px] ${earned ? "" : "text-white/40"}`}>
         {badge.title}
+      </p>
+      <p
+        className={`mt-0.5 text-center text-[10px] leading-snug ${
+          earned ? "text-white/45" : "text-white/30"
+        }`}
+      >
+        {badge.description}
       </p>
       {isDisplay && (
         <span className="absolute -top-1.5 -right-1.5 rounded-full bg-brand-400 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">
