@@ -141,17 +141,39 @@ function buildEventBody(
   return event;
 }
 
+// Pull a human-readable message out of a googleapis / fetch error.
+function calendarErrorMessage(err: unknown): string {
+  const e = err as {
+    code?: number | string;
+    message?: string;
+    errors?: { message?: string }[];
+    response?: { data?: { error?: { message?: string } | string } };
+  };
+  const apiErr = e?.response?.data?.error;
+  const detail =
+    (typeof apiErr === "object" ? apiErr?.message : apiErr) ||
+    e?.errors?.[0]?.message ||
+    e?.message ||
+    "Unknown calendar error";
+  return e?.code ? `${detail} (${e.code})` : detail;
+}
+
+type ReconcileResult = { blocks: BlockedWindow[]; errors: string[] };
+
 // Reconcile the new blocks against the previous DB state by mirroring to
-// Google Calendar. Returns the new blocks with calendarEventId populated
-// for each mirrored block. Failures are swallowed per-block so one bad
-// row doesn't take down the whole save.
+// Google Calendar. Returns the new blocks with calendarEventId populated for
+// each mirrored block, plus any per-block errors. A block whose calendar
+// write fails is reverted to un-mirrored (so the UI doesn't hang on
+// "Adding…") and its error is reported back to the client.
 async function reconcileBlocks(
   userId: string,
   oldBlocks: BlockedWindow[],
   newBlocks: BlockedWindow[],
   tz: string,
   activeDays: Set<number>,
-): Promise<BlockedWindow[]> {
+): Promise<ReconcileResult> {
+  const errors: string[] = [];
+  const labelOf = (b: BlockedWindow) => b.label?.trim() || "Block";
   let calendar: calendar_v3.Calendar | null = null;
   async function getCalendar(): Promise<calendar_v3.Calendar | null> {
     if (calendar) return calendar;
@@ -183,18 +205,22 @@ async function reconcileBlocks(
     if (wantMirror) {
       const cal = await getCalendar();
       if (!cal) {
-        // Calendar unavailable — keep the block but drop the eventId so we
-        // retry next save instead of pretending we synced.
-        reconciled.push({ ...block, calendarEventId: undefined });
+        // Calendar unavailable — revert the block so it doesn't hang on
+        // "Adding…", and report it.
+        reconciled.push({ ...block, mirrorToCalendar: false, calendarEventId: undefined });
+        errors.push(
+          `“${labelOf(block)}” couldn’t reach Google Calendar — try reconnecting your Google account.`,
+        );
         continue;
       }
       const body = buildEventBody(block, activeDays, tz);
       if (!body) {
-        reconciled.push({ ...block, calendarEventId: undefined });
+        reconciled.push({ ...block, mirrorToCalendar: false, calendarEventId: undefined });
+        errors.push(`“${labelOf(block)}” has invalid times or recurrence; nothing was created.`);
         continue;
       }
       if (prevId) {
-        // Patch existing event in case label/times changed.
+        // Patch existing event in case label/times/recurrence changed.
         try {
           await cal.events.patch({
             calendarId: "primary",
@@ -216,7 +242,8 @@ async function reconcileBlocks(
             reconciled.push({ ...block, calendarEventId: newId });
           } catch (insertErr) {
             console.error("[scheduling] recreate insert failed:", insertErr);
-            reconciled.push({ ...block, calendarEventId: undefined });
+            reconciled.push({ ...block, mirrorToCalendar: false, calendarEventId: undefined });
+            errors.push(`“${labelOf(block)}”: ${calendarErrorMessage(insertErr)}`);
           }
         }
       } else {
@@ -230,7 +257,8 @@ async function reconcileBlocks(
           reconciled.push({ ...block, calendarEventId: newId });
         } catch (err) {
           console.error("[scheduling] insert failed:", err);
-          reconciled.push({ ...block, calendarEventId: undefined });
+          reconciled.push({ ...block, mirrorToCalendar: false, calendarEventId: undefined });
+          errors.push(`“${labelOf(block)}”: ${calendarErrorMessage(err)}`);
         }
       }
     } else {
@@ -266,7 +294,7 @@ async function reconcileBlocks(
     }
   }
 
-  return reconciled;
+  return { blocks: reconciled, errors };
 }
 
 export async function POST(req: Request) {
@@ -304,6 +332,10 @@ export async function POST(req: Request) {
   if (typeof body.enabled === "boolean") data.schedulingEnabled = body.enabled;
   if (typeof body.timezone === "string" && body.timezone.trim()) data.timezone = body.timezone.trim();
 
+  // Per-block calendar sync errors, surfaced to the client so failures aren't
+  // silent (the UI otherwise hangs on "Adding…").
+  let syncErrors: string[] = [];
+
   // Either the prefs changed, or the timezone changed and existing blocks
   // need their Calendar events re-anchored to the new tz. Treat both as
   // triggers for the reconciler.
@@ -334,7 +366,8 @@ export async function POST(req: Request) {
         [1, 2, 3, 4, 5].forEach((d) => activeDays.add(d));
       }
       const reconciled = await reconcileBlocks(userId, oldBlocks, newBlocks, tz, activeDays);
-      incoming.blockedWindows = reconciled;
+      incoming.blockedWindows = reconciled.blocks;
+      syncErrors = reconciled.errors;
     }
 
     // Persist even when only tzChanged so the event-id-bearing prefs come
@@ -349,5 +382,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     success: true,
     schedulingPreferences: data.schedulingPreferences ?? dbUser?.schedulingPreferences ?? null,
+    syncErrors,
   });
 }

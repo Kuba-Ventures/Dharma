@@ -300,6 +300,8 @@ export default function SchedulingCard({ initial }: Props) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   // Index of the block awaiting "Add to calendar" confirmation, or null.
   const [confirmAddIdx, setConfirmAddIdx] = useState<number | null>(null);
+  // Per-block calendar sync errors returned by the last save.
+  const [blockErrors, setBlockErrors] = useState<string[]>([]);
 
   // Days the user takes meetings — the default day-set for a new block.
   const activeDays = [...new Set(hours.map((h) => h.dayOfWeek))].sort((a, b) => a - b);
@@ -333,22 +335,33 @@ export default function SchedulingCard({ initial }: Props) {
 
   async function persistPrefs(next: Prefs) {
     setPrefs(next);
+    setBlockErrors([]);
     try {
       const res = await fetch("/api/preferences/scheduling", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ schedulingPreferences: JSON.stringify(next) }),
       });
-      if (!res.ok) return;
-      const data = (await res.json()) as { schedulingPreferences?: string | null };
-      // Server may have populated calendarEventIds on mirrored blocks.
-      // Reflect those back into local state so subsequent edits patch the
-      // right event instead of creating duplicates.
+      if (!res.ok) {
+        setBlockErrors(["Couldn’t save your changes — please try again."]);
+        return;
+      }
+      const data = (await res.json()) as {
+        schedulingPreferences?: string | null;
+        syncErrors?: string[];
+      };
+      // Server may have populated calendarEventIds on mirrored blocks (or
+      // reverted ones that failed to sync). Reflect those back into local
+      // state so the UI matches the server and edits patch the right event.
       if (typeof data.schedulingPreferences === "string") {
         setPrefs(parsePrefs(data.schedulingPreferences));
       }
+      if (Array.isArray(data.syncErrors) && data.syncErrors.length > 0) {
+        setBlockErrors(data.syncErrors);
+      }
     } catch (err) {
       console.error("[scheduling] persistPrefs failed:", err);
+      setBlockErrors(["Couldn’t reach the server — please try again."]);
     }
   }
 
@@ -579,6 +592,15 @@ export default function SchedulingCard({ initial }: Props) {
                     />
                   ))}
                 </ul>
+              )}
+              {blockErrors.length > 0 && (
+                <div className="mt-3 space-y-1 rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2">
+                  {blockErrors.map((msg, i) => (
+                    <p key={i} className="text-[11px] text-red-200">
+                      {msg}
+                    </p>
+                  ))}
+                </div>
               )}
             </Card>
 
