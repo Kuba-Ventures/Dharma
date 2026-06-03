@@ -36,7 +36,7 @@ export default function SettingsPage() {
         </h2>
         <p className="mt-1 text-[12px] text-white/55">
           Draft replies right inside Gmail&apos;s sidebar. Labeling and sorting
-          already run automatically — this adds the in-Gmail compose experience.
+          already run automatically. This adds the in-Gmail compose experience.
         </p>
         <ol className="mt-3 space-y-1.5 text-[12px] text-white/50">
           <li>
@@ -44,7 +44,7 @@ export default function SettingsPage() {
             <span className="text-white/70">Install</span>, and approve the Google
             permissions.
           </li>
-          <li>2. Reload Gmail — the Dharma icon appears in the right sidebar.</li>
+          <li>2. Reload Gmail, and the Dharma icon appears in the right sidebar.</li>
         </ol>
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <a

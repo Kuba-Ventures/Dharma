@@ -30,13 +30,13 @@ export default async function StepFive() {
       step={4}
       total={5}
       eyebrow="Welcome to Dharma"
-      title="What Dharma does — and one quick install"
+      title="What Dharma does, and one quick install"
       description="A 20-second tour, then add Dharma to Gmail. Your dashboard unlocks right after."
     >
       <div className="space-y-2.5">
         <FeatureRow
           title="Smart labels"
-          body="New mail is sorted into the preset labels you just picked — automatically, inside your own Gmail."
+          body="New mail is sorted automatically into the preset labels you just picked, inside your own Gmail."
         />
         <FeatureRow
           title="Replies in your voice"
@@ -54,7 +54,7 @@ export default async function StepFive() {
         </p>
         <p className="mt-2 text-sm text-white/70">
           Install the Gmail add-on to draft replies right inside Gmail&apos;s
-          sidebar. Labeling and sorting already work without it — this adds the
+          sidebar. Labeling and sorting already work without it. This adds the
           in-Gmail compose experience.
         </p>
         <ol className="mt-3 space-y-1.5 text-[12px] text-white/50">
@@ -63,7 +63,7 @@ export default async function StepFive() {
             <span className="text-white/70">Install</span>, and approve the Google
             permissions.
           </li>
-          <li>2. Reload Gmail — the Dharma icon appears in the right sidebar.</li>
+          <li>2. Reload Gmail, and the Dharma icon appears in the right sidebar.</li>
         </ol>
         <a
           href={MARKETPLACE_URL}
@@ -77,7 +77,7 @@ export default async function StepFive() {
 
       <form action={finish} className="mt-5 flex items-center justify-between gap-3">
         <p className="text-[12px] text-white/40">
-          No rush — you can install this anytime from Support.
+          No rush. You can install this anytime from Support.
         </p>
         <button
           type="submit"
