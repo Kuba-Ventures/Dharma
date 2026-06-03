@@ -116,6 +116,8 @@ async function detect(args: {
     const res = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: anthropicHeaders(apiKey),
+      // Bound the call so signal detection can't hang the back-scan budget.
+      signal: AbortSignal.timeout(20_000),
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: 240,

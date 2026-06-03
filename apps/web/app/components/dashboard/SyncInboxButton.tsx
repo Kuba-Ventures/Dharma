@@ -29,22 +29,33 @@ export default function SyncInboxButton() {
         body: JSON.stringify({ force: true }),
       });
       if (!res.ok) {
+        // Surface the server's actionable message (e.g. "reconnect Google",
+        // "Gmail is rate-limiting") instead of a bare "Sync failed".
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
         setState("error");
-        setResultText("Sync failed");
-        setTimeout(() => setState("idle"), 3500);
+        setResultText(err.error ?? "Sync failed");
+        setTimeout(() => setState("idle"), 6000);
         return;
       }
-      const data = (await res.json()) as { scanned: number; tagged: number };
+      const data = (await res.json()) as {
+        scanned: number;
+        tagged: number;
+        incomplete?: boolean;
+      };
       setState("done");
-      setResultText(`✓ Scanned ${data.scanned}, tagged ${data.tagged}`);
+      setResultText(
+        data.incomplete
+          ? `✓ Tagged ${data.tagged} of ${data.scanned} — run again for the rest`
+          : `✓ Scanned ${data.scanned}, tagged ${data.tagged}`,
+      );
       setTimeout(() => {
         setState("idle");
         setResultText(null);
       }, 4500);
     } catch {
       setState("error");
-      setResultText("Sync failed");
-      setTimeout(() => setState("idle"), 3500);
+      setResultText("Sync failed — check your connection");
+      setTimeout(() => setState("idle"), 6000);
     }
   }
 

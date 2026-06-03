@@ -3,6 +3,11 @@ import { ANTHROPIC_URL, anthropicHeaders } from "./anthropicEndpoint";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
+// Per-request ceiling so one hung Anthropic call can't burn a whole serverless
+// function budget (back-scan classifies up to 25 threads under a 60s cap). On
+// timeout the fetch aborts and the caller degrades gracefully (null/empty).
+const CLASSIFY_TIMEOUT_MS = 20_000;
+
 async function callClaude(
   prompt: string,
   maxTokens = 80,
@@ -18,6 +23,7 @@ async function callClaude(
     const response = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: anthropicHeaders(apiKey),
+      signal: AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: maxTokens,
@@ -260,6 +266,7 @@ Use null for label only as a last resort.`;
     const response = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: anthropicHeaders(apiKey),
+      signal: AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
       body: JSON.stringify({
         model: HAIKU_MODEL,
         max_tokens: 120,

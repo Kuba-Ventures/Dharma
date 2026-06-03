@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser, applyGmailLabels } from "../../../../lib/gmail";
-import { google } from "googleapis";
+import { google, type gmail_v1 } from "googleapis";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import {
   HIGH_PRIORITY_NAME,
@@ -17,6 +17,38 @@ import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
 const MAX_THREADS = 25;
 const CONCURRENCY = 5;
+// Stop *starting* new classification batches past this point so the function
+// returns a partial-but-successful result instead of being killed at the 60s
+// cap (an in-flight batch can still run ~10s, leaving headroom under 60s).
+const BUDGET_MS = 45_000;
+
+// Turn a Gmail/token error into an actionable message + status, mirroring the
+// reconnect handling other Google-backed routes (tone/sync, calendar/sync)
+// already do. Without this, an expired grant or Gmail hiccup surfaced to the
+// user as a bare "Sync failed".
+function gmailErrorResponse(err: unknown): NextResponse {
+  const code =
+    (err as { code?: number })?.code ??
+    (err as { response?: { status?: number } })?.response?.status;
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(`[back-scan] Gmail/setup failed (code=${code ?? "?"}):`, msg);
+  if (code === 401 || /invalid_grant|invalid_token|insufficient|scope|unauthorized/i.test(msg)) {
+    return NextResponse.json(
+      { error: "Google access expired. Sign out and sign back in to reconnect." },
+      { status: 401 },
+    );
+  }
+  if (code === 429) {
+    return NextResponse.json(
+      { error: "Gmail is rate-limiting right now — wait a moment and try again." },
+      { status: 429 },
+    );
+  }
+  return NextResponse.json(
+    { error: "Couldn't reach Gmail — please try again in a moment." },
+    { status: 502 },
+  );
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -75,15 +107,23 @@ export async function POST(req: Request) {
   });
 
   // Pull recent inbox threads — by thread we'd need history, so use messages.list
-  // and dedupe by threadId since classification is thread-scoped.
-  const { auth: oauthClient } = await makeAuthForUser(userId);
-  const gmail = google.gmail({ version: "v1", auth: oauthClient });
-  const listRes = await gmail.users.messages.list({
-    userId: "me",
-    labelIds: ["INBOX"],
-    maxResults: MAX_THREADS * 2,
-  });
-  const messages = listRes.data.messages ?? [];
+  // and dedupe by threadId since classification is thread-scoped. Token refresh
+  // and Gmail list failures surface here; classify them into an actionable
+  // message rather than letting them become an opaque 500 / "Sync failed".
+  let gmail: gmail_v1.Gmail;
+  let messages: gmail_v1.Schema$Message[];
+  try {
+    const { auth: oauthClient } = await makeAuthForUser(userId);
+    gmail = google.gmail({ version: "v1", auth: oauthClient });
+    const listRes = await gmail.users.messages.list({
+      userId: "me",
+      labelIds: ["INBOX"],
+      maxResults: MAX_THREADS * 2,
+    });
+    messages = listRes.data.messages ?? [];
+  } catch (err) {
+    return gmailErrorResponse(err);
+  }
 
   // Resolve unique threads, skipping any already classified.
   const seenThreads = new Set<string>();
@@ -207,8 +247,16 @@ export async function POST(req: Request) {
   }
 
   // Process in small batches to stay well under Vercel's 60s function limit
-  // without saturating Anthropic.
+  // without saturating Anthropic. Stop starting new batches once we're past the
+  // time budget and report the run as incomplete — a partial 200 beats a 60s
+  // timeout that the user only sees as "Sync failed".
+  const startedAt = Date.now();
+  let incomplete = false;
   for (let i = 0; i < toClassify.length; i += CONCURRENCY) {
+    if (Date.now() - startedAt > BUDGET_MS) {
+      incomplete = true;
+      break;
+    }
     await Promise.all(toClassify.slice(i, i + CONCURRENCY).map(processOne));
   }
 
@@ -216,6 +264,7 @@ export async function POST(req: Request) {
     scanned,
     tagged,
     skipped,
+    incomplete,
     errors: errors.slice(0, 5),
     total: candidates.length,
   });

@@ -296,15 +296,26 @@ export default function LabelsCard({ initial }: Props) {
         body: JSON.stringify({ force: true }),
       });
       if (res.ok) {
-        const data = (await res.json()) as { scanned?: number; tagged?: number };
+        const data = (await res.json()) as {
+          scanned?: number;
+          tagged?: number;
+          incomplete?: boolean;
+        };
         const tagged = data.tagged ?? 0;
         const scanned = data.scanned ?? 0;
-        setBackfillStatus(`Re-classified ${tagged} of ${scanned} recent threads.`);
+        setBackfillStatus(
+          data.incomplete
+            ? `Labels synced. Re-classified ${tagged} of ${scanned} — run Sync again for the rest.`
+            : `Re-classified ${tagged} of ${scanned} recent threads.`,
+        );
       } else {
-        setBackfillStatus("Labels synced. Back-scan skipped.");
+        // Show the route's actionable error (reconnect / rate-limited) instead
+        // of a vague "skipped".
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(err.error ?? "Labels synced, but the inbox re-scan failed. Try Sync again.");
       }
     } catch {
-      setBackfillStatus("Labels synced. Back-scan skipped.");
+      setErrorMessage("Labels synced, but the inbox re-scan couldn't reach the server. Try Sync again.");
     } finally {
       setSyncingInbox(false);
       refresh();
