@@ -328,6 +328,13 @@ export default function SchedulingCard({ initial }: Props) {
   // Per-block calendar sync errors returned by the last save.
   const [blockErrors, setBlockErrors] = useState<string[]>([]);
 
+  // Auto-dismiss the error banner so a transient blip doesn't linger.
+  useEffect(() => {
+    if (blockErrors.length === 0) return;
+    const t = setTimeout(() => setBlockErrors([]), 8000);
+    return () => clearTimeout(t);
+  }, [blockErrors]);
+
   // Days the user takes meetings — the default day-set for a new block.
   const activeDays = [...new Set(hours.map((h) => h.dayOfWeek))].sort((a, b) => a - b);
 
@@ -359,6 +366,7 @@ export default function SchedulingCard({ initial }: Props) {
   }
 
   async function persistPrefs(next: Prefs) {
+    const prev = prefs; // for rollback if the save doesn't land
     setPrefs(next);
     setBlockErrors([]);
     try {
@@ -367,7 +375,15 @@ export default function SchedulingCard({ initial }: Props) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ schedulingPreferences: JSON.stringify(next) }),
       });
+      // An expired session redirects the API call to /login (HTML), which
+      // would otherwise surface as a confusing "couldn't reach server".
+      if (res.redirected || /\/login/.test(res.url)) {
+        setPrefs(prev);
+        setBlockErrors(["Your session expired — refresh the page and sign in again."]);
+        return;
+      }
       if (!res.ok) {
+        setPrefs(prev);
         setBlockErrors(["Couldn’t save your changes — please try again."]);
         return;
       }
@@ -386,6 +402,7 @@ export default function SchedulingCard({ initial }: Props) {
       }
     } catch (err) {
       console.error("[scheduling] persistPrefs failed:", err);
+      setPrefs(prev);
       setBlockErrors(["Couldn’t reach the server — please try again."]);
     }
   }
