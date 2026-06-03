@@ -72,7 +72,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Google not connected" }, { status: 400 });
   }
   if (!presetRow?.enabled || !isPresetKey(presetRow.preset)) {
-    return NextResponse.json({ error: "No active preset" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No label preset is active yet. Open Configuration → Labels, pick a preset, turn it on, and hit Sync to Gmail." },
+      { status: 400 },
+    );
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "Classifier unavailable" }, { status: 503 });
