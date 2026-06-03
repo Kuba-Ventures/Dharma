@@ -7,7 +7,7 @@ import ToneCard from "../../components/configuration/ToneCard";
 import LabelsCard from "../../components/configuration/LabelsCard";
 import SchedulingCard from "../../components/configuration/SchedulingCard";
 
-type Preset = "VC" | "PE" | "Legal" | "General" | "Custom";
+type Preset = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
 
 export default async function ConfigurationPage() {
   const session = await auth();

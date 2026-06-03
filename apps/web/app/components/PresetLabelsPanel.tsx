@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 
 // Mirrors lib/labelPresets.ts — kept locally so this component does not depend
 // on server-only imports. Update both if the spec changes.
-type PresetKey = "VC" | "PE" | "Legal" | "General" | "Custom";
-const PRESET_KEYS: PresetKey[] = ["VC", "PE", "Legal", "General", "Custom"];
+type PresetKey = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
+const PRESET_KEYS: PresetKey[] = ["VC", "PE", "Legal", "General", "Personal", "Custom"];
 
 interface CustomLabel {
   shortName: string;
@@ -53,6 +53,16 @@ const BUILT_IN_LABELS: Record<Exclude<PresetKey, "Custom">, PresetLabel[]> = {
     { name: "Respond",       displayHex: "#fb4c2f" },
     { name: "Meeting",       displayHex: "#4a86e8" },
     { name: "Informational", displayHex: "#8e63ce" },
+    { name: "High-Priority", displayHex: "#ffad47" },
+  ],
+  Personal: [
+    { name: "Orders",        displayHex: "#16a765" },
+    { name: "Shipping",      displayHex: "#4a86e8" },
+    { name: "Follow-Up",     displayHex: "#fb4c2f" },
+    { name: "Work",          displayHex: "#8e63ce" },
+    { name: "Promotions",    displayHex: "#f2c960" },
+    { name: "Updates",       displayHex: "#2da2bb" },
+    { name: "Likely-Spam",   displayHex: "#cf8933" },
     { name: "High-Priority", displayHex: "#ffad47" },
   ],
 };

@@ -23,7 +23,7 @@ export default async function StepFour() {
     >
       <LabelPresetPicker
         initial={{
-          preset: (labelPreset?.preset as "VC" | "PE" | "Legal" | "General" | "Custom" | undefined) ?? null,
+          preset: (labelPreset?.preset as "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom" | undefined) ?? null,
           customName: labelPreset?.customName ?? "",
         }}
       />

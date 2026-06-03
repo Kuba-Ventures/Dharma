@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 
-type Preset = "VC" | "PE" | "Legal" | "General" | "Custom";
+type Preset = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
 
 const PRESETS: { id: Preset; description: string }[] = [
   { id: "VC", description: "Portfolio · Deal-Flow · LP-Relations · Internal · High-Priority" },
   { id: "PE", description: "Portfolio-Co · Deal · Diligence · Internal · High-Priority" },
   { id: "Legal", description: "Contracts · Client · Internal · High-Priority" },
   { id: "General", description: "Respond · Meeting · Informational · High-Priority" },
+  { id: "Personal", description: "Orders · Shipping · Follow-Up · Work · Promotions · Updates · Likely-Spam · High-Priority" },
   { id: "Custom", description: "Define your own preset name and labels." },
 ];
 

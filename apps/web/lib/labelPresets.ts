@@ -7,8 +7,8 @@
 // The original spec hex values are used for display; we mapped each one to the
 // nearest valid Gmail color for actual provisioning.
 
-export type PresetKey = "VC" | "PE" | "Legal" | "General" | "Custom";
-export type BuiltInPresetKey = "VC" | "PE" | "Legal" | "General";
+export type PresetKey = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
+export type BuiltInPresetKey = "VC" | "PE" | "Legal" | "General" | "Personal";
 
 // Either a named legacy color ("blue", "red", ...) or any Gmail-valid hex like "#cc3a21".
 // lib/gmail.ts::resolveGmailColor accepts both forms.
@@ -100,9 +100,20 @@ export const LABEL_PRESETS: Record<BuiltInPresetKey, PresetLabel[]> = {
     { name: "Informational", shortName: "Informational", colorKey: "purple", displayHex: "#8e63ce" },
     { name: "High-Priority", shortName: "High-Priority", colorKey: "orange", displayHex: "#ffad47" },
   ],
+  // For personal (non-work) inboxes: receipts, shipping, newsletters, junk.
+  Personal: [
+    { name: "Orders",        shortName: "Orders",        colorKey: "green",     displayHex: "#16a765" },
+    { name: "Shipping",      shortName: "Shipping",      colorKey: "blue",      displayHex: "#4a86e8" },
+    { name: "Follow-Up",     shortName: "Follow-Up",     colorKey: "red",       displayHex: "#fb4c2f" },
+    { name: "Work",          shortName: "Work",          colorKey: "purple",    displayHex: "#8e63ce" },
+    { name: "Promotions",    shortName: "Promotions",    colorKey: "yellow",    displayHex: "#f2c960" },
+    { name: "Updates",       shortName: "Updates",       colorKey: "teal",      displayHex: "#2da2bb" },
+    { name: "Likely-Spam",   shortName: "Likely-Spam",   colorKey: "#cf8933",   displayHex: "#cf8933" },
+    { name: "High-Priority", shortName: "High-Priority", colorKey: "orange",    displayHex: "#ffad47" },
+  ],
 };
 
-export const BUILT_IN_PRESET_KEYS: BuiltInPresetKey[] = ["VC", "PE", "Legal", "General"];
+export const BUILT_IN_PRESET_KEYS: BuiltInPresetKey[] = ["VC", "PE", "Legal", "General", "Personal"];
 export const PRESET_KEYS: PresetKey[] = [...BUILT_IN_PRESET_KEYS, "Custom"];
 
 export function isBuiltInPresetKey(s: string): s is BuiltInPresetKey {

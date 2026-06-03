@@ -235,7 +235,7 @@ export async function classifyForPreset(
   const { displayName, labelNames, subject, from, snippet, body, userId } = args;
   if (labelNames.length === 0) return { label: null, priority: 0 };
 
-  const systemPrompt = `You are a decisive email classifier for a ${displayName} professional.
+  const systemPrompt = `You are a decisive email classifier for a ${displayName} inbox.
 
 Pick the SINGLE best-fit label from this list:
 ${labelNames.map((n) => `- ${n}`).join("\n")}

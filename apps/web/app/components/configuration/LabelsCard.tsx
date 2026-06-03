@@ -21,7 +21,7 @@ const LABELS_ICON = (
   </svg>
 );
 
-const PRESETS = ["VC", "PE", "Legal", "General", "Custom"] as const;
+const PRESETS = ["VC", "PE", "Legal", "General", "Personal", "Custom"] as const;
 type Preset = (typeof PRESETS)[number];
 
 type CustomLabel = {
