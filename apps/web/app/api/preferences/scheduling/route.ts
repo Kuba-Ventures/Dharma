@@ -32,6 +32,9 @@ type Prefs = {
 };
 
 const DAY_RRULE_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+// Google Calendar event color "1" = Lavender (#7986CB), the nearest preset to
+// Dharma's brand indigo. Calendar only supports its fixed 11-color palette.
+const DHARMA_EVENT_COLOR_ID = "1";
 const BLOCK_DESCRIPTION =
   "Created by Dharma. Edit or remove this block in Configuration → Scheduling on your dashboard.";
 
@@ -133,6 +136,9 @@ function buildEventBody(
     start: { dateTime: startDT, timeZone: tz },
     end: { dateTime: endDT, timeZone: tz },
     transparency: "opaque",
+    // "Lavender" — the closest match in Google's fixed event-color palette to
+    // Dharma's brand indigo (#7F77DD). Google only allows these 11 presets.
+    colorId: DHARMA_EVENT_COLOR_ID,
     reminders: { useDefault: false, overrides: [] },
   };
 
