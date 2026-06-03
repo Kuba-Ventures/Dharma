@@ -9,6 +9,11 @@ out/
 .env
 .env.local
 .env.*.local
+# Backups/copies of env files — never commit secrets
+.env.bak
+.env.*.bak
+.env.backup
+.env.save
 
 # ── Prisma ────────────────────────────────────────────────────────────────────
 # Keep schema.prisma but ignore generated client if checked in separately
