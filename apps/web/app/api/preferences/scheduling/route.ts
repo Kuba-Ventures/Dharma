@@ -22,6 +22,7 @@ type BlockedWindow = {
   mirrorToCalendar?: boolean;
   calendarEventId?: string; // present once the block has been synced to Calendar
   recurrence?: Recurrence;  // how the mirrored event repeats
+  colorId?: string;         // Google Calendar event color "1".."11"
 };
 
 type Prefs = {
@@ -136,9 +137,12 @@ function buildEventBody(
     start: { dateTime: startDT, timeZone: tz },
     end: { dateTime: endDT, timeZone: tz },
     transparency: "opaque",
-    // "Lavender" — the closest match in Google's fixed event-color palette to
-    // Dharma's brand indigo (#7F77DD). Google only allows these 11 presets.
-    colorId: DHARMA_EVENT_COLOR_ID,
+    // Per-block color if the user picked one, else "Lavender" — the closest
+    // preset to Dharma's brand indigo (#7F77DD). Google only allows its fixed
+    // 11-color palette ("1".."11").
+    colorId: /^([1-9]|1[01])$/.test(block.colorId ?? "")
+      ? (block.colorId as string)
+      : DHARMA_EVENT_COLOR_ID,
     reminders: { useDefault: false, overrides: [] },
   };
 

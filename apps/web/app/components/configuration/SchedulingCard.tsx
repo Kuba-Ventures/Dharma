@@ -43,6 +43,7 @@ type BlockedWindow = {
   mirrorToCalendar?: boolean;
   calendarEventId?: string;
   recurrence?: Recurrence;
+  colorId?: string;
 };
 
 type Prefs = {
@@ -76,6 +77,9 @@ function parsePrefs(raw: string | null): Prefs {
           ...(typeof obj.calendarEventId === "string" ? { calendarEventId: obj.calendarEventId } : {}),
           ...(obj.recurrence && typeof obj.recurrence === "object"
             ? { recurrence: sanitizeRecurrence(obj.recurrence as Partial<Recurrence>) }
+            : {}),
+          ...(typeof obj.colorId === "string" && /^([1-9]|1[01])$/.test(obj.colorId)
+            ? { colorId: obj.colorId }
             : {}),
         };
       })
@@ -171,6 +175,27 @@ function sanitizeRecurrence(r: Partial<Recurrence>): Recurrence {
     ...(typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? { date: r.date } : {}),
     ...(typeof r.until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.until) ? { until: r.until } : {}),
   };
+}
+
+// Google Calendar's fixed event-color palette (colorId "1".."11") with
+// approximate hexes for swatches. "1" (Lavender) is Dharma's default — the
+// nearest preset to the brand indigo.
+const GOOGLE_EVENT_COLORS: { id: string; name: string; hex: string }[] = [
+  { id: "1", name: "Lavender", hex: "#7986CB" },
+  { id: "9", name: "Blueberry", hex: "#3F51B5" },
+  { id: "3", name: "Grape", hex: "#8E24AA" },
+  { id: "7", name: "Peacock", hex: "#039BE5" },
+  { id: "2", name: "Sage", hex: "#33B679" },
+  { id: "10", name: "Basil", hex: "#0B8043" },
+  { id: "5", name: "Banana", hex: "#F6BF26" },
+  { id: "6", name: "Tangerine", hex: "#F4511E" },
+  { id: "4", name: "Flamingo", hex: "#E67C73" },
+  { id: "11", name: "Tomato", hex: "#D50000" },
+  { id: "8", name: "Graphite", hex: "#616161" },
+];
+const DEFAULT_COLOR_ID = "1";
+function colorName(id: string | undefined): string {
+  return GOOGLE_EVENT_COLORS.find((c) => c.id === (id ?? DEFAULT_COLOR_ID))?.name ?? "Lavender";
 }
 
 function defaultRecurrence(activeDays: number[]): Recurrence {
@@ -635,7 +660,7 @@ export default function SchedulingCard({ initial }: Props) {
                     block.start,
                   )}–${fmtTime(block.end)}, ${recurrenceSummary(rec)}${
                     rec.until ? `, until ${prettyDate(rec.until)}` : ""
-                  }. You can edit or remove it anytime.`
+                  }, in ${colorName(block.colorId)}. You can edit or remove it anytime.`
                 : undefined
             }
             confirmLabel="Add to calendar"
@@ -822,6 +847,30 @@ function BlockRow({
           )}
         </div>
       )}
+
+      {/* event color */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] uppercase tracking-[0.06em] text-white/35">Color</span>
+        <div className="flex items-center gap-1.5">
+          {GOOGLE_EVENT_COLORS.map((c) => {
+            const selected = (block.colorId ?? DEFAULT_COLOR_ID) === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onChange({ ...block, colorId: c.id })}
+                title={c.id === DEFAULT_COLOR_ID ? `${c.name} (Dharma default)` : c.name}
+                aria-label={c.name}
+                aria-pressed={selected}
+                className={`h-5 w-5 rounded-full transition-transform hover:scale-110 ${
+                  selected ? "ring-2 ring-white ring-offset-2 ring-offset-[#0d0d12]" : ""
+                }`}
+                style={{ backgroundColor: c.hex }}
+              />
+            );
+          })}
+        </div>
+      </div>
 
       {/* status + actions */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
