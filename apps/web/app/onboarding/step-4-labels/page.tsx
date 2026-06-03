@@ -16,7 +16,7 @@ export default async function StepFour() {
   return (
     <StepShell
       step={3}
-      total={4}
+      total={5}
       eyebrow="Welcome to Dharma"
       title="Pick a label preset"
       description="Dharma classifies new mail into these labels and provisions them in Gmail. You can switch or customize anytime in Configuration."

@@ -58,13 +58,14 @@ export default function LabelPresetPicker({ initial }: Props) {
         throw new Error(err.error ?? "Failed to provision in Gmail");
       }
 
-      // Mark onboarding complete and bounce to dashboard.
+      // Record progress and move to the final walkthrough/install step, which
+      // stamps completion and releases the user to the dashboard.
       await fetch("/api/onboarding/advance", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ complete: true }),
+        body: JSON.stringify({ step: 4 }),
       });
-      router.push("/dashboard");
+      router.push("/onboarding/step-5-install");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Setup failed");
       setProvisioning(false);
@@ -123,7 +124,7 @@ export default function LabelPresetPicker({ initial }: Props) {
           disabled={!preset || provisioning}
           onClick={finish}
         >
-          {provisioning ? "Provisioning…" : "Finish setup"}
+          {provisioning ? "Provisioning…" : "Continue"}
         </Button>
       </div>
     </div>

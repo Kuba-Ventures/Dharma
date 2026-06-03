@@ -3,12 +3,14 @@ import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { findCityByName } from "../../../../lib/cities";
 
-// POST { step?: 1-4, city?: { name, state }, complete?: true }
+// POST { step?: 0-4, city?: { name, state }, complete?: true }
 //
-// Advances the user through the onboarding flow. Each step records progress
-// so a refresh resumes where they left off. Step 2 also persists the
-// confirmed home city and timezone. Setting complete=true (after step 4)
-// stamps onboardingCompletedAt so the (app) layout stops redirecting.
+// Advances the user through the 5-step onboarding flow (step is a 0-based
+// index: 0 connect → 1 city → 2 tone → 3 labels → 4 features/install). Each
+// step records progress so a refresh resumes where they left off. Step 2 also
+// persists the confirmed home city and timezone. Setting complete=true (from
+// the final step) stamps onboardingCompletedAt so the (app) layout stops
+// redirecting.
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id)

@@ -16,7 +16,7 @@ export default async function StepThree() {
   return (
     <StepShell
       step={2}
-      total={4}
+      total={5}
       eyebrow="Welcome to Dharma"
       title="Train your tone"
       description="Dharma reads 15 of your sent emails and writes a summary of how you sound. Editable after. Nothing is shared."

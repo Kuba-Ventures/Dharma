@@ -30,10 +30,10 @@ export default async function StepOne() {
   return (
     <StepShell
       step={0}
-      total={4}
+      total={5}
       eyebrow="Welcome to Dharma"
       title="Let's get you set up"
-      description="Four quick steps. About three minutes. Your dashboard unlocks when you're done."
+      description="Five quick steps. About three minutes. Your dashboard unlocks when you're done."
     >
       <Card variant="elevated">
         <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">

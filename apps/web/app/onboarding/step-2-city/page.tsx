@@ -19,7 +19,7 @@ export default async function StepTwo() {
   return (
     <StepShell
       step={1}
-      total={4}
+      total={5}
       eyebrow="Welcome to Dharma"
       title="Where do you call home?"
       description="Your home city personalizes the milestones Dharma surfaces: local trails, peaks, and cross-town distances tied to time you save."

@@ -48,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       "/onboarding/step-2-city",
       "/onboarding/step-3-tone",
       "/onboarding/step-4-labels",
+      "/onboarding/step-5-install",
     ];
     redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
   }
