@@ -22,3 +22,43 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+## Merge policy
+
+This repo runs a supervised PR factory. A PR auto-merges only when the factory review
+returns `APPROVE-LOWRISK` against this policy. Auto-merge is **disabled** until the repo
+variable `FACTORY_AUTOMERGE` is set to `true` (turned on only after a supervised soak).
+
+Paths below are relative to the repo root. This is a paying client's product (Gmail/Calendar
+access, OAuth, AI drafting). When in doubt, **escalate**. The reviewer
+(`.claude/agents/pr-reviewer.md`) enforces this block; tighten it whenever something slips through.
+
+**Low-risk surfaces — eligible for auto-merge** (static copy and pure helpers, covered by tests in
+`apps/web/lib/*.test.ts` and `apps/web/app/{privacy,terms,support}/page.test.tsx`):
+
+- `apps/web/app/privacy/**`, `apps/web/app/terms/**`, `apps/web/app/support/**` — static legal /
+  support pages (copy + markup only).
+- `apps/web/lib/timeSaved.ts` — pure time-saved math.
+- `apps/web/lib/cities.ts`, `apps/web/lib/citiesExtended.ts` — pure city data + lookup helpers.
+- `apps/web/lib/labelPresets.ts` — pure label-preset data + resolver (no I/O).
+- `apps/web/lib/sampleScenarios.ts` — static sample-prompt data + pure selectors.
+
+**Always escalate to a human — never auto-merge, regardless of how small the change:**
+
+- **Auth / identity / sessions:** `apps/web/lib/auth.ts`, `apps/web/lib/auth.config.ts`,
+  `apps/web/lib/extension-token.ts`, `apps/web/lib/apple-crypto.ts`, `apps/web/app/login/**`,
+  `apps/web/middleware.ts`.
+- **Data / DB:** `schema.prisma`, `apps/web/lib/prisma.ts`, `apps/web/lib/adapter.ts`,
+  `apps/web/lib/usage.ts`, any Prisma migration.
+- **Money / tiers / entitlements:** `apps/web/lib/tiers.ts`, `apps/web/lib/effectiveTier.ts`,
+  `apps/web/lib/badges*.ts`, `apps/web/lib/milestone*.ts`.
+- **AI behavior:** `packages/reply-generation/**`, `apps/web/lib/anthropicEndpoint.ts`,
+  `apps/web/lib/classify.ts`, `apps/web/lib/signalDetector.ts`, `apps/web/app/onboarding/**`.
+- **Product surfaces:** all `apps/web/app/api/**`, `apps/web/app/components/**`,
+  `apps/web/lib/gmail.ts`, `apps/web/lib/calendar.ts`, `apps/web/lib/adminSheet.ts`,
+  `apps/web/app/share/**`, the landing page `apps/web/app/page.tsx` (embeds the waitlist form).
+- **Integrations / other apps:** `packages/providers-*/**`, `packages/calendar-core/**`,
+  `packages/types/**`, `apps/gmail-addon/**`, `apps/chrome-extension/**`.
+- **CI / build / deps:** `.github/**`, `apps/web/next.config.*`, `apps/web/vercel.json`,
+  any `package.json` / `package-lock.json` / `tsconfig*.json`.
+- **Anything not explicitly listed as low-risk above.**

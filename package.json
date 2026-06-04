@@ -11,7 +11,8 @@
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
     "db:push": "npm run db:push --workspace=apps/web",
-    "db:studio": "npm run db:studio --workspace=apps/web"
+    "db:studio": "npm run db:studio --workspace=apps/web",
+    "test": "npm run test --workspace=apps/web"
   },
   "engines": {
     "node": ">=20"
