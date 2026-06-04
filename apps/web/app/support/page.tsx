@@ -104,7 +104,7 @@ export default function SupportPage() {
                 finley@qsbsrollover.com
               </a>
             </p>
-            <p className="text-white/40 text-xs">We typically respond within one business day.</p>
+            <p className="text-white/40 text-xs">We typically respond within one business day (Mon–Fri).</p>
           </div>
         </Section>
 
