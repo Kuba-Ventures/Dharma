@@ -248,9 +248,16 @@
   function injectTextIntoBox(box, text) {
     box.click();
     box.focus();
-    // Select everything and replace with generated text
+    // Select everything and replace with generated text.
     document.execCommand("selectAll", false, undefined);
-    document.execCommand("insertText", false, text);
+    // Insert as HTML, not raw text: passing newline characters to insertText
+    // leaves bare "\n"s in the compose body, which Gmail hard-wraps at ~78
+    // columns on send (every paragraph breaks into short lines). Mapping each
+    // newline to <br> keeps it as rich text that soft-wraps to full width.
+    const esc = (s) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = text.split("\n").map(esc).join("<br>");
+    document.execCommand("insertHTML", false, html);
     // Fire input event so Gmail registers the change
     box.dispatchEvent(new InputEvent("input", { bubbles: true }));
   }
