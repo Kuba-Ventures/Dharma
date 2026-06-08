@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { sendGTMEvent } from "@next/third-parties/google";
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ function WaitlistForm({ className = "" }: { className?: string }) {
     if (!email || submitting) return;
     setSubmitting(true);
     try {
-      await fetch("/api/waitlist/join", {
+      const res = await fetch("/api/waitlist/join", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -111,6 +112,14 @@ function WaitlistForm({ className = "" }: { className?: string }) {
           sourcePage: typeof window !== "undefined" ? window.location.pathname : "/",
         }),
       });
+      if (res.ok) {
+        // GA4 key event — pushed to the dataLayer only on a confirmed signup,
+        // so the conversion count reflects real signups, not button clicks.
+        sendGTMEvent({
+          event: "waitlist_signup",
+          source_page: typeof window !== "undefined" ? window.location.pathname : "/",
+        });
+      }
     } catch {
       // Best-effort. We still show success below; signup is captured in the
       // request log even if the sheet append fails.
