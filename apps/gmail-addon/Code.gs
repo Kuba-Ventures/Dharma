@@ -624,13 +624,19 @@ function insertPolishedDraft(e) {
         'From: ' + userEmail,
         'To: ' + (meta.to || ''),
         'Subject: ' + (meta.subject || ''),
-        'Content-Type: text/plain; charset=utf-8'
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8'
       ];
       if (meta.inReplyTo) lines.push('In-Reply-To: ' + meta.inReplyTo);
       if (meta.references || meta.inReplyTo) {
         lines.push('References: ' + ((meta.references ? meta.references + ' ' : '') + (meta.inReplyTo || '')).trim());
       }
-      var raw = lines.join('\r\n') + '\r\n\r\n' + polishedText;
+      // Send as HTML, not text/plain: a text/plain body looks full-width in the
+      // editable compose box but mail clients display and send it hard-wrapped
+      // at ~78 columns, breaking every paragraph into short lines. Reuse the
+      // same div-wrapping the instant-insert path uses so the sent message
+      // soft-wraps to the recipient's width.
+      var raw = lines.join('\r\n') + '\r\n\r\n' + textToGmailHtml(polishedText);
       var encoded = Utilities.base64EncodeWebSafe(raw);
 
       var putRes = UrlFetchApp.fetch(
