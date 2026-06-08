@@ -25,6 +25,7 @@
     "@dharma/providers-outlook": "*",
     "@dharma/reply-generation": "*",
     "@dharma/types": "*",
+    "@next/third-parties": "^16.2.7",
     "@prisma/client": "^5.22.0",
     "@vercel/functions": "^3.4.3",
     "@vercel/og": "^0.11.1",

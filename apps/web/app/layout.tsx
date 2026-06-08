@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
+
+// Public (client-exposed) GTM container ID, e.g. "GTM-XXXXXXX". Read from the
+// environment so the ID is never hardcoded; GA4 fires via a tag inside GTM.
+const gtmId = process.env.NEXT_PUBLIC_GTM_CONTAINER_ID;
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -25,6 +30,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body className={`${plusJakartaSans.variable} ${inter.variable}`}>{children}</body>
     </html>
   );
