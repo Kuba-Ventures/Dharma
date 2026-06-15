@@ -21,8 +21,8 @@ export default function SupportPage() {
           <ol className="list-decimal list-inside space-y-3">
             <li>
               <strong className="text-white/80">Create your account</strong> : visit{" "}
-              <a href="https://dharma-lake.vercel.app" className="text-brand-200/80 underline">
-                dharma-lake.vercel.app
+              <a href="https://www.dharmaautomations.com" className="text-brand-200/80 underline">
+                www.dharmaautomations.com
               </a>{" "}
               and sign in with your Google account.
             </li>
@@ -50,7 +50,7 @@ export default function SupportPage() {
             </li>
             <li>
               <strong className="text-white/80">Set your preferences</strong> : visit your{" "}
-              <a href="https://dharma-lake.vercel.app" className="text-brand-200/80 underline">
+              <a href="https://www.dharmaautomations.com" className="text-brand-200/80 underline">
                 dashboard
               </a>{" "}
               to choose tone, enable scheduling, and set up industry-preset labels.

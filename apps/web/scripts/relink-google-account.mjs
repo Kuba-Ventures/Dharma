@@ -52,6 +52,6 @@ const deletedSessions = await prisma.session.deleteMany({
 });
 
 console.log(`\nDeleted ${deletedAccounts.count} Account row(s) and ${deletedSessions.count} Session row(s).`);
-console.log("\nNext: sign in at https://dharma-lake.vercel.app/login. NextAuth will create a fresh Account row tied to your existing User. Your data is untouched.");
+console.log("\nNext: sign in at https://www.dharmaautomations.com/login. NextAuth will create a fresh Account row tied to your existing User. Your data is untouched.");
 
 await prisma.$disconnect();

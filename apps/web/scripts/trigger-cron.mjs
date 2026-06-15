@@ -7,7 +7,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync, unlinkSync, existsSync } from "node:fs";
 
-const TARGET_URL = "https://dharma-lake.vercel.app/api/cron/awards";
+const TARGET_URL = "https://www.dharmaautomations.com/api/cron/awards";
 const TMP_FILE = ".env.cron-trigger-temp";
 
 try {
