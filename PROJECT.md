@@ -1,13 +1,13 @@
 # Dharma
 *AI-drafted Gmail replies and scheduling, wrapped in a labeled inbox.*
 
-*Last updated: 2026-05-29 (late PM) by kuba-vault*
+*Last updated: 2026-06-15 by kuba-vault*
 
 ---
 
 ## TL;DR
 
-Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. Tonight a 5-phase run landed on `main`: the Dashboard was rebuilt into a single-scroll six-section hierarchy, `/api/metrics` was hardened (real 7d window + dual 7D/All-time toggle), the Configuration tab got polished, the signal detector was rewritten around a sharper `buried_intent` kind with a per-user daily cost cap, and the gamification system was made scale-ready with a 9-milestone starter seed pushed live. Live at `dharma-lake.vercel.app`. Phase is post-MVP iteration with a launch-prep overhang on Chrome Web Store review (submitted 2026-04-30, outcome still pending).
+Dharma is a Next.js web app + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. This session retired the Chrome extension entirely (the `apps/chrome-extension/` directory is deleted) — the Gmail add-on is now the sole in-Gmail surface. The Vercel project also moved to the `kuba-ventures` team: the old `dharma-lake.vercel.app` alias is dead (404), and production now lives at the custom domain **`https://www.dharmaautomations.com`**. The Gmail add-on, which still pointed at the dead alias and was failing "Polish draft" with a 404, was repointed to the new domain and redeployed live as clasp **v22**. Phase is post-MVP iteration; the earlier Chrome Web Store launch-prep track is closed (the extension was never published).
 
 ---
 
@@ -22,18 +22,18 @@ Dharma is a Next.js + Chrome extension + Gmail add-on stack that watches a user'
 
 ## Status
 
-- **Phase:** post-MVP iteration / launch prep (Chrome Web Store submission in flight; dashboard + metrics + signals rewrite just shipped)
+- **Phase:** post-MVP iteration (Chrome extension retired; production migrated to a custom domain; Gmail add-on is the sole in-Gmail surface)
 - **Engagement manager:** self-directed (Finley)
 - **Lead:** Finley
 - **Cadence:** daily commits; no formal external client cadence
-- **Next milestone:** CWS approval + first external user end-to-end on the redesigned flow
+- **Next milestone:** first external user end-to-end on the redesigned flow via the Gmail add-on at `www.dharmaautomations.com`
 - **Flags:** shipping
 
 ---
 
 ## Where we are right now
 
-Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `~/.claude/plans/dharma-dashboard-serialized-stonebraker.md`, per-phase log at repo-root `NIGHT-RUN.md`) reworked the dashboard, the metrics surface, the configuration tab, the signal detector, and the gamification scaling story. The Dashboard is now a single-scroll six-section hierarchy: Greeting + Sync inbox button + slim `TierStrip` → "Running for you" (ConfigStatusCard trio) → "This week" (DashboardMetrics, links to /metrics) → NextMilestoneStrip → ActivityFeed → SignalsPeek. `/api/metrics` no longer reports all-time `emailsTagged` — it's now 7d-windowed (this was a bug), and it returns both `replyRate7d` and `replyRateAllTime`. The Configuration tab got a 2x2 selectable-card tone grid, numeric scheduling hour ranges, a per-label "Active labels · last 7 days" list with tagged counts, and a new per-user `SignalDetectionCard` toggle. The signal detector was rewritten — `deal_flow` / `term_sheet` / `transaction` are replaced with `buried_intent` (shipped) plus `cold_thread` (reserved, deferred) and `pattern_shift` (deferred, blocked on a `ContactBaseline` table). A new `SIGNAL_DAILY_LIMIT` env var (default 100/UTC-day/user) gates detection via `UsageEvent` count. `lib/tiers.ts` opened up — `type Tier = string` (was a 5-string literal union), `TierLadder` scales dynamically, and `scripts/seed-starter-milestones.mjs` seeded 9 universal milestones (3h–250h) into Neon. Six decisions are flagged for Finley's review tomorrow in the end-of-run section of `NIGHT-RUN.md`. Next concrete steps: hear back on CWS, run a real external user through the new dashboard/metrics surface, and verify the Pub/Sub push path end-to-end.
+This session was cleanup and a production-URL migration, not feature work. Three things landed. (1) The Chrome extension is gone — `apps/chrome-extension/` was deleted (`9793a9b`); it was never published to the Chrome Web Store (the Kuba Ventures developer dashboard shows no items), so nothing in the wild breaks. The shared server endpoints the extension used (`/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft`) were left in place on purpose — the Gmail add-on and web app also use them. (2) The Vercel project moved to the `kuba-ventures` team, which killed the old auto-alias `https://dharma-lake.vercel.app` (now returns 404 DEPLOYMENT_NOT_FOUND). Production is now the custom domain `https://www.dharmaautomations.com` (the bare apex 308-redirects to www). (3) The Gmail add-on had the dead alias hardcoded, so "Polish draft" was failing with an HTTP 404. It was repointed to `www.dharmaautomations.com` (`1395fc2`) and shipped as clasp deployment v22. Heads-up for Finley: a few in-repo source files still reference the dead `dharma-lake.vercel.app` URL — `apps/web/app/support/page.tsx` (two links shown to users), `apps/web/scripts/relink-google-account.mjs`, and `apps/web/scripts/trigger-cron.mjs`. Those weren't touched this session and are worth a follow-up. Next concrete step: run a real external user through the add-on against the new domain to confirm the 404 is fully gone.
 
 ---
 
@@ -75,14 +75,11 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 - `waitlist/join` — admin-sheet write
 - `geo/cities` — bundled autocomplete
 
-**Chrome extension (apps/chrome-extension)**
-- MV3, no build step; injects "Draft reply" + "Polish draft" into Gmail DOM via `content.js`
-- Popup pastes HMAC token from `dharma-lake.vercel.app/settings`
-- Host permissions: `mail.google.com` + `dharma-lake.vercel.app`
-
-**Gmail add-on (apps/gmail-addon)**
-- Apps Script `Code.gs` (~19KB) deployed via `clasp`
+**Gmail add-on (apps/gmail-addon)** — the only in-Gmail surface (the Chrome extension was retired 2026-06-15)
+- Apps Script `Code.gs` (~19KB) deployed via `clasp`; live as deployment **v22**
 - Sidebar with tone buttons + Polish Draft; calls Dharma API with `GoogleBearer`
+- `DHARMA_API` constant points at `https://www.dharmaautomations.com` (repointed off the dead `dharma-lake.vercel.app` alias on 2026-06-15)
+- Shared endpoints `/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft` are still served by the web app (used by the add-on; previously also by the extension)
 
 **Shared packages**
 - `@dharma/types`, `@dharma/calendar-core`, `@dharma/providers-google` / `-outlook` / `-apple`, `@dharma/reply-generation`
@@ -96,7 +93,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 - `MeetingHour`, `MilestoneDef` (with `requiredCity`), `UserMilestone`, `BadgeDef`, `UserBadge`, `Signal` (now with `title` + `whyItMatters`), `Feedback`
 
 **Infrastructure**
-- Vercel hosting at `dharma-lake.vercel.app`; nightly cron at `/api/cron/awards` (UTC)
+- Vercel hosting (project now on the `kuba-ventures` team) at `https://www.dharmaautomations.com`; old `dharma-lake.vercel.app` alias is dead (404). Nightly cron at `/api/cron/awards` (UTC)
 - Neon Postgres
 - Admin Google Sheet (Waitlist / Subscribers / Debugging) via service account, auto-headered + backfilled
 - Optional Google Cloud Pub/Sub for real-time Gmail push
@@ -123,8 +120,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 | Hosting | Vercel | `vercel.json` runs `prisma generate && next build` |
 | OG / share cards | Vercel Edge runtime | `app/api/share/milestone/[id]` |
 | Cron | Vercel cron, UTC | `/api/cron/awards` nightly |
-| Chrome extension | Vanilla MV3 (no bundler) | `apps/chrome-extension/` |
-| Gmail add-on | Apps Script via `clasp` | `apps/gmail-addon/Code.gs` |
+| Gmail add-on | Apps Script via `clasp` (live deployment v22) | `apps/gmail-addon/Code.gs`, points at `www.dharmaautomations.com` |
 | Poller | Node script `apps/web/scripts/poller.mjs` | Hits `/api/gmail/poll` on a schedule |
 
 ---
@@ -157,7 +153,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 | Integration | Purpose | Cost | Status |
 |---|---|---|---|
-| Vercel (hosting + functions + cron + Edge OG) | Hosts Next.js app, runs API routes, nightly cron, share-card OG | unknown (Hobby/Pro tier) | live (`dharma-lake.vercel.app`) |
+| Vercel (hosting + functions + cron + Edge OG) | Hosts Next.js app, runs API routes, nightly cron, share-card OG | unknown (Hobby/Pro tier) | live (`www.dharmaautomations.com`; project on `kuba-ventures` team; old `dharma-lake.vercel.app` alias dead) |
 | Neon (Postgres) | Primary database | unknown | live |
 | Anthropic API (direct, optionally via AI Gateway) | Haiku (classify/polish/tone/milestone-gen/signal) + Sonnet (scheduling, toneSummary) | usage-based; tracked per-event in `UsageEvent`; `SIGNAL_DAILY_LIMIT` caps signal detection at 100/UTC-day/user | live |
 | Google OAuth | User login | free | live |
@@ -167,8 +163,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 | Google Sheets (service account) | Admin sheet: Waitlist / Subscribers / Debugging | free (quota-limited) | live |
 | Microsoft Graph | Outlook calendar free/busy | free (quota-limited) | live |
 | Apple iCloud CalDAV | iCloud calendar free/busy | free | live |
-| Chrome Web Store | Distribution for the extension | one-time $5 developer fee | submission in review (filed 2026-04-30) |
-| Google Workspace Marketplace | Distribution for the Gmail add-on | unknown | not yet listed (deployed via clasp only) |
+| Google Workspace Marketplace | Distribution for the Gmail add-on | unknown | not yet listed (deployed via clasp only, deployment v22) |
 
 *Source: no MCP configs found in repo; this table is generated from `.env`/`.env.local` references, the system diagram (`docs/architecture/dharma_system_diagram.md`), and the admin-sheet wiring in `lib/adminSheet.ts`.*
 
@@ -176,6 +171,9 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 ## Decisions log
 
+- **2026-06-15 — Retire the Chrome extension entirely** — Deleted `apps/chrome-extension/` (`9793a9b`). The extension was never published to the Chrome Web Store (the Kuba Ventures developer dashboard shows no items), so removing it breaks nothing in the wild. The Gmail add-on is now the sole in-Gmail surface. The shared server endpoints the extension used (`/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft`) were intentionally kept — the add-on and web app also depend on them. Rejected: maintaining two parallel Gmail surfaces.
+- **2026-06-15 — Production moves to the `dharmaautomations.com` custom domain** — The Vercel project moved to the `kuba-ventures` team, which killed the old auto-alias `dharma-lake.vercel.app` (now 404 DEPLOYMENT_NOT_FOUND). Live production is `https://www.dharmaautomations.com`; the bare apex 308-redirects to www. Rejected: continuing to rely on the Vercel auto-alias as the canonical URL.
+- **2026-06-15 — Repoint the Gmail add-on to the new domain (clasp v22)** — The add-on had `dharma-lake.vercel.app` hardcoded in `DHARMA_API`, so "Polish draft" failed with HTTP 404 after the team move. Repointed to `www.dharmaautomations.com` (`1395fc2`) and shipped as clasp deployment v22 (per the gmail-addon-deploy memory: create-version + deploy -i, not just clasp push).
 - **2026-05-29 (PM) — `buried_intent` is the first shipped signal kind; `cold_thread` and `pattern_shift` deferred** — Detector rewrite replaced `deal_flow` / `term_sheet` / `transaction` with `buried_intent`. `cold_thread` is reserved in the schema but needs a cron sweep (not inbound-triggered) to fire correctly. `pattern_shift` is blocked on a `ContactBaseline` table that doesn't exist yet. Both are tracked as open loops. Full specs live in `NIGHT-RUN.md`.
 - **2026-05-29 (PM) — Per-user signal toggle + `SIGNAL_DAILY_LIMIT` cap together replace a single global ceiling** — `User.signalDetectionEnabled` lets users opt out entirely; `SIGNAL_DAILY_LIMIT` (default 100/UTC-day/user, gated via `UsageEvent` count) bounds spend even for opted-in users. Rejected: a single global cap — too blunt; some users want more, some want none.
 - **2026-05-29 (PM) — `Tier` type is now `string`, not a literal union** — Adding a new tier was a multi-file type-change. `lib/tiers.ts` keeps the `TIERS` array as the single runtime source; `TierLadder` grids dynamically off `TIERS.length`. Rejected: keeping the literal union "for safety" — TIERS was already the runtime source, the union was redundant friction.
@@ -207,10 +205,10 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 ## Open loops
 
-- [ ] Confirm Chrome Web Store review outcome (submitted 2026-04-30) — Finley
-- [ ] First external user test of preset-label + Sync Inbox flow — Finley
+- [ ] Scrub remaining `dharma-lake.vercel.app` references from in-repo source — `apps/web/app/support/page.tsx` (two user-facing links), `apps/web/scripts/relink-google-account.mjs`, `apps/web/scripts/trigger-cron.mjs` — Finley
+- [ ] First external user test of preset-label + Sync Inbox flow, via the Gmail add-on against `www.dharmaautomations.com` — Finley
 - [ ] Verify Pub/Sub push path end-to-end (current default is the poller script) — Finley
-- [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only) — Finley
+- [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only, deployment v22) — Finley
 - [ ] **Six decisions flagged for review** in `NIGHT-RUN.md` end-of-run section — Finley
 - [ ] **`cold_thread` detector** — reserved kind but needs a cron sweep (not inbound-triggered) to fire. Full spec in `NIGHT-RUN.md`.
 - [ ] **`pattern_shift` detector** — blocked on a `ContactBaseline` table that doesn't yet exist. Full spec in `NIGHT-RUN.md`.
@@ -221,6 +219,9 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 - [ ] Cities autocomplete: extended set up to ~240; ~5k still aspirational. Needs a US Cities dataset (Census / simplemaps) to be vendored.
 
 ### Recently closed
+- [x] Retire the Chrome extension; delete `apps/chrome-extension/` (2026-06-15) — was never published; add-on is the sole in-Gmail surface
+- [x] Migrate production to `www.dharmaautomations.com` after the Vercel team move; old `dharma-lake.vercel.app` alias dead (2026-06-15)
+- [x] Repoint Gmail add-on off the dead alias, fixing the "Polish draft" 404; shipped clasp v22 (2026-06-15)
 - [x] Dashboard re-layout to single-scroll six-section hierarchy (2026-05-29 PM, Phase 1)
 - [x] `/api/metrics` accuracy (7d `emailsTagged`) + dual 7D/All-time reply rate + `timeSaved.ts` consolidation (2026-05-29 PM, Phase 2)
 - [x] Configuration polish: 2x2 tone grid, numeric scheduling hours, active-labels list, `SignalDetectionCard` (2026-05-29 PM, Phase 3)
@@ -246,7 +247,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 ## Risks & known issues
 
-- **Chrome Web Store approval timing unknown** — submission filed April 30; no in-repo tracking of review status. Blocks public distribution.
+- **Stale `dharma-lake.vercel.app` URLs remain in source** — `apps/web/app/support/page.tsx` shows two user-facing links to the dead alias; `scripts/relink-google-account.mjs` and `scripts/trigger-cron.mjs` also reference it. The dead alias 404s, so anyone following those links or running those scripts unedited will hit a wall. Not fixed this session.
 - **`cold_thread` and `pattern_shift` shipped as `null` from the brief** — `buried_intent` is the only live signal kind. Existing `deal_flow` / `term_sheet` / `transaction` rows still render with legacy chip styling.
 - **`SIGNAL_DAILY_LIMIT` enforcement depends on `UsageEvent` writes landing on the same UTC day** — any signal path that forgets `logUsage` is invisible to the gate.
 - **`next-auth` is on a 5.0 beta** (`^5.0.0-beta.25`) — pin carefully on breaking releases.
@@ -259,11 +260,11 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 ## Links
 
-- **Live URL:** https://dharma-lake.vercel.app
-- **Settings (extension token):** https://dharma-lake.vercel.app/settings
-- **Share-card example:** https://dharma-lake.vercel.app/share/milestone/[id]
+- **Live URL:** https://www.dharmaautomations.com (apex `dharmaautomations.com` 308-redirects to www)
+- **Old URL (dead):** https://dharma-lake.vercel.app — 404 DEPLOYMENT_NOT_FOUND since the Vercel team move to `kuba-ventures`
+- **Settings (add-on token):** https://www.dharmaautomations.com/settings
+- **Share-card example:** https://www.dharmaautomations.com/share/milestone/[id]
 - **Staging:** not configured (or not documented in repo)
-- **Chrome Web Store listing:** pending review (submitted 2026-04-30)
 - **Admin Google Sheet:** referenced via service account in `lib/adminSheet.ts` (URL in env)
 - **Tonight's plan:** `~/.claude/plans/dharma-dashboard-serialized-stonebraker.md`
 - **Tonight's per-phase log:** `/Users/finley/Code/Dharma Code/NIGHT-RUN.md`
@@ -275,6 +276,7 @@ Tonight's five-phase auto-loop run (commits `9b17c05` → `1d53ff7`, driven by `
 
 ## Changelog
 
+- **2026-06-15:** Chrome extension retired and production URL migrated. (1) Deleted `apps/chrome-extension/` (`9793a9b`) — never published; shared endpoints `/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft` kept for the add-on + web app. (2) Vercel project moved to the `kuba-ventures` team; old `dharma-lake.vercel.app` alias now 404s; production is `https://www.dharmaautomations.com` (apex → www). (3) Gmail add-on repointed off the dead alias (`1395fc2`), fixing the "Polish draft" 404, shipped as clasp deployment v22. Note: stale `dharma-lake` URLs still live in `support/page.tsx` and two scripts (out of scope this run).
 - **2026-05-29 (late PM, 5-phase auto-loop run):** Closed five sequential phases against `~/.claude/plans/dharma-dashboard-serialized-stonebraker.md` (per-phase log at `NIGHT-RUN.md`):
   - **Phase 1 (`9b17c05`) — Dashboard re-layout** — single-scroll six-section hierarchy: Greeting + Sync inbox button + slim `TierStrip` → "Running for you" (ConfigStatusCard trio) → "This week" (DashboardMetrics) → `NextMilestoneStrip` → `ActivityFeed` → `SignalsPeek`. New components under `apps/web/app/components/dashboard/`. New `/api/activity/recent` + `lib/recentActivity.ts` power the mixed event stream. Old `MilestoneHero`, `InboxPanel`, `QuickActions` no longer rendered (files retained).
   - **Phase 2 (`8be7093`) — Metrics accuracy + dual view** — `/api/metrics` `emailsTagged` is now 7d-windowed (was an all-time bug). Returns both `replyRate7d` and `replyRateAllTime`. Time-saved constants extracted to `lib/timeSaved.ts` (one source for `/api/metrics`, `/api/metrics/timeseries`, `/api/cron/awards`). New 7D↔All-time toggle on `ReplyRateHero`. Dashboard label status card now uses `/api/metrics/by-label?days=7`.
