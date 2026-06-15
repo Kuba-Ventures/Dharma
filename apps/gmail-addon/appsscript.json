@@ -12,7 +12,7 @@
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "urlFetchWhitelist": [
-    "https://dharma-lake.vercel.app/",
+    "https://www.dharmaautomations.com/",
     "https://gmail.googleapis.com/"
   ],
   "oauthScopes": [
@@ -27,7 +27,7 @@
   "addOns": {
     "common": {
       "name": "Dharma",
-      "logoUrl": "https://dharma-lake.vercel.app/logo.png",
+      "logoUrl": "https://www.dharmaautomations.com/logo.png",
       "homepageTrigger": {
         "runFunction": "onHomepage"
       }

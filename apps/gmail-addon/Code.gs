@@ -1,4 +1,4 @@
-var DHARMA_API = 'https://dharma-lake.vercel.app';
+var DHARMA_API = 'https://www.dharmaautomations.com';
 var BRAND_PRIMARY = '#7F77DD';   // brand-400 — same purple as web
 var BRAND_SECONDARY = '#534AB7'; // brand-600 — supporting actions
 var BRAND_ACCENT = '#AFA9EC';    // brand-200 — section accents

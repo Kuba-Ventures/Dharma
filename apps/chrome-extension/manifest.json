@@ -6,7 +6,7 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://mail.google.com/*",
-    "https://dharma-lake.vercel.app/*"
+    "https://www.dharmaautomations.com/*"
   ],
   "background": {
     "service_worker": "background.js"

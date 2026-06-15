@@ -3,7 +3,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   console.log("[Dharma] drafting thread:", msg.threadId);
 
-  fetch("https://dharma-lake.vercel.app/api/emails/thread-draft", {
+  fetch("https://www.dharmaautomations.com/api/emails/thread-draft", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

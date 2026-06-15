@@ -21,7 +21,7 @@ saveBtn.addEventListener("click", async () => {
 
   // Fetch connected email so the button only appears on the right account
   try {
-    const res = await fetch("https://dharma-lake.vercel.app/api/user/me", {
+    const res = await fetch("https://www.dharmaautomations.com/api/user/me", {
       headers: { "Authorization": `Bearer ${token}` },
     });
     if (res.ok) {
