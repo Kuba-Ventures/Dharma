@@ -1,13 +1,13 @@
 # Dharma
 *AI-drafted Gmail replies and scheduling, wrapped in a labeled inbox.*
 
-*Last updated: 2026-06-15 by kuba-vault*
+*Last updated: 2026-06-22 by kuba-vault*
 
 ---
 
 ## TL;DR
 
-Dharma is a Next.js web app + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. This session retired the Chrome extension entirely (the `apps/chrome-extension/` directory is deleted) — the Gmail add-on is now the sole in-Gmail surface. The Vercel project also moved to the `kuba-ventures` team: the old `dharma-lake.vercel.app` alias is dead (404), and production now lives at the custom domain **`https://www.dharmaautomations.com`**. The Gmail add-on, which still pointed at the dead alias and was failing "Polish draft" with a 404, was repointed to the new domain and redeployed live as clasp **v22**. Phase is post-MVP iteration; the earlier Chrome Web Store launch-prep track is closed (the extension was never published).
+Dharma is a Next.js web app + Gmail add-on stack that watches a user's Gmail, classifies threads into preset labels (VC, PE, Legal, General, Custom), and helps draft replies — including calendar-aware scheduling replies that read free/busy from Google, Microsoft, and Apple. Tonight (2026-06-22) was a production incident: auto-labeling had silently stopped because the earlier `dharma-lake` → `dharmaautomations.com` prod migration broke the Gmail labeling pipeline in three ways (dead Pub/Sub push endpoint + audience, orphaned OAuth refresh tokens, and a lapsed Gmail watch hiding behind a stale DB expiry). It's fixed: the Pub/Sub push endpoint/audience were repointed to the live domain, the affected account was re-authed, and two PRs landed to harden against recurrence — a `/api/gmail/poll` cron fallback that doesn't depend on a live watch (PR #10) and a label-reconcile fix so "Sync inbox" replaces rather than accumulates labels (PR #11). Phase is post-MVP iteration. One HIGH-priority follow-up remains: confirm the Google OAuth consent screen is "In production" (Testing mode expires all refresh tokens every 7 days and would re-break labeling weekly).
 
 ---
 
@@ -26,14 +26,14 @@ Dharma is a Next.js web app + Gmail add-on stack that watches a user's Gmail, cl
 - **Engagement manager:** self-directed (Finley)
 - **Lead:** Finley
 - **Cadence:** daily commits; no formal external client cadence
-- **Next milestone:** first external user end-to-end on the redesigned flow via the Gmail add-on at `www.dharmaautomations.com`
-- **Flags:** shipping
+- **Next milestone:** confirm the Google OAuth consent screen is "In production" (HIGH priority — Testing mode expires all refresh tokens every 7 days), then re-auth the two remaining orphaned-token users
+- **Flags:** shipping (labeling pipeline restored 2026-06-22)
 
 ---
 
 ## Where we are right now
 
-This session was cleanup and a production-URL migration, not feature work. Three things landed. (1) The Chrome extension is gone — `apps/chrome-extension/` was deleted (`9793a9b`); it was never published to the Chrome Web Store (the Kuba Ventures developer dashboard shows no items), so nothing in the wild breaks. The shared server endpoints the extension used (`/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft`) were left in place on purpose — the Gmail add-on and web app also use them. (2) The Vercel project moved to the `kuba-ventures` team, which killed the old auto-alias `https://dharma-lake.vercel.app` (now returns 404 DEPLOYMENT_NOT_FOUND). Production is now the custom domain `https://www.dharmaautomations.com` (the bare apex 308-redirects to www). (3) The Gmail add-on had the dead alias hardcoded, so "Polish draft" was failing with an HTTP 404. It was repointed to `www.dharmaautomations.com` (`1395fc2`) and shipped as clasp deployment v22. Heads-up for Finley: a few in-repo source files still reference the dead `dharma-lake.vercel.app` URL — `apps/web/app/support/page.tsx` (two links shown to users), `apps/web/scripts/relink-google-account.mjs`, and `apps/web/scripts/trigger-cron.mjs`. Those weren't touched this session and are worth a follow-up. Next concrete step: run a real external user through the add-on against the new domain to confirm the 404 is fully gone.
+Tonight (2026-06-22) was a production incident: the inbox stopped being labeled. Root cause was fallout from the earlier `dharma-lake` → `dharmaautomations.com` prod migration (the Vercel project move to `kuba-ventures`), which broke the Gmail labeling pipeline three ways: (1) the Google Pub/Sub push subscription's endpoint URL + `PUBSUB_PUSH_AUDIENCE` still pointed at the dead `dharma-lake` domain, so every push to `/api/gmail/webhook` was rejected on an OIDC audience mismatch (403); (2) the OAuth client changed in the migration, orphaning stored refresh tokens so the Gmail watch renewal threw `unauthorized_client` for affected users; (3) the user's own Gmail watch had lapsed but carried a stale future `gmailWatchExpiry` in the DB, so the daily renew-watches cron skipped it silently — no watch, no pushes, no labels. Resolution: repointed the Pub/Sub push endpoint + audience to `https://www.dharmaautomations.com/api/gmail/webhook` (GCP Pub/Sub console + Vercel env) and redeployed, confirming pushes now authorize; re-authed the affected Google account (disconnect at myaccount.google.com → reconnect), which re-armed a fresh watch via `setupGmailWatch` in `auth.ts` — real-time labeling now works within seconds of new mail. Two hardening PRs landed and deployed: PR #10 (`9ce85a6`) added a poll-cron fallback that does not depend on a live watch plus ops alerting on watch-renewal failures; PR #11 (`d95699e`) fixed "Sync inbox" piling labels on threads. The user's 10 stuck inbox threads were backfilled via one forced "Sync inbox". Next concrete step: confirm the OAuth consent screen is "In production" (Testing mode expires refresh tokens every 7 days, which would re-break labeling for everyone weekly), then have `patrick@qsbsrollover.com` and `brady@qsbsrollover.com` re-auth to clear their orphaned tokens.
 
 ---
 
@@ -57,7 +57,10 @@ This session was cleanup and a production-URL migration, not feature work. Three
 **Backend / API (apps/web/app/api)**
 - `auth/[...nextauth]` — Google OAuth via NextAuth v5; PrismaAdapter wrapped in `lib/adapter.ts` for idempotent Account linking
 - `emails/thread-draft`, `emails/recent`, `emails/[id]` — draft/polish, dashboard preview
-- `gmail/poll` + `gmail/webhook` + `scripts/poller.mjs` — polling default, Pub/Sub push optional
+- `gmail/webhook` — real-time Pub/Sub push receiver (verifies OIDC token against `PUBSUB_PUSH_AUDIENCE`; the primary labeling path when a watch is live)
+- **`gmail/poll` (now a Vercel cron, `*/30 * * * *`, hardened 2026-06-22):** safety-net sweep across all connected accounts. Calls Gmail `history.list` per user and does **not** depend on a live Gmail watch, so it keeps labeling even if a watch lapses or a push is dropped. Idempotent — advances each user's `gmailHistoryId` and the `ClassifiedThread` dedupe prevents double-labeling, so it cooperates safely with the webhook. Auto-seeds `gmailHistoryId` for accounts that connected but never got seeded. Auth via `x-cron-secret` header or `Authorization: Bearer <CRON_SECRET>`. `scripts/poller.mjs` remains as a local-only manual hitter.
+- `cron/renew-watches` (`0 7 * * *`) — renews any Gmail watch expiring within 48h (re-seeds if `gmailHistoryId` missing). **New 2026-06-22:** emits an ops alert via `lib/opsAlert.ts` when any renewal fails (an `unauthorized_client` here means the user must re-auth, else their inbox silently stops being labeled)
+- **`labels/back-scan` (reconcile fix, 2026-06-22):** powers the "Sync inbox" button (`force:true` re-classifies recent threads under the current preset, capped at the 25 most-recent threads). Now reconciles labels instead of appending — applies the single best preset label and strips any *other* preset-managed label, and does the same within the user-defined `Label` set — so re-syncs replace rather than accumulate. One forced sync after deploy self-heals pre-existing label pileup.
 - `suggest-times` — Sonnet streaming scheduling reply over multi-calendar free/busy
 - `labels/*` — CRUD, `preset`, `provision`, `setup-gmail`, `scan-inbox`, `back-scan`, `seed-rules`, `status`
 - `preferences/{tone,scheduling,meeting-hours,signal-detection}`, `user/{me,preferences,extension-token,nps-postpone,ack-tier,dismiss}`
@@ -93,10 +96,12 @@ This session was cleanup and a production-URL migration, not feature work. Three
 - `MeetingHour`, `MilestoneDef` (with `requiredCity`), `UserMilestone`, `BadgeDef`, `UserBadge`, `Signal` (now with `title` + `whyItMatters`), `Feedback`
 
 **Infrastructure**
-- Vercel hosting (project now on the `kuba-ventures` team) at `https://www.dharmaautomations.com`; old `dharma-lake.vercel.app` alias is dead (404). Nightly cron at `/api/cron/awards` (UTC)
+- Vercel hosting (project now on the `kuba-ventures` team) at `https://www.dharmaautomations.com`; old `dharma-lake.vercel.app` alias is dead (404)
+- **Three Vercel crons (all UTC) in `apps/web/vercel.json`:** `/api/cron/awards` (`0 8 * * *`, nightly award sweep), `/api/cron/renew-watches` (`0 7 * * *`, Gmail watch renewal + failure alerting), `/api/gmail/poll` (`*/30 * * * *`, labeling fallback that survives a lapsed watch — added 2026-06-22)
 - Neon Postgres
 - Admin Google Sheet (Waitlist / Subscribers / Debugging) via service account, auto-headered + backfilled
-- Optional Google Cloud Pub/Sub for real-time Gmail push
+- Google Cloud Pub/Sub for real-time Gmail push — push endpoint + `PUBSUB_PUSH_AUDIENCE` both point at `https://www.dharmaautomations.com/api/gmail/webhook` (repointed off the dead `dharma-lake` domain 2026-06-22; the audience mismatch was rejecting every push with a 403)
+- `lib/opsAlert.ts` — optional ops alerting: posts `{ "text": ... }` to `OPS_ALERT_WEBHOOK_URL` (Slack-compatible incoming webhook) and always mirrors to `console.error`; best-effort, never throws
 
 ---
 
@@ -159,7 +164,8 @@ This session was cleanup and a production-URL migration, not feature work. Three
 | Google OAuth | User login | free | live |
 | Gmail API | Read inbox, apply labels, create drafts, register Watch | free (quota-limited) | live |
 | Google Calendar API | Free/busy, create events with Meet | free (quota-limited) | live |
-| Google Cloud Pub/Sub | Real-time Gmail push notifications | usage-based, unknown | optional (falls back to polling) |
+| Google Cloud Pub/Sub | Real-time Gmail push notifications (push → `/api/gmail/webhook`, OIDC-verified against `PUBSUB_PUSH_AUDIENCE`) | usage-based, unknown | live (endpoint + audience repointed to `www.dharmaautomations.com` 2026-06-22; `/api/gmail/poll` cron is the fallback) |
+| Slack-compatible ops webhook | Watch-renewal failure alerts via `OPS_ALERT_WEBHOOK_URL` (`lib/opsAlert.ts`); mirrors to `console.error` regardless | free | planned (env var not yet set in prod; alerts currently land in logs only) |
 | Google Sheets (service account) | Admin sheet: Waitlist / Subscribers / Debugging | free (quota-limited) | live |
 | Microsoft Graph | Outlook calendar free/busy | free (quota-limited) | live |
 | Apple iCloud CalDAV | iCloud calendar free/busy | free | live |
@@ -171,6 +177,10 @@ This session was cleanup and a production-URL migration, not feature work. Three
 
 ## Decisions log
 
+- **2026-06-22 — Re-attach `/api/gmail/poll` as a `*/30` Vercel cron fallback that doesn't depend on a live Gmail watch** — Tonight's incident proved the Pub/Sub-push-only labeling path is single-point-of-failure: when a watch lapses or a push is rejected, labeling stops silently. The poll cron calls `history.list` directly per user, advances `gmailHistoryId`, and relies on `ClassifiedThread` dedupe to cooperate safely with the webhook, so it keeps labeling without a watch. Rejected: relying on watch renewal alone (it can fail on orphaned tokens) and the local-only `scripts/poller.mjs` (no host on Vercel). (PR #10, `9ce85a6`)
+- **2026-06-22 — Alert loudly on Gmail watch-renewal failures via `lib/opsAlert.ts`** — A failed renewal (e.g. `unauthorized_client` from orphaned tokens) means that user's inbox silently stops being labeled within 7 days. `renew-watches` now posts a per-failure ops alert to `OPS_ALERT_WEBHOOK_URL` (Slack-compatible) and always mirrors to `console.error`, so the signal is never lost even when no webhook is configured. Rejected: log-only — tonight's outage was invisible for days precisely because nothing surfaced it. (PR #10, `9ce85a6`)
+- **2026-06-22 — "Sync inbox" reconciles labels instead of appending** — `applyGmailLabels` was add-only; `force=true` re-classifies all recent threads each run and the LLM is non-deterministic, so repeated "Sync inbox" clicks piled every label onto each thread. `applyGmailLabels` gained an optional `removeLabelIds` arg; back-scan now applies the single best preset label and strips any other preset-managed label (the preset is single-label by design), and reconciles the user-defined `Label` set the same way. One forced sync after deploy self-heals existing pileup. Rejected: clearing all labels before re-applying (would flicker labels off mid-sync and lose user-defined labels that still match). (PR #11, `d95699e`)
+- **2026-06-22 — Repoint the Pub/Sub push endpoint + audience to the live domain, not patch around the 403** — The migration left the push subscription's endpoint URL and `PUBSUB_PUSH_AUDIENCE` on the dead `dharma-lake` domain, so the OIDC audience check rejected every push. Fixed at the source (GCP Pub/Sub console + Vercel env) rather than loosening webhook auth. Rejected: disabling audience verification to "just make pushes work" — that would accept forged pushes.
 - **2026-06-15 — Retire the Chrome extension entirely** — Deleted `apps/chrome-extension/` (`9793a9b`). The extension was never published to the Chrome Web Store (the Kuba Ventures developer dashboard shows no items), so removing it breaks nothing in the wild. The Gmail add-on is now the sole in-Gmail surface. The shared server endpoints the extension used (`/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft`) were intentionally kept — the add-on and web app also depend on them. Rejected: maintaining two parallel Gmail surfaces.
 - **2026-06-15 — Production moves to the `dharmaautomations.com` custom domain** — The Vercel project moved to the `kuba-ventures` team, which killed the old auto-alias `dharma-lake.vercel.app` (now 404 DEPLOYMENT_NOT_FOUND). Live production is `https://www.dharmaautomations.com`; the bare apex 308-redirects to www. Rejected: continuing to rely on the Vercel auto-alias as the canonical URL.
 - **2026-06-15 — Repoint the Gmail add-on to the new domain (clasp v22)** — The add-on had `dharma-lake.vercel.app` hardcoded in `DHARMA_API`, so "Polish draft" failed with HTTP 404 after the team move. Repointed to `www.dharmaautomations.com` (`1395fc2`) and shipped as clasp deployment v22 (per the gmail-addon-deploy memory: create-version + deploy -i, not just clasp push).
@@ -205,9 +215,11 @@ This session was cleanup and a production-URL migration, not feature work. Three
 
 ## Open loops
 
-- [ ] Scrub remaining `dharma-lake.vercel.app` references from in-repo source — `apps/web/app/support/page.tsx` (two user-facing links), `apps/web/scripts/relink-google-account.mjs`, `apps/web/scripts/trigger-cron.mjs` — Finley
+- [ ] **HIGH — Verify the Google OAuth consent screen is set to "In production" (not Testing)** — in Testing mode Google expires all refresh tokens every 7 days, which would re-break labeling for every user weekly. Top priority follow-up from tonight's incident — Finley
+- [ ] **Re-auth `patrick@qsbsrollover.com` and `brady@qsbsrollover.com`** — both still have orphaned tokens (`unauthorized_client`) from the OAuth client change; their inboxes won't label until they disconnect + reconnect — Finley
+- [ ] Set `OPS_ALERT_WEBHOOK_URL` in prod env so watch-renewal failures page out instead of only landing in logs (optional) — Finley
+- [ ] Deeper historical backfill beyond the 25-most-recent-threads cap in `/api/labels/back-scan` (optional future work) — Finley
 - [ ] First external user test of preset-label + Sync Inbox flow, via the Gmail add-on against `www.dharmaautomations.com` — Finley
-- [ ] Verify Pub/Sub push path end-to-end (current default is the poller script) — Finley
 - [ ] List Gmail add-on on Google Workspace Marketplace (currently `clasp`-only, deployment v22) — Finley
 - [ ] **Six decisions flagged for review** in `NIGHT-RUN.md` end-of-run section — Finley
 - [ ] **`cold_thread` detector** — reserved kind but needs a cron sweep (not inbound-triggered) to fire. Full spec in `NIGHT-RUN.md`.
@@ -219,6 +231,10 @@ This session was cleanup and a production-URL migration, not feature work. Three
 - [ ] Cities autocomplete: extended set up to ~240; ~5k still aspirational. Needs a US Cities dataset (Census / simplemaps) to be vendored.
 
 ### Recently closed
+- [x] Restore the broken auto-labeling pipeline (2026-06-22) — repointed Pub/Sub push endpoint + audience to the live domain, re-authed the affected account, backfilled 10 stuck threads
+- [x] Poll-cron labeling fallback that survives a lapsed Gmail watch + ops alerting on renewal failures (2026-06-22, PR #10)
+- [x] "Sync inbox" label reconcile fix — re-syncs replace rather than accumulate labels (2026-06-22, PR #11)
+- [x] Scrub remaining `dharma-lake.vercel.app` references from in-repo source — `support/page.tsx`, `relink-google-account.mjs`, `trigger-cron.mjs` (2026-06-22, `b966b53`)
 - [x] Retire the Chrome extension; delete `apps/chrome-extension/` (2026-06-15) — was never published; add-on is the sole in-Gmail surface
 - [x] Migrate production to `www.dharmaautomations.com` after the Vercel team move; old `dharma-lake.vercel.app` alias dead (2026-06-15)
 - [x] Repoint Gmail add-on off the dead alias, fixing the "Polish draft" 404; shipped clasp v22 (2026-06-15)
@@ -247,12 +263,14 @@ This session was cleanup and a production-URL migration, not feature work. Three
 
 ## Risks & known issues
 
-- **Stale `dharma-lake.vercel.app` URLs remain in source** — `apps/web/app/support/page.tsx` shows two user-facing links to the dead alias; `scripts/relink-google-account.mjs` and `scripts/trigger-cron.mjs` also reference it. The dead alias 404s, so anyone following those links or running those scripts unedited will hit a wall. Not fixed this session.
+- **OAuth consent screen may still be in "Testing" mode** — if so, Google expires every user's refresh token every 7 days, which would re-break labeling for all users weekly (exactly the orphaned-token failure mode seen tonight). Unverified — top-priority follow-up. The poll cron and renewal alerting added tonight blunt the impact but don't fix the root cause.
+- **`patrick@qsbsrollover.com` and `brady@qsbsrollover.com` have orphaned refresh tokens** — `unauthorized_client` on watch renewal after the OAuth client change. Their inboxes won't label until they re-auth. Now surfaced via the renew-watches ops alert (if `OPS_ALERT_WEBHOOK_URL` is set; otherwise logs only).
+- **Real-time labeling is single-point-of-failure on the Gmail watch** — if a watch lapses (and tonight showed a stale `gmailWatchExpiry` can hide that from the renewal cron), the only thing keeping labels flowing is the `*/30` poll cron, which lags up to 30 min vs. seconds for a live push.
 - **`cold_thread` and `pattern_shift` shipped as `null` from the brief** — `buried_intent` is the only live signal kind. Existing `deal_flow` / `term_sheet` / `transaction` rows still render with legacy chip styling.
 - **`SIGNAL_DAILY_LIMIT` enforcement depends on `UsageEvent` writes landing on the same UTC day** — any signal path that forgets `logUsage` is invisible to the gate.
 - **`next-auth` is on a 5.0 beta** (`^5.0.0-beta.25`) — pin carefully on breaking releases.
 - **Prisma version split** — root devDep `prisma@^6.12.0`, web app devDep + client `^5.22.0`. Confirm `prisma generate` uses the version expected at runtime.
-- **Polling fallback runs as a Node script** (`scripts/poller.mjs`) — needs a host if Pub/Sub isn't wired up. Vercel cron is the natural home.
+- **`scripts/poller.mjs` is local-only** — the production labeling fallback is now the `/api/gmail/poll` Vercel cron (`*/30`); the script remains a manual hitter for debugging.
 - **Cost visibility depends on `UsageEvent` writes** — any code path that forgets `logUsage` is invisible in Metrics.
 - **No automated tests visible** in `apps/web` (only `scripts/test-poll.mjs` for the poller).
 
@@ -276,6 +294,10 @@ This session was cleanup and a production-URL migration, not feature work. Three
 
 ## Changelog
 
+- **2026-06-22:** Production incident — auto-labeling had silently stopped. Root cause: the `dharma-lake` → `dharmaautomations.com` migration broke the labeling pipeline three ways — (1) the Pub/Sub push endpoint + `PUBSUB_PUSH_AUDIENCE` still pointed at the dead domain, so every push hit a 403 OIDC audience mismatch; (2) the OAuth client changed, orphaning refresh tokens (`unauthorized_client` on watch renewal); (3) the affected user's Gmail watch had lapsed behind a stale future `gmailWatchExpiry`, so the renewal cron skipped it. Fixes: repointed the Pub/Sub push endpoint + audience to `https://www.dharmaautomations.com/api/gmail/webhook` (GCP + Vercel env) and redeployed; re-authed the affected account to re-arm a fresh watch; backfilled the user's 10 stuck threads via one forced "Sync inbox". Also: `b966b53` scrubbed the last `dharma-lake` URLs from `support/page.tsx` + two scripts. Two hardening PRs landed and deployed:
+  - **PR #10 (`9ce85a6`) — `harden(gmail): poll cron fallback + alert on watch-renewal failures`** — re-attached `/api/gmail/poll` as a Vercel cron (`*/30 * * * *`) that calls `history.list` directly and does not depend on a live Gmail watch; added `lib/opsAlert.ts` (posts to `OPS_ALERT_WEBHOOK_URL`, always mirrors to `console.error`); `renew-watches` now fires an ops alert on any renewal failure. `vercel.json` now runs three crons.
+  - **PR #11 (`d95699e`) — `fix(labels): reconcile labels on Sync Inbox instead of appending`** — `applyGmailLabels` gained an optional `removeLabelIds` arg; back-scan now reconciles within the single-label preset set and the user-defined `Label` set, so re-syncs replace rather than accumulate labels. Note: the two label-sync buttons differ — "Sync inbox" (top, by the toggle) sends `force:true` and re-classifies/backfills recent threads; "Sync to Gmail" (bottom) is non-forced provisioning that skips already-classified threads.
+  - **Open follow-ups:** verify OAuth consent screen is "In production" (HIGH); re-auth `patrick@` and `brady@qsbsrollover.com`; optionally set `OPS_ALERT_WEBHOOK_URL` in prod; optional deeper backfill past the 25-thread back-scan cap.
 - **2026-06-15:** Chrome extension retired and production URL migrated. (1) Deleted `apps/chrome-extension/` (`9793a9b`) — never published; shared endpoints `/api/user/me`, `/api/user/extension-token`, `/api/emails/thread-draft` kept for the add-on + web app. (2) Vercel project moved to the `kuba-ventures` team; old `dharma-lake.vercel.app` alias now 404s; production is `https://www.dharmaautomations.com` (apex → www). (3) Gmail add-on repointed off the dead alias (`1395fc2`), fixing the "Polish draft" 404, shipped as clasp deployment v22. Note: stale `dharma-lake` URLs still live in `support/page.tsx` and two scripts (out of scope this run).
 - **2026-05-29 (late PM, 5-phase auto-loop run):** Closed five sequential phases against `~/.claude/plans/dharma-dashboard-serialized-stonebraker.md` (per-phase log at `NIGHT-RUN.md`):
   - **Phase 1 (`9b17c05`) — Dashboard re-layout** — single-scroll six-section hierarchy: Greeting + Sync inbox button + slim `TierStrip` → "Running for you" (ConfigStatusCard trio) → "This week" (DashboardMetrics) → `NextMilestoneStrip` → `ActivityFeed` → `SignalsPeek`. New components under `apps/web/app/components/dashboard/`. New `/api/activity/recent` + `lib/recentActivity.ts` power the mixed event stream. Old `MilestoneHero`, `InboxPanel`, `QuickActions` no longer rendered (files retained).
