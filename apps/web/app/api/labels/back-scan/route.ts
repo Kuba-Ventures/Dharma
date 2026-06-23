@@ -193,9 +193,14 @@ export async function POST(req: Request) {
           aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
         }
         const userGmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
-        if (userGmailIds.length > 0) {
-          await applyGmailLabels(userId, c.messageId, userGmailIds);
-        }
+        // Reconcile within the user-defined labels too: strip any that no
+        // longer match so a re-sync reflects the current rules/classification
+        // instead of accumulating stale labels.
+        const userApplySet = new Set(userGmailIds);
+        const userRemoveIds = userLabels
+          .map((l) => l.gmailLabelId!)
+          .filter((id) => !userApplySet.has(id));
+        await applyGmailLabels(userId, c.messageId, userGmailIds, userRemoveIds);
       }
 
       const result = await classifyForPreset({
@@ -219,15 +224,20 @@ export async function POST(req: Request) {
         namesToApply.push(HIGH_PRIORITY_NAME);
       }
 
-      if (namesToApply.length > 0) {
-        const gmailIds = namesToApply
-          .map((n) => mappingByName.get(n))
-          .filter((id): id is string => Boolean(id));
-        if (gmailIds.length > 0) {
-          await applyGmailLabels(userId, c.messageId, gmailIds);
-          tagged++;
-        }
-      }
+      // Reconcile within the preset-managed labels: apply the matched label(s)
+      // and strip any *other* preset label still on the message. The preset is
+      // single-label, so without this a forced re-sync would append the new
+      // label without removing the old one — over repeated syncs threads
+      // accumulate nearly every label.
+      const applyIds = namesToApply
+        .map((n) => mappingByName.get(n))
+        .filter((id): id is string => Boolean(id));
+      const applySet = new Set(applyIds);
+      const presetRemoveIds = mappings
+        .map((m) => m.gmailLabelId)
+        .filter((id) => !applySet.has(id));
+      await applyGmailLabels(userId, c.messageId, applyIds, presetRemoveIds);
+      if (applyIds.length > 0) tagged++;
 
       await prisma.classifiedThread.upsert({
         where: { userId_threadId: { userId, threadId: c.threadId } },
