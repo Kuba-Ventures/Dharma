@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { renewGmailWatch, setupGmailWatch } from "../../../../lib/gmail";
+import { sendOpsAlert } from "../../../../lib/opsAlert";
 
 // Gmail Pub/Sub watches expire after 7 days. This cron renews any watch
 // expiring within the next 48 hours so a single missed run still leaves
@@ -45,12 +46,23 @@ export async function GET(req: Request) {
     }
   }
 
+  const failures = results.filter((r) => r.status === "failed");
+  if (failures.length > 0) {
+    // A failed renewal means that user's Gmail watch will lapse (watches expire
+    // after 7 days) and their inbox will silently stop being labeled. Surface it
+    // loudly — an `unauthorized_client` here means the user must re-auth.
+    const detail = failures.map((r) => `${r.email} (${r.error ?? "unknown"})`).join(", ");
+    await sendOpsAlert(
+      `renew-watches: ${failures.length}/${stale.length} Gmail watch renewal(s) failed — ${detail}. Affected inboxes will stop being labeled until the user re-authenticates.`
+    );
+  }
+
   return NextResponse.json({
     ranAt: new Date().toISOString(),
     candidates: stale.length,
     renewed: results.filter((r) => r.status === "renewed").length,
     seeded: results.filter((r) => r.status === "seeded").length,
-    failed: results.filter((r) => r.status === "failed").length,
+    failed: failures.length,
     results,
   });
 }

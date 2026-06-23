@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/renew-watches",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/gmail/poll",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
