@@ -393,15 +393,24 @@ export async function listRecentInboxMessages(
 export async function applyGmailLabels(
   userId: string,
   messageId: string,
-  gmailLabelIds: string[]
+  gmailLabelIds: string[],
+  removeLabelIds: string[] = []
 ): Promise<void> {
-  if (!gmailLabelIds.length) return;
+  // Reconcile: never remove a label we're also adding. With no removeLabelIds
+  // this stays pure-append, so existing 3-arg callers are unchanged.
+  const removeSet = new Set(removeLabelIds);
+  const addLabelIds = gmailLabelIds.filter((id) => !removeSet.has(id));
+  const remove = removeLabelIds.filter((id) => !gmailLabelIds.includes(id));
+  if (!addLabelIds.length && !remove.length) return;
   const { auth } = await makeAuthForUser(userId);
   const gmail = google.gmail({ version: "v1", auth });
   await gmail.users.messages.modify({
     userId: "me",
     id: messageId,
-    requestBody: { addLabelIds: gmailLabelIds },
+    requestBody: {
+      ...(addLabelIds.length ? { addLabelIds } : {}),
+      ...(remove.length ? { removeLabelIds: remove } : {}),
+    },
   });
 }
 
