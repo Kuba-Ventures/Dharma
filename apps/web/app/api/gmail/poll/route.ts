@@ -5,10 +5,16 @@ import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
-// Manual-invoke / debugging endpoint for label backfill across all connected
-// accounts. No longer attached to a cron (see vercel.json) and never creates
-// drafts or calendar events. Drafts are only ever created by the three
-// user-facing button handlers (sidebar, inline, FAB).
+// Fallback label sweep across all connected accounts. Runs on a cron (see
+// vercel.json) as a safety net behind the real-time Pub/Sub webhook: it calls
+// history.list directly per user and does NOT depend on a live Gmail watch, so
+// it keeps labeling even if a watch lapses or a push is dropped. Idempotent —
+// it advances each user's historyId and the ClassifiedThread dedupe prevents
+// double-labeling, so it cooperates safely with the webhook. Also manually
+// invocable for backfill/debugging. Never creates drafts or calendar events;
+// drafts are only ever created by the three user-facing button handlers
+// (sidebar, inline, FAB).
+export const maxDuration = 60;
 //
 // Accepts both:
 //   x-cron-secret header (legacy local poller script)
