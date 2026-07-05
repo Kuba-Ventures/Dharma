@@ -23,6 +23,10 @@ export default auth((req) => {
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/support" ||
+    // Crawler files must be reachable unauthenticated; otherwise the redirect
+    // below bounces Googlebot to /login and the sitemap/robots never resolve.
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
     isAddonEndpoint ||

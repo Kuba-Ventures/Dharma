@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
+};
 
 export default function PrivacyPage() {
   return (
