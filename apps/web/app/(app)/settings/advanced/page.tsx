@@ -1,4 +1,5 @@
 import ExtensionTokenCard from "../../../components/settings/ExtensionTokenCard";
+import DeleteAccountCard from "../../../components/settings/DeleteAccountCard";
 import SettingsBackLink from "../../../components/settings/SettingsBackLink";
 
 export default function AdvancedSettingsPage() {
@@ -16,6 +17,7 @@ export default function AdvancedSettingsPage() {
       </header>
 
       <ExtensionTokenCard />
+      <DeleteAccountCard />
     </div>
   );
 }

@@ -98,6 +98,31 @@ export async function renewGmailWatch(
   return { expiry };
 }
 
+// Cancels the Gmail Pub/Sub push watch for a user so Google stops sending
+// inbox notifications. Best-effort: used during account deletion, where the
+// credential row is about to be removed anyway. Uses makeAuthForUser so a
+// stale access token is auto-refreshed before the stop call.
+export async function stopGmailWatch(userId: string): Promise<void> {
+  const { auth } = await makeAuthForUser(userId);
+  const gmail = google.gmail({ version: "v1", auth });
+  await gmail.users.stop({ userId: "me" });
+  console.log(`[gmail] Pub/Sub watch stopped for user ${userId}`);
+}
+
+// Revokes the user's Google OAuth grant entirely (access + refresh token), so
+// Dharma can no longer touch their Gmail/Calendar. Called during account
+// deletion to honor the Limited Use "revoke on request" commitment.
+export async function revokeGoogleAccess(userId: string): Promise<void> {
+  const cred = await prisma.googleCredential.findUnique({ where: { userId } });
+  if (!cred) return;
+  const auth = makeOAuth2Client();
+  // Revoking the refresh token invalidates every token issued from this grant.
+  const tokenToRevoke = cred.refreshToken || cred.accessToken;
+  if (!tokenToRevoke) return;
+  await auth.revokeToken(tokenToRevoke);
+  console.log(`[gmail] Google OAuth grant revoked for user ${userId}`);
+}
+
 // Thrown when Gmail's history buffer no longer contains startHistoryId
 // (buffer is roughly 7 days but shorter for high-volume accounts). The
 // webhook handler catches this and resets gmailHistoryId so subsequent

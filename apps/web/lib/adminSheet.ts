@@ -316,6 +316,49 @@ export async function batchUpdateCells(
   }
 }
 
+// Removes a user's row from the Users tab (the sign-in allowlist), so a
+// deleted account can no longer authenticate and their email/PII no longer
+// lingers in the sheet. Physically deletes the row via deleteDimension.
+// Never throws — no-op if env is unset or the email isn't found.
+export async function removeFromUsers(email: string): Promise<void> {
+  const sheets = client();
+  const id = sheetId();
+  if (!sheets || !id) return;
+
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+    const sheet = meta.data.sheets?.find((s) => s.properties?.title === "Users");
+    const internalSheetId = sheet?.properties?.sheetId;
+    if (internalSheetId === null || internalSheetId === undefined) return;
+
+    const rows = await readRows("Users");
+    const idx = rows.findIndex((r) => (r[0] ?? "").toLowerCase() === email.toLowerCase());
+    if (idx === -1) return;
+    // +1 because deleteDimension is 0-indexed and row 0 is the header.
+    const rowIndex = idx + 1;
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: id,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: internalSheetId,
+                dimension: "ROWS",
+                startIndex: rowIndex,
+                endIndex: rowIndex + 1,
+              },
+            },
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error("[adminSheet] removeFromUsers failed:", err);
+  }
+}
+
 // Mark a Waitlist row as converted (sets column E to the timestamp). Used
 // when a waitlist email gets promoted to a Users row. No-op if the
 // email isn't on the waitlist.
