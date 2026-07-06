@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
+import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { prisma } from "../../../../../lib/prisma";
 import { google } from "googleapis";
@@ -85,6 +86,10 @@ JSON only, no other text.`;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const guard = await checkAiGuard(session.user.id, "schedule");
+  if (!guard.allowed)
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
 
   const { auth: oauthClient } = await makeAuthForUser(session.user.id);
   const calendar = google.calendar({ version: "v3", auth: oauthClient });

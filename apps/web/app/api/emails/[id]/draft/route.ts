@@ -4,6 +4,7 @@ import { verifyExtensionToken } from "../../../../../lib/extension-token";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser, createDraft } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
+import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { google } from "googleapis";
 
@@ -67,6 +68,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const guard = await checkAiGuard(userId, "draft");
+  if (!guard.allowed)
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
+
   const googleCred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!googleCred) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
 

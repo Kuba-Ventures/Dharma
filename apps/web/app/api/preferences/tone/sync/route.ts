@@ -3,6 +3,7 @@ import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
+import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { google } from "googleapis";
 
@@ -167,6 +168,10 @@ async function resolveUserId(req: NextRequest): Promise<string | null> {
 export async function POST(req: NextRequest) {
   const userId = await resolveUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
+
+  const guard = await checkAiGuard(userId, "tone_sync");
+  if (!guard.allowed)
+    return NextResponse.json({ error: guard.error }, { status: guard.status, headers: CORS });
 
   const cred = await prisma.googleCredential.findUnique({ where: { userId } });
   if (!cred) {
