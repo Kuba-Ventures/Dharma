@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import type { EventType } from "./usage";
 import { limitsFor, globalCeilingUsd, planForUser } from "./aiLimits";
+import type { Plan } from "./aiLimits";
+import { isComped } from "./effectiveTier";
 
 export { planForUser } from "./aiLimits";
 export type { Plan } from "./aiLimits";
@@ -44,6 +46,24 @@ async function costSince(
   return res._sum.costUsd ?? 0;
 }
 
+// Resolve the user's plan. A user gets paid limits if they're on the
+// AI_PAID_USER_IDS allowlist (the billing seam) OR they've been comped in the
+// admin sheet (Tier set above what they earned) — so an admin comp lifts AI
+// limits the same way it lifts the displayed tier. The comp check reuses the
+// ~60s-cached Users-tab read, so it isn't a Sheets API hit per request. Falls
+// back to `free` if the user row is missing.
+async function resolvePlan(userId: string): Promise<Plan> {
+  if (planForUser(userId) === "paid") return "paid";
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, cumulativeSecondsSaved: true },
+  });
+  if (!user) return "free";
+  return (await isComped(user.cumulativeSecondsSaved, user.email))
+    ? "paid"
+    : "free";
+}
+
 // Main entry point. Call after resolving userId, before the Anthropic request.
 // `eventType` is accepted for future per-type limits and logging; current
 // limits are aggregate across all AI actions (the right abuse metric).
@@ -79,15 +99,15 @@ export async function checkAiGuard(
     };
   }
 
-  // 3. Per-user limits, sized by plan.
-  const plan = planForUser(userId);
-  const limits = limitsFor(plan);
-
-  const [burst, daily, userCost] = await Promise.all([
+  // 3. Per-user limits, sized by plan. Plan resolution runs alongside the usage
+  //    reads — it doesn't depend on them, only the comparisons below do.
+  const [plan, burst, daily, userCost] = await Promise.all([
+    resolvePlan(userId),
     countSince(userId, minuteAgo),
     countSince(userId, dayAgo),
     costSince(dayAgo, userId),
   ]);
+  const limits = limitsFor(plan);
 
   if (burst >= limits.perMinute) {
     return {

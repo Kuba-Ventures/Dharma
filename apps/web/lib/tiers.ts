@@ -39,6 +39,14 @@ export function tierRank(id: string): number {
   return TIERS.findIndex((t) => t.id === id);
 }
 
+// True if `override` is an admin comp that outranks the earned tier — the same
+// comp-up condition effectiveTier uses. A blank, unknown, or same/lower
+// override is not a comp (tierRank returns -1 for blank/unknown, so it always
+// ranks below a real earned tier).
+export function isComp(earned: Tier, override: string): boolean {
+  return tierRank(override) > tierRank(earned);
+}
+
 export function nextTier(currentTier: Tier): TierSpec | null {
   const idx = TIERS.findIndex((t) => t.id === currentTier);
   if (idx === -1 || idx === TIERS.length - 1) return null;
