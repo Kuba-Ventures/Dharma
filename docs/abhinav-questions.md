@@ -19,11 +19,37 @@ security assessment by a Google-authorized assessor. Recurs **every 12 months**.
 - [ ] Any procurement/security-review constraints on which vendor we can use?
 
 ## 3. Pricing / monetization — unblocks Stripe (#7)
-Decided: **free + paid tiers.** Still needed:
-- [ ] **Feature split:** what does the **free** tier include vs **paid**?
-      (e.g. free = labeling + N drafts/day; paid = unlimited drafts + scheduling +
-      priority?) This directly sizes the cost guardrails and the Stripe build.
-- [ ] **Price point(s):** monthly/annual amount for the paid tier(s).
+Decided: **free + paid tiers.** To turn this from an open question into a
+yes/no, here's a **proposed split** to react to (not final — edit freely):
+
+### Proposed free vs paid split
+
+| Capability | Free | Paid |
+|---|---|---|
+| Inbox auto-labeling | ✅ included | ✅ included |
+| AI draft replies | **10 / day** | Unlimited\* |
+| Draft tones | Concise only | **All** (My Tone, Formal/Legal, Casual, Scheduling) |
+| Tone learning ("My Tone" from sent mail) | 1 initial sync | Re-sync anytime |
+| Scheduling (suggest times + create calendar events) | ❌ | ✅ |
+| High-signal email detection | ❌ | ✅ |
+| Metrics / badges / time-saved | ✅ | ✅ |
+
+\* "Unlimited" stays within the abuse guardrails already shipped
+(`AI_PAID_*` env). Free maps to the existing `AI_FREE_*` caps (≈60 AI
+actions/day, $0.75/day) — so **auto-labeling for free users is already
+cost-bounded**; no separate labeling cap needed.
+
+**Rationale:** labeling is the hook (keep it free to drive adoption); drafting,
+all-tones, scheduling, and signals are the daily-value features people will pay
+for. This split maps cleanly onto the `planForUser()` seam already in the code —
+Stripe just flips a user free↔paid.
+
+### Decisions needed
+- [ ] **Approve or edit the split above** (esp. whether scheduling/signals are
+      paid-only, and the free draft/day number).
+- [ ] **Price point(s):** monthly + annual for the paid tier (a common starting
+      point is ~$12–20/mo or ~$99–199/yr — your call; the number doesn't block
+      the build, only the checkout config).
 - [ ] **Free trial?** length, and does it require a card?
 
 ## 4. Ownership / accounts — unblocks the consent-screen work
@@ -31,10 +57,29 @@ Decided: **free + paid tiers.** Still needed:
       registrar** — Abhinav (client) or Finley (agency)? This decides who owns
       the consent-screen / brand-verification / authorized-domains lines.
 
-## 5. Brand verification — needed before the demo video
+## 5. Brand verification + demo video — needed for Google review
 - [ ] Confirm the **final consent-screen app name, logo, and support email** (the
       demo video and Google review require these to be locked).
 - [ ] Authorized domains include `dharmaautomations.com`.
+
+### Demo video (the script is written and ready to record)
+Google requires an unlisted demo video showing every requested scope in action.
+The **full shot-by-shot script is in `docs/demo-video-script.md`** — please skim
+it and confirm the plan. It runs ~3–5 min and will show:
+
+1. Sign-in + the OAuth **consent screen** (with the client ID visible in the URL
+   bar — a hard Google requirement).
+2. `gmail.modify` — applying a label to an inbox thread.
+3. `gmail.compose` — generating an AI draft reply into Gmail Drafts.
+4. `calendar.readonly` — reading availability to suggest times.
+5. `calendar.events` — confirming a scheduling action that creates an event.
+6. The Gmail add-on sidebar (reads the thread, drafts a reply).
+7. The Limited Use policy + self-serve account deletion.
+
+- [ ] **Review the demo plan** in `demo-video-script.md` (approve or flag anything).
+- **Blocked on:** the brand assets above being final, and the add-on
+  `gmail.compose` removal (item #8) — both must be settled before recording so
+  the video matches the live consent screen. Finley records once unblocked.
 
 ## 6. Legal sign-off on the privacy policy — unblocks PR #16
 - [ ] **Approve the "Limited Use of Google User Data" wording** in PR #16 so it
