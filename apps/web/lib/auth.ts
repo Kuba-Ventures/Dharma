@@ -41,11 +41,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
             "https://www.googleapis.com/auth/calendar.events",
           ].join(" "),
           access_type: "offline",
-          // "consent" keeps refresh tokens coming back on re-auth.
           // "select_account" forces Google's account picker every sign-in
           // so Chrome can't silently pick the wrong account when you're
-          // signed into multiple Google accounts.
-          prompt: "consent select_account",
+          // signed into multiple Google accounts. We deliberately do NOT
+          // pass "consent": Google issues a refresh token on the first
+          // grant and we persist it in GoogleCredential, so forcing the
+          // consent screen on every re-auth was redundant friction.
+          // Returning users who already granted now skip the consent page.
+          prompt: "select_account",
         },
       },
     }),
