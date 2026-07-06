@@ -12,20 +12,22 @@ plan (see also `casa-verification-checklist.md`).
 - ✅ Self-serve signup switch, flag-gated OFF (#8, PR #17)
 - ✅ OAuth scope audit (#3)
 
-**In flight:**
+**Open PRs (awaiting review/merge):**
 - 📝 Privacy Limited-Use policy (#5, PR #16) — **draft, blocked on Abhinav's legal sign-off**
-- 📄 Demo-video script written (#4) — awaits a human to record
-- 🟡 Security pre-work (#10) — automated pass done; `googleapis` bump remains
+- 🔵 `googleapis` 144→173 bump, clears the high-sev uuid vuln (#10, PR #20) — needs live Gmail/Calendar QA before merge
+- 🔵 Health check + poll-failure alert + self-serve deletion in support (#11/#12, PR #21)
+
+**Prepared, awaiting a human:**
+- 📄 Demo-video script written (#4, PR #18 merged) — awaits recording
+- 📄 Abhinav decision doc (PR #19) — `abhinav-questions.md`: budget, assessor, pricing, sign-offs
 
 **The bottleneck — external, needs Abhinav:**
 - ⛔ Google restricted-scope verification + CASA Tier 2 (#1/#2). Runs ~1–2
   months on Google's + an assessor's clock. Blocked until Abhinav assigns
-  owners, approves the CASA budget, and picks an assessor.
+  owners, approves the CASA budget, and picks an assessor. See `abhinav-questions.md`.
 
-**Not started (not blocking launch):**
+**Not started (needs a decision):**
 - Stripe billing (#7) — needs the free-vs-paid feature split decision
-- Reliability monitoring (#11)
-- Support channel (#12)
 
 **The launch flip, once verification clears:**
 `SELF_SERVE_SIGNUP=true` + confirm `AI_*` guardrail envs are set.
@@ -33,6 +35,23 @@ plan (see also `casa-verification-checklist.md`).
 ---
 
 ## Log
+
+### 2026-07-05 (cont.) — Abhinav doc, dep bump, monitoring/support
+
+- **PR #19** `abhinav-questions.md` — consolidated the non-code blockers for the
+  client owner: CASA budget + assessor (critical path), free-vs-paid pricing
+  split, GCP/domain ownership, brand verification, privacy sign-off, support
+  channel, add-on `gmail.compose` removal.
+- **PR #20** `googleapis` `^144 → ^173` — clears all 7 googleapis-chain vulns
+  (incl. the 1 high-sev uuid). Fixed an adminSheet type break by switching to
+  googleapis' bundled `google.auth.JWT`. tsc + 46 tests green; **needs live
+  Gmail/Calendar/sheet QA before merge.** 2 unrelated `next`/`postcss`
+  build-time vulns remain (follow-up).
+- **PR #21** ops hardening (#11/#12): `GET /api/health` (public DB check for an
+  external uptime monitor), poll-cron total-failure alert via `sendOpsAlert`,
+  and support-page FAQs now point to self-serve deletion. Docs: `monitoring.md`.
+- Confirmed: the app-side of launch is complete once #16/#20/#21 merge. The only
+  remaining gate is external (Google verification/CASA), pending Abhinav.
 
 ### 2026-07-05 — Session: app-side hardening for public launch
 
