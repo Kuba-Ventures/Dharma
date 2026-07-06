@@ -129,7 +129,7 @@ export default async function ProfilePage() {
       <GuidedTour id="profile" steps={PROFILE_TOUR} />
 
       <div data-tour="profile-tier">
-        <TierLadder secondsSaved={user.cumulativeSecondsSaved} />
+        <TierLadder secondsSaved={user.cumulativeSecondsSaved} displayTier={tierLabel} />
       </div>
 
       <div data-tour="profile-badges">
