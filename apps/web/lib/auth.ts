@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { authConfig } from "./auth.config";
 import { prisma } from "./prisma";
 import { makeResilientAdapter } from "./adapter";
-import { isSubscriber } from "./adminSheet";
+import { isSubscriber, provisionUser } from "./adminSheet";
 
 // Config is passed as a FUNCTION, not a static object. With an object,
 // next-auth runs setEnvDefaults once at module-eval (cold start) and the
@@ -117,8 +117,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
       if (account?.provider === "google" && profile?.email) {
         const allowed = await isSubscriber(profile.email);
         if (!allowed) {
-          console.warn("[auth] Rejecting sign-in: not in Users list:", profile.email);
-          return false;
+          // Public launch switch. When SELF_SERVE_SIGNUP is on, anyone who
+          // completes Google OAuth is auto-provisioned onto the allowlist (and
+          // their waitlist row converted) instead of being rejected. Defaults
+          // OFF so the manual allowlist stays in force until we flip it — do
+          // NOT enable before Google restricted-scope verification clears
+          // (task #2), or sign-ins just hit Google's 100-user testing cap.
+          if (process.env.SELF_SERVE_SIGNUP === "true") {
+            await provisionUser(profile.email);
+            console.log("[auth] Self-serve signup provisioned:", profile.email);
+          } else {
+            console.warn("[auth] Rejecting sign-in: not in Users list:", profile.email);
+            return false;
+          }
         }
       }
 
