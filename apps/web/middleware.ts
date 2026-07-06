@@ -27,6 +27,8 @@ export default auth((req) => {
     // below bounces Googlebot to /login and the sitemap/robots never resolve.
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
+    // Public health check for external uptime monitors — must not redirect.
+    pathname === "/api/health" ||
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/gmail/") ||
     isAddonEndpoint ||
