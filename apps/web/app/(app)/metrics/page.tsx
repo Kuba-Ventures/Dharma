@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import ReplyRateHero from "../../components/metrics/ReplyRateHero";
 import TimeSavedChart from "../../components/metrics/TimeSavedChart";
 import ReplyRateByLabel from "../../components/metrics/ReplyRateByLabel";
-import MilestoneTimelineStrip from "../../components/metrics/MilestoneTimelineStrip";
 import MetricsCard from "../../components/MetricsCard";
 import GuidedTour, { type TourStep } from "../../components/GuidedTour";
 
@@ -58,10 +57,6 @@ export default function MetricsPage() {
         </p>
         <MetricsCard />
       </div>
-
-      <Suspense>
-        <MilestoneTimelineStrip />
-      </Suspense>
     </div>
   );
 }
