@@ -91,7 +91,7 @@ export default function SupportPage() {
             />
             <FAQ
               q="Can I uninstall Dharma?"
-              a="Yes. From the Workspace Marketplace listing click Uninstall, or go to myaccount.google.com > Security > Third-party apps and remove Dharma. Your account and data on our end can be deleted by emailing us."
+              a="Yes. From the Workspace Marketplace listing click Uninstall, or go to myaccount.google.com > Security > Third-party apps and remove Dharma. To delete your account and all associated data, go to Settings > Advanced > Delete account in the dashboard — this stops inbox monitoring, revokes our Google access, and removes your data. You can also email us and we'll do it for you."
             />
             <FAQ
               q="How do I delete my account?"

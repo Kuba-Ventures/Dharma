@@ -4,6 +4,7 @@ import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
+import { sendOpsAlert } from "../../../../lib/opsAlert";
 
 // Fallback label sweep across all connected accounts. Runs on a cron (see
 // vercel.json) as a safety net behind the real-time Pub/Sub webhook: it calls
@@ -243,5 +244,17 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({ polled: creds.length, results });
 }
 
-export const GET = runPoll;
-export const POST = runPoll;
+// Wrap the handler so a total poll failure (e.g. DB unreachable) pages ops
+// instead of failing silently on the 30-minute cron. Per-message failures are
+// already caught inside runPoll and don't reach here.
+async function runPollWithAlert(req: NextRequest): Promise<NextResponse> {
+  try {
+    return await runPoll(req);
+  } catch (err) {
+    await sendOpsAlert(`[poll] cron run failed: ${(err as Error).message}`);
+    throw err;
+  }
+}
+
+export const GET = runPollWithAlert;
+export const POST = runPollWithAlert;
