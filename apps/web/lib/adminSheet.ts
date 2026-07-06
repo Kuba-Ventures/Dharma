@@ -8,7 +8,6 @@
 // doesn't need to be set up by hand.
 
 import { google, type sheets_v4 } from "googleapis";
-import { JWT } from "google-auth-library";
 import { getBadge } from "./badges";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -40,7 +39,10 @@ function buildClient(): sheets_v4.Sheets | null {
     console.error("[adminSheet] service account JSON missing client_email or private_key");
     return null;
   }
-  const auth = new JWT({
+  // Use googleapis' bundled auth (google.auth.JWT) rather than importing JWT
+  // from google-auth-library directly — that avoids a type mismatch when the
+  // two resolve to different google-auth-library versions.
+  const auth = new google.auth.JWT({
     email: key.client_email,
     key: key.private_key,
     scopes: SCOPES,
