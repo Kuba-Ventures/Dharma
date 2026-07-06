@@ -359,6 +359,32 @@ export async function removeFromUsers(email: string): Promise<void> {
   }
 }
 
+// Provisions a new user on self-serve signup: appends them to the Users tab
+// (the sign-in allowlist) and converts any matching Waitlist row. Best-effort,
+// never throws — the caller decides sign-in independently. Busts the subscriber
+// cache so the just-added email is recognized on the next isSubscriber call
+// (prevents a duplicate row if the same user retries within the cache TTL).
+export async function provisionUser(email: string): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return;
+  try {
+    // Row shape matches TAB_HEADERS.Users:
+    // [email, tier, started_at, stripe_customer_id, badges, notes]
+    await appendRow("Users", [
+      email.trim(),
+      "Apprentice",
+      new Date().toISOString(),
+      "",
+      "",
+      "self-serve signup",
+    ]);
+    subscriberCache = null; // force a fresh Users read on next isSubscriber
+    await markWaitlistConverted(email);
+  } catch (err) {
+    console.error("[adminSheet] provisionUser failed:", err);
+  }
+}
+
 // Mark a Waitlist row as converted (sets column E to the timestamp). Used
 // when a waitlist email gets promoted to a Users row. No-op if the
 // email isn't on the waitlist.
