@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { logUsage } from "../../../../../lib/usage";
+import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { SAMPLE_SCENARIOS, scenarioById } from "../../../../../lib/sampleScenarios";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 
@@ -14,6 +15,10 @@ export async function POST(req: Request) {
   if (!session?.user?.id)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = session.user.id;
+
+  const guard = await checkAiGuard(userId, "tone_sync");
+  if (!guard.allowed)
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
 
   const { scenarioId } = (await req.json().catch(() => ({}))) as {
     scenarioId?: string;

@@ -22,6 +22,7 @@
 
 import { prisma } from "./prisma";
 import { logUsage } from "./usage";
+import { pipelineAiAllowed } from "./aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "./anthropicEndpoint";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -109,6 +110,9 @@ async function detect(args: {
 }): Promise<DetectorResult | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
+
+  // Kill switch / global spend ceiling (on top of the per-user daily cap).
+  if (!(await pipelineAiAllowed())) return null;
 
   const userMessage = `Subject: ${args.subject}\nFrom: ${args.from}\nBody (first 2000 chars):\n${args.body.slice(0, 2000)}`;
 

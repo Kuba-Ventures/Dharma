@@ -1,4 +1,5 @@
 import { logUsage, type EventType } from "./usage";
+import { pipelineAiAllowed } from "./aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "./anthropicEndpoint";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -16,6 +17,12 @@ async function callClaude(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     console.error("[classify] ANTHROPIC_API_KEY is not set — classification skipped");
+    return "";
+  }
+
+  // Kill switch / global spend ceiling. Callers degrade gracefully on "".
+  if (!(await pipelineAiAllowed())) {
+    console.warn("[classify] AI paused (kill switch or global ceiling) — skipping");
     return "";
   }
 

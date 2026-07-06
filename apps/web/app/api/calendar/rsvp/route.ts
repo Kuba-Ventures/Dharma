@@ -4,6 +4,7 @@ import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { logUsage } from "../../../../lib/usage";
+import { checkAiGuard } from "../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../lib/anthropicEndpoint";
 import { google } from "googleapis";
 
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest) {
 
   if (body.action === "reschedule") {
     // Generate a short context-aware reply proposing alternative times.
+    // Only the reschedule branch calls the model, so the AI guard lives here —
+    // plain accept/decline/tentative RSVPs are cheap calendar patches.
+    const guard = await checkAiGuard(userId, "schedule");
+    if (!guard.allowed)
+      return NextResponse.json({ error: guard.error }, { status: guard.status, headers: CORS });
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500, headers: CORS });
 
