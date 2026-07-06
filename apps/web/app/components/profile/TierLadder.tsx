@@ -1,7 +1,13 @@
-import { TIERS, type Tier, progressToNext } from "../../../lib/tiers";
+import { TIERS, type Tier, progressToNext, tierRank } from "../../../lib/tiers";
 
 type Props = {
   secondsSaved: number;
+  // The tier to display, from effectiveTier() — the higher of the time-earned
+  // tier and any admin comp set in the Users sheet. When omitted, falls back to
+  // the time-earned tier. When a comp outranks what's been earned, we show the
+  // comped tier as current and drop the time-based "progress to next" (it would
+  // be misleading — the tier was granted, not earned by time).
+  displayTier?: Tier;
 };
 
 function formatSeconds(s: number): string {
@@ -11,8 +17,12 @@ function formatSeconds(s: number): string {
   return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
 }
 
-export default function TierLadder({ secondsSaved }: Props) {
-  const { current, next, progress } = progressToNext(secondsSaved);
+export default function TierLadder({ secondsSaved, displayTier }: Props) {
+  const earned = progressToNext(secondsSaved);
+  const comped =
+    !!displayTier && tierRank(displayTier) > tierRank(earned.current);
+  const current: Tier = comped ? displayTier! : earned.current;
+  const { next, progress } = earned;
 
   return (
     <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-5">
@@ -23,11 +33,13 @@ export default function TierLadder({ secondsSaved }: Props) {
           </p>
           <p className="font-display text-2xl text-white">{current}</p>
         </div>
-        {next && (
+        {comped ? (
+          <p className="text-[12px] text-brand-200">Complimentary tier</p>
+        ) : next ? (
           <p className="text-[12px] text-white/50">
             {formatSeconds(secondsSaved)} saved · {formatSeconds(next.threshold - secondsSaved)} to {next.id}
           </p>
-        )}
+        ) : null}
       </div>
 
       <div
@@ -63,7 +75,7 @@ export default function TierLadder({ secondsSaved }: Props) {
         })}
       </div>
 
-      {next && progress < 1 && (
+      {!comped && next && progress < 1 && (
         <div className="mt-4">
           <div className="mb-1 flex items-center justify-between text-[11px] text-white/40">
             <span>Progress to {next.id}</span>
