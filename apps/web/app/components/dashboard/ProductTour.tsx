@@ -25,7 +25,7 @@ const STEPS: Step[] = [
     selector: '[data-tour="sync"]',
     title: "Sync your inbox & calendar",
     description:
-      "Hit Sync inbox to classify recent mail. If it ever says “reconnect,” sign out and back in once — that re-grants Google access and fixes most sync issues.",
+      "Hit Sync inbox to classify recent mail. If it ever says “reconnect,” sign out and back in once. That re-grants Google access and fixes most sync issues.",
   },
   {
     selector: '[data-tour="config"]',
@@ -43,7 +43,7 @@ const STEPS: Step[] = [
     selector: '[data-tour="nav-config"]',
     title: "Fine-tune anytime",
     description:
-      "Everything lives in Configuration — change presets, tone, and scheduling whenever you like.",
+      "Everything lives in Configuration. Change presets, tone, and scheduling whenever you like.",
   },
 ];
 

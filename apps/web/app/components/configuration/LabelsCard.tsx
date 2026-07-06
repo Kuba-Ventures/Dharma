@@ -39,6 +39,60 @@ const COLOR_ROWS: string[][] = [
 ];
 const DEFAULT_COLOR_HEX = "#4a86e8";
 
+// Display-side mirror of LABEL_PRESETS in lib/labelPresets.ts. Hexes are the
+// palette values from COLOR_ROWS so the color picker highlights correctly.
+// Editing a built-in preset forks it to Custom seeded from this list — keep in
+// sync if a preset's labels change server-side.
+const BUILT_IN_LABELS: Record<Exclude<Preset, "Custom">, { shortName: string; displayHex: string }[]> = {
+  VC: [
+    { shortName: "Portfolio", displayHex: "#16a766" },
+    { shortName: "Deal-Flow", displayHex: "#fb4c2f" },
+    { shortName: "LP-Relations", displayHex: "#4a86e8" },
+    { shortName: "Internal", displayHex: "#8e63ce" },
+    { shortName: "High-Priority", displayHex: "#ffad47" },
+  ],
+  PE: [
+    { shortName: "Portfolio-Co", displayHex: "#16a766" },
+    { shortName: "Deal", displayHex: "#fb4c2f" },
+    { shortName: "Diligence", displayHex: "#4a86e8" },
+    { shortName: "Internal", displayHex: "#8e63ce" },
+    { shortName: "High-Priority", displayHex: "#ffad47" },
+  ],
+  Legal: [
+    { shortName: "Contracts", displayHex: "#fb4c2f" },
+    { shortName: "Client", displayHex: "#16a766" },
+    { shortName: "Internal", displayHex: "#8e63ce" },
+    { shortName: "High-Priority", displayHex: "#ffad47" },
+  ],
+  General: [
+    { shortName: "Respond", displayHex: "#fb4c2f" },
+    { shortName: "Meeting", displayHex: "#4a86e8" },
+    { shortName: "Informational", displayHex: "#8e63ce" },
+    { shortName: "High-Priority", displayHex: "#ffad47" },
+  ],
+  Personal: [
+    { shortName: "Orders", displayHex: "#16a766" },
+    { shortName: "Shipping", displayHex: "#4a86e8" },
+    { shortName: "Follow-Up", displayHex: "#fb4c2f" },
+    { shortName: "Work", displayHex: "#8e63ce" },
+    { shortName: "Promotions", displayHex: "#f2c960" },
+    { shortName: "Updates", displayHex: "#2da2bb" },
+    { shortName: "Likely-Spam", displayHex: "#cf8933" },
+    { shortName: "High-Priority", displayHex: "#ffad47" },
+  ],
+};
+
+// Seed editable rows from a built-in preset. colorKey doubles as the hex the
+// API maps to Gmail's palette, so we reuse displayHex for both.
+function builtInSeed(p: Preset): CustomLabel[] {
+  if (p === "Custom") return [];
+  return (BUILT_IN_LABELS[p] ?? []).map((l) => ({
+    shortName: l.shortName,
+    colorKey: l.displayHex,
+    displayHex: l.displayHex,
+  }));
+}
+
 function parseCustomLabels(raw: unknown): CustomLabel[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -115,20 +169,57 @@ export default function LabelsCard({ initial }: Props) {
       .filter((l) => l.shortName);
   }
 
-  function updateLabel(idx: number, patch: Partial<CustomLabel>) {
-    setCustomLabels((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  // Persist the editable label list as a Custom preset. Built-in presets are
+  // flat (no prefix), so a fork keeps the same Gmail label names — classified
+  // mail and provisioned labels carry over untouched.
+  async function persistLabels(list: CustomLabel[], prefix: string) {
+    await persistPreset({
+      preset: "Custom",
+      enabled: true,
+      customName: prefix,
+      customLabels: list.map((l) => ({ ...l, shortName: l.shortName.trim() })).filter((l) => l.shortName),
+    });
+    setEnabled(true);
+  }
+
+  // Edits operate on the active list whether it's a built-in seed or the user's
+  // Custom labels. Touching a built-in forks it to Custom so the change sticks.
+  function updateLabel(idx: number, patch: Partial<CustomLabel>, persist = false) {
+    const wasCustom = preset === "Custom";
+    const base = wasCustom ? customLabels : builtInSeed(preset);
+    const next = base.map((l, i) => (i === idx ? { ...l, ...patch } : l));
+    if (!wasCustom) {
+      setPreset("Custom");
+      setCustomName("");
+    }
+    setCustomLabels(next);
+    if (persist) void persistLabels(next, wasCustom ? customName : "");
   }
 
   function addLabel() {
-    setCustomLabels((prev) => {
-      const row = COLOR_ROWS[0];
-      const next = row[prev.length % row.length];
-      return [...prev, { shortName: "", colorKey: next, displayHex: next }];
-    });
+    const wasCustom = preset === "Custom";
+    const base = wasCustom ? customLabels : builtInSeed(preset);
+    const row = COLOR_ROWS[0];
+    const nextColor = row[base.length % row.length];
+    const next = [...base, { shortName: "", colorKey: nextColor, displayHex: nextColor }];
+    if (!wasCustom) {
+      setPreset("Custom");
+      setCustomName("");
+    }
+    setCustomLabels(next);
   }
 
   function removeLabel(idx: number) {
-    setCustomLabels((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+    const wasCustom = preset === "Custom";
+    const base = wasCustom ? customLabels : builtInSeed(preset);
+    if (base.length <= 1) return;
+    const next = base.filter((_, i) => i !== idx);
+    if (!wasCustom) {
+      setPreset("Custom");
+      setCustomName("");
+    }
+    setCustomLabels(next);
+    void persistLabels(next, wasCustom ? customName : "");
   }
 
   async function persistCustomState() {
@@ -337,6 +428,12 @@ export default function LabelsCard({ initial }: Props) {
     return () => window.removeEventListener("focus", refresh);
   }, []);
 
+  // The rows shown in the editor: a built-in preset's labels (read from the
+  // mirror) or the user's Custom list. High-Priority is included because it's a
+  // real provisioned label; Uncategorized has its own section below.
+  const editableLabels: CustomLabel[] =
+    preset === "Custom" ? customLabels : builtInSeed(preset);
+
   return (
     <>
       <Card>
@@ -405,80 +502,79 @@ export default function LabelsCard({ initial }: Props) {
             </div>
 
             {preset === "Custom" && (
-              <div className="space-y-4 rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] p-4">
-                <label className="block">
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-                    Gmail folder prefix{" "}
-                    <span className="text-white/30 normal-case tracking-normal">(optional)</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    onBlur={persistCustomState}
-                    placeholder="e.g. Kuba Ventures"
-                    className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
-                  />
-                  <p className="mt-1 text-[11px] text-white/40">
-                    {customName.trim() ? (
-                      <>
-                        Labels nest under{" "}
-                        <code className="text-white/55">{customName.trim()}/Label-Name</code> in your
-                        Gmail sidebar.
-                      </>
-                    ) : (
-                      <>Leave blank for flat top-level labels.</>
-                    )}
-                  </p>
-                </label>
-
-                <div>
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-                    Custom labels
-                  </span>
-                  <div className="mt-2 space-y-2">
-                    {customLabels.map((label, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <ColorPickerDot
-                          selectedHex={label.colorKey}
-                          onPick={(hex) => {
-                            updateLabel(idx, { colorKey: hex, displayHex: hex });
-                            void persistCustomState();
-                          }}
-                        />
-                        <input
-                          type="text"
-                          value={label.shortName}
-                          onChange={(e) => updateLabel(idx, { shortName: e.target.value })}
-                          onBlur={persistCustomState}
-                          placeholder="follow-up"
-                          className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-1.5 text-sm text-white placeholder:text-white/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            removeLabel(idx);
-                            void persistCustomState();
-                          }}
-                          disabled={customLabels.length <= 1}
-                          aria-label="Remove label"
-                          className="px-2 text-base leading-none text-white/30 transition-colors hover:text-red-400/70 disabled:opacity-30 disabled:hover:text-white/30"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addLabel}
-                    className="mt-2 text-[11px] text-white/40 transition-colors hover:text-white/70"
-                  >
-                    + Add label
-                  </button>
-                </div>
-              </div>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                  Gmail folder prefix{" "}
+                  <span className="text-white/30 normal-case tracking-normal">(optional)</span>
+                </span>
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  onBlur={persistCustomState}
+                  placeholder="e.g. Kuba Ventures"
+                  className="mt-1 w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white placeholder:text-white/30"
+                />
+                <p className="mt-1 text-[11px] text-white/40">
+                  {customName.trim() ? (
+                    <>
+                      Labels nest under{" "}
+                      <code className="text-white/55">{customName.trim()}/Label-Name</code> in your
+                      Gmail sidebar.
+                    </>
+                  ) : (
+                    <>Leave blank for flat top-level labels.</>
+                  )}
+                </p>
+              </label>
             )}
+
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
+                  Labels in this preset
+                </span>
+                {preset !== "Custom" && (
+                  <span className="text-[10px] text-white/30">
+                    Edit a color or name to customize
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 space-y-2">
+                {editableLabels.map((label, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <ColorPickerDot
+                      selectedHex={label.colorKey}
+                      onPick={(hex) => updateLabel(idx, { colorKey: hex, displayHex: hex }, true)}
+                    />
+                    <input
+                      type="text"
+                      value={label.shortName}
+                      onChange={(e) => updateLabel(idx, { shortName: e.target.value })}
+                      onBlur={persistCustomState}
+                      placeholder="follow-up"
+                      className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-1.5 text-sm text-white placeholder:text-white/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeLabel(idx)}
+                      disabled={editableLabels.length <= 1}
+                      aria-label="Remove label"
+                      className="px-2 text-base leading-none text-white/30 transition-colors hover:text-red-400/70 disabled:opacity-30 disabled:hover:text-white/30"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addLabel}
+                className="mt-2 text-[11px] text-white/40 transition-colors hover:text-white/70"
+              >
+                + Add label
+              </button>
+            </div>
 
             <div>
               <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
