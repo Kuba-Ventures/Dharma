@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     step?: number;
     city?: { name?: string; state?: string };
     role?: string;
+    firstName?: string;
     complete?: boolean;
   };
 
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     onboardingCompletedAt?: Date;
     onboardingFlow?: string;
     role?: string;
+    firstName?: string;
     homeCity?: string;
     homeCityLat?: number;
     homeCityLng?: number;
@@ -47,6 +49,11 @@ export async function POST(req: Request) {
 
   if (body.role !== undefined) {
     data.role = body.role;
+  }
+
+  // The v2 quiz lets the user confirm/correct the OAuth-prefilled first name.
+  if (typeof body.firstName === "string" && body.firstName.trim()) {
+    data.firstName = body.firstName.trim().slice(0, 80);
   }
 
   // Flow is pinned at entry (step-1-connect) from the ONBOARDING_V2 flag. By
