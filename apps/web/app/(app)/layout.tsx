@@ -12,6 +12,7 @@ import {
 } from "../../lib/badges";
 import { sheetIdentityBadgesForEmail } from "../../lib/adminSheet";
 import { effectiveTier } from "../../lib/effectiveTier";
+import { resolveOnboardingFlow, onboardingStepUrl } from "../../lib/onboardingFlow";
 import Sidebar from "../components/Sidebar";
 import ProfileChip from "../components/ProfileChip";
 import FeedbackButton from "../components/ui/FeedbackButton";
@@ -36,21 +37,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       homeCity: true,
       onboardingCompletedAt: true,
       onboardingStep: true,
+      onboardingFlow: true,
     },
   });
   if (!user) redirect("/login");
 
-  // Bounce new users into the onboarding flow. Existing users were backfilled
-  // with onboardingCompletedAt by scripts/backfill-onboarding.mjs.
+  // Bounce new users into the onboarding flow, resuming on their pinned flow's
+  // step (null pin → v1, matching pre-v2 behavior). Existing users were
+  // backfilled with onboardingCompletedAt by scripts/backfill-onboarding.mjs.
   if (!user.onboardingCompletedAt) {
-    const stepUrls = [
-      "/onboarding/step-1-connect",
-      "/onboarding/step-2-city",
-      "/onboarding/step-3-tone",
-      "/onboarding/step-4-labels",
-      "/onboarding/step-5-install",
-    ];
-    redirect(stepUrls[Math.min(user.onboardingStep, stepUrls.length - 1)]);
+    const flow = resolveOnboardingFlow(user.onboardingFlow);
+    redirect(onboardingStepUrl(flow, user.onboardingStep));
   }
 
   // Signal producers aren't live yet, so the sidebar badge would only ever
