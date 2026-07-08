@@ -4,6 +4,12 @@ import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import StepShell from "../components/StepShell";
 import Card from "../../components/ui/Card";
+import {
+  flowForNewUser,
+  resolveOnboardingFlow,
+  onboardingStepUrl,
+  stepUrlsForFlow,
+} from "../../../lib/onboardingFlow";
 
 export default async function StepOne() {
   const session = await auth();
@@ -15,22 +21,33 @@ export default async function StepOne() {
   });
 
   const connected = !!cred;
+  // Flow shown for a not-yet-pinned user (drives the progress-bar total).
+  const displayFlow = flowForNewUser(process.env.ONBOARDING_V2 === "true");
+  const total = stepUrlsForFlow(displayFlow).length;
 
   async function advance() {
     "use server";
     const s = await auth();
     if (!s?.user?.id) return;
+    // Pin the flow at entry (once), then resume on step 2 of that flow.
+    const u = await prisma.user.findUnique({
+      where: { id: s.user.id },
+      select: { onboardingFlow: true },
+    });
+    const flow = u?.onboardingFlow
+      ? resolveOnboardingFlow(u.onboardingFlow)
+      : flowForNewUser(process.env.ONBOARDING_V2 === "true");
     await prisma.user.update({
       where: { id: s.user.id },
-      data: { onboardingStep: 1 },
+      data: { onboardingStep: 1, ...(u?.onboardingFlow ? {} : { onboardingFlow: flow }) },
     });
-    redirect("/onboarding/step-2-city");
+    redirect(onboardingStepUrl(flow, 1));
   }
 
   return (
     <StepShell
       step={0}
-      total={5}
+      total={total}
       eyebrow="Welcome to Dharma"
       title="Let's get you set up"
       description="Five quick steps. About three minutes. Your dashboard unlocks when you're done."
