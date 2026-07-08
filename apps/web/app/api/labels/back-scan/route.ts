@@ -1,6 +1,9 @@
-export const maxDuration = 60;
+// Raised from 60s: the onboarding path runs a second 25-thread tranche in an
+// after() continuation (same invocation), so the function needs headroom for
+// ~two ~45s budget windows to hit 50 threads inside ~2 minutes.
+export const maxDuration = 120;
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser, applyGmailLabels } from "../../../../lib/gmail";
@@ -18,14 +21,12 @@ import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 const MAX_THREADS = 25;
 const CONCURRENCY = 5;
 // Stop *starting* new classification batches past this point so the function
-// returns a partial-but-successful result instead of being killed at the 60s
-// cap (an in-flight batch can still run ~10s, leaving headroom under 60s).
+// returns a partial-but-successful result instead of being killed at the cap
+// (an in-flight batch can still run ~10s).
 const BUDGET_MS = 45_000;
 
 // Turn a Gmail/token error into an actionable message + status, mirroring the
-// reconnect handling other Google-backed routes (tone/sync, calendar/sync)
-// already do. Without this, an expired grant or Gmail hiccup surfaced to the
-// user as a bare "Sync failed".
+// reconnect handling other Google-backed routes (tone/sync, calendar/sync) do.
 function gmailErrorResponse(err: unknown): NextResponse {
   const code =
     (err as { code?: number })?.code ??
@@ -50,35 +51,52 @@ function gmailErrorResponse(err: unknown): NextResponse {
   );
 }
 
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
+type ScanOpts = {
+  userId: string;
+  force?: boolean;
+  limit?: number;
+  pageToken?: string | null;
+  /** Skip per-thread signal detection (used by the onboarding scan to protect the budget). */
+  skipSignals?: boolean;
+};
 
-  // When invoked from the "Sync inbox" button, the caller passes force=true to
-  // bypass the ClassifiedThread dedupe and re-classify recent threads under
-  // the *current* preset. Auto-poll callers should omit it.
-  const body = (await req.json().catch(() => ({}))) as { force?: boolean };
-  const force = body.force === true;
+// Discriminated result so the interactive route and the after() tail handle
+// setup/gmail failures uniformly without throwing across the response boundary.
+type ScanResult =
+  | {
+      kind: "ok";
+      scanned: number;
+      tagged: number;
+      skipped: number;
+      incomplete: boolean;
+      total: number;
+      nextPageToken: string | null;
+    }
+  | { kind: "setup_error"; error: string; status: number }
+  | { kind: "gmail_error"; err: unknown };
+
+// The classification pass, fully self-contained (resolves preset + Gmail
+// client, lists a page of inbox threads, classifies each). Callable directly
+// from the route and from an after() continuation — no auth/HTTP inside.
+async function scanCore(opts: ScanOpts): Promise<ScanResult> {
+  const { userId, force = false, limit = MAX_THREADS, pageToken = null, skipSignals = false } = opts;
 
   const [presetRow, cred] = await Promise.all([
     prisma.labelPreset.findUnique({ where: { userId } }),
     prisma.googleCredential.findUnique({ where: { userId } }),
   ]);
 
-  if (!cred) {
-    return NextResponse.json({ error: "Google not connected" }, { status: 400 });
-  }
+  if (!cred) return { kind: "setup_error", error: "Google not connected", status: 400 };
   if (!presetRow?.enabled || !isPresetKey(presetRow.preset)) {
-    return NextResponse.json(
-      { error: "No label preset is active yet. Open Configuration → Labels, pick a preset, turn it on, and hit Sync to Gmail." },
-      { status: 400 },
-    );
+    return {
+      kind: "setup_error",
+      error:
+        "No label preset is active yet. Open Configuration → Labels, pick a preset, turn it on, and hit Sync to Gmail.",
+      status: 400,
+    };
   }
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "Classifier unavailable" }, { status: 503 });
+    return { kind: "setup_error", error: "Classifier unavailable", status: 503 };
   }
 
   const maybeSpec = resolvePresetSpec({
@@ -88,7 +106,7 @@ export async function POST(req: Request) {
     includeUncategorized: presetRow.uncategorizedEnabled,
   });
   if (!maybeSpec || maybeSpec.labels.length === 0) {
-    return NextResponse.json({ error: "Preset has no labels" }, { status: 400 });
+    return { kind: "setup_error", error: "Preset has no labels", status: 400 };
   }
   const spec = maybeSpec;
   const preset = presetRow.preset;
@@ -97,38 +115,34 @@ export async function POST(req: Request) {
     .map((l) => l.shortName)
     .filter((n) => n !== HIGH_PRIORITY_NAME && n !== UNCATEGORIZED_NAME);
 
-  // Load LabelMappings into a map so we can resolve short names → Gmail ids.
   const mappings = await prisma.labelMapping.findMany({ where: { userId } });
   const mappingByName = new Map(mappings.map((m) => [m.labelName, m.gmailLabelId]));
 
-  // User-defined Labels (separate from preset). Mirrors the path in
-  // app/api/gmail/webhook/route.ts so the first-impression scan covers
-  // both surfaces a new email would.
   const userLabels = await prisma.label.findMany({
     where: { userId, enabled: true, gmailLabelId: { not: null } },
     include: { rules: true },
   });
 
-  // Pull recent inbox threads — by thread we'd need history, so use messages.list
-  // and dedupe by threadId since classification is thread-scoped. Token refresh
-  // and Gmail list failures surface here; classify them into an actionable
-  // message rather than letting them become an opaque 500 / "Sync failed".
+  // Pull a page of recent inbox threads. Token refresh and Gmail list failures
+  // classify into an actionable message rather than an opaque 500.
   let gmail: gmail_v1.Gmail;
   let messages: gmail_v1.Schema$Message[];
+  let nextPageToken: string | null;
   try {
     const { auth: oauthClient } = await makeAuthForUser(userId);
     gmail = google.gmail({ version: "v1", auth: oauthClient });
     const listRes = await gmail.users.messages.list({
       userId: "me",
       labelIds: ["INBOX"],
-      maxResults: MAX_THREADS * 2,
+      maxResults: limit * 2,
+      ...(pageToken ? { pageToken } : {}),
     });
     messages = listRes.data.messages ?? [];
+    nextPageToken = listRes.data.nextPageToken ?? null;
   } catch (err) {
-    return gmailErrorResponse(err);
+    return { kind: "gmail_error", err };
   }
 
-  // Resolve unique threads, skipping any already classified.
   const seenThreads = new Set<string>();
   const candidates: Array<{ messageId: string; threadId: string }> = [];
   for (const m of messages) {
@@ -136,11 +150,9 @@ export async function POST(req: Request) {
     if (seenThreads.has(m.threadId)) continue;
     seenThreads.add(m.threadId);
     candidates.push({ messageId: m.id, threadId: m.threadId });
-    if (candidates.length >= MAX_THREADS) break;
+    if (candidates.length >= limit) break;
   }
 
-  // Dedupe only when not forced; the Sync Inbox button always forces a fresh
-  // pass so preset changes get reflected on previously-seen threads.
   const alreadySet = force
     ? new Set<string>()
     : new Set(
@@ -155,8 +167,7 @@ export async function POST(req: Request) {
 
   let scanned = 0;
   let tagged = 0;
-  let skipped = alreadySet.size;
-  const errors: string[] = [];
+  const skipped = alreadySet.size;
 
   async function processOne(c: { messageId: string; threadId: string }) {
     scanned++;
@@ -176,11 +187,9 @@ export async function POST(req: Request) {
       const snippet = msg.snippet ?? "";
       const body = extractBody(msg.payload) || snippet;
 
-      // User-defined Label classification (rules first, then AI for labels
-      // without rules) — same logic as the webhook.
       if (userLabels.length > 0) {
         const ruleMatches = userLabels.filter(
-          (l) => l.rules.length > 0 && l.rules.some((rule) => matchesRule(rule, { subject, from, body }))
+          (l) => l.rules.length > 0 && l.rules.some((rule) => matchesRule(rule, { subject, from, body })),
         );
         const labelsWithoutRules = userLabels.filter((l) => l.rules.length === 0);
         let aiMatches: typeof userLabels = [];
@@ -188,14 +197,11 @@ export async function POST(req: Request) {
           const aiNames = await classifyEmailLabels(
             subject, from, body,
             labelsWithoutRules.map((l) => ({ name: l.name, description: l.description })),
-            userId
+            userId,
           );
           aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
         }
         const userGmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
-        // Reconcile within the user-defined labels too: strip any that no
-        // longer match so a re-sync reflects the current rules/classification
-        // instead of accumulating stale labels.
         const userApplySet = new Set(userGmailIds);
         const userRemoveIds = userLabels
           .map((l) => l.gmailLabelId!)
@@ -213,7 +219,6 @@ export async function POST(req: Request) {
         userId,
       });
 
-      // Fall back to the catch-all so nothing goes unlabeled.
       const matched =
         (result.label ? spec.labels.find((l) => l.shortName === result.label) : null) ??
         spec.labels.find((l) => l.shortName === UNCATEGORIZED_NAME) ??
@@ -224,11 +229,6 @@ export async function POST(req: Request) {
         namesToApply.push(HIGH_PRIORITY_NAME);
       }
 
-      // Reconcile within the preset-managed labels: apply the matched label(s)
-      // and strip any *other* preset label still on the message. The preset is
-      // single-label, so without this a forced re-sync would append the new
-      // label without removing the old one — over repeated syncs threads
-      // accumulate nearly every label.
       const applyIds = namesToApply
         .map((n) => mappingByName.get(n))
         .filter((id): id is string => Boolean(id));
@@ -245,24 +245,17 @@ export async function POST(req: Request) {
         update: { labelName: matched?.name ?? null },
       });
 
-      await detectAndPersistSignal({
-        userId,
-        threadId: c.threadId,
-        subject,
-        from,
-        body,
-      });
+      // Signal detection is skipped for the onboarding scan to protect the
+      // 2-minute budget; live classification picks signals up afterward.
+      if (!skipSignals) {
+        await detectAndPersistSignal({ userId, threadId: c.threadId, subject, from, body });
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(msg);
-      console.error(`[back-scan] thread ${c.threadId} failed:`, msg);
+      const m = err instanceof Error ? err.message : String(err);
+      console.error(`[back-scan] thread ${c.threadId} failed:`, m);
     }
   }
 
-  // Process in small batches to stay well under Vercel's 60s function limit
-  // without saturating Anthropic. Stop starting new batches once we're past the
-  // time budget and report the run as incomplete — a partial 200 beats a 60s
-  // timeout that the user only sees as "Sync failed".
   const startedAt = Date.now();
   let incomplete = false;
   for (let i = 0; i < toClassify.length; i += CONCURRENCY) {
@@ -273,19 +266,84 @@ export async function POST(req: Request) {
     await Promise.all(toClassify.slice(i, i + CONCURRENCY).map(processOne));
   }
 
-  return NextResponse.json({
+  return {
+    kind: "ok",
     scanned,
     tagged,
     skipped,
     incomplete,
-    errors: errors.slice(0, 5),
     total: candidates.length,
+    nextPageToken,
+  };
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+
+  // force=true (Sync-inbox button) bypasses dedupe. onboarding=true runs a
+  // second 25-thread tranche via after() and skips signal detection, labeling
+  // ~50 threads across the two tranches within the raised maxDuration.
+  const body = (await req.json().catch(() => ({}))) as {
+    force?: boolean;
+    onboarding?: boolean;
+  };
+  const force = body.force === true;
+  const onboarding = body.onboarding === true;
+
+  const first = await scanCore({
+    userId,
+    force,
+    limit: MAX_THREADS,
+    skipSignals: onboarding,
+  });
+
+  if (first.kind === "setup_error") {
+    return NextResponse.json({ error: first.error }, { status: first.status });
+  }
+  if (first.kind === "gmail_error") {
+    return gmailErrorResponse(first.err);
+  }
+
+  // Onboarding tail: label the next ~25 threads after the response returns, in
+  // the same invocation's extended lifetime. Best-effort — failures just leave
+  // those threads for live classification.
+  if (onboarding && first.nextPageToken) {
+    const pageToken = first.nextPageToken;
+    after(async () => {
+      try {
+        const tail = await scanCore({
+          userId,
+          force,
+          limit: MAX_THREADS,
+          pageToken,
+          skipSignals: true,
+        });
+        if (tail.kind !== "ok") {
+          console.error("[back-scan] onboarding tail non-ok:", tail.kind);
+        }
+      } catch (err) {
+        console.error("[back-scan] onboarding tail threw:", err);
+      }
+    });
+  }
+
+  return NextResponse.json({
+    scanned: first.scanned,
+    tagged: first.tagged,
+    skipped: first.skipped,
+    incomplete: first.incomplete,
+    total: first.total,
+    tailQueued: onboarding && !!first.nextPageToken,
   });
 }
 
 function matchesRule(
   rule: { field: string; operator: string; value: string },
-  msg: { subject: string; from: string; body: string }
+  msg: { subject: string; from: string; body: string },
 ): boolean {
   const haystack = (() => {
     switch (rule.field) {

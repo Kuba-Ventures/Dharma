@@ -116,12 +116,13 @@ export default function PersonalizeForm({
       return;
     }
 
-    // Synchronous 25-thread back-scan: gate the redirect on it so the inbox is
-    // already labeled on arrival. A backfill failure is non-fatal — labels
+    // Synchronous first-25 back-scan: gate the redirect on it so the inbox is
+    // already labeled on arrival. onboarding=true also queues the next ~25 via
+    // an after() tail server-side. A backfill failure is non-fatal — labels
     // still apply to new mail — so we proceed either way.
     setPhase("labeling");
     try {
-      await post("/api/labels/back-scan", {});
+      await post("/api/labels/back-scan", { onboarding: true });
     } catch {
       // Non-fatal; continue.
     }
