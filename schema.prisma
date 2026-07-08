@@ -36,6 +36,9 @@ model User {
   // Onboarding + UI state
   onboardingStep           Int                  @default(0)
   onboardingCompletedAt    DateTime?
+  onboardingFlow           String?              // 'v1' | 'v2' — pinned at onboarding entry; layouts route by this, not the ONBOARDING_V2 env flag
+  role                     String?              // onboarding role key (see lib/rolePresets.ts); drives the derived label preset
+  addonInstalledAt         DateTime?            // stamped on first GoogleBearer add-on call; drives the install-nudge state
   tourCompletedAt          DateTime?
   toursSeen                String[]             @default([])
   dismissedTiles           String[]             @default([])
