@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
+import { markAddonInstalled } from "../../../../lib/addonInstall";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { logUsage } from "../../../../lib/usage";
 import { checkAiGuard } from "../../../../lib/aiGuard";
@@ -38,7 +39,10 @@ async function resolveUserId(req: NextRequest): Promise<string | null> {
     if (userinfoRes.ok) {
       const { email } = (await userinfoRes.json()) as { email: string };
       const cred = await prisma.googleCredential.findUnique({ where: { email } });
-      if (cred) return cred.userId;
+      if (cred) {
+        void markAddonInstalled(cred.userId).catch(() => {});
+        return cred.userId;
+      }
     }
   }
   return null;

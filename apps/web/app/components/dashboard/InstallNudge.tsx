@@ -6,23 +6,28 @@ import { useEffect, useState } from "react";
 // Live Google Workspace Marketplace listing for the Dharma Gmail add-on.
 const MARKETPLACE_URL =
   "https://workspace.google.com/marketplace/app/dharma/63757021962";
-// Per-browser dismissal. We don't track whether the add-on is actually
-// installed, so this is a nudge the user clears once (install or dismiss).
+// Per-browser dismissal, layered on top of the server truth: `installed`
+// (User.addonInstalledAt, stamped on the add-on's first GoogleBearer call)
+// hides the nudge everywhere once the add-on is actually in use; the localStorage
+// key just lets a not-yet-installed user clear it on this browser.
 const DISMISS_KEY = "dharma.installNudgeDismissed";
 
-export default function InstallNudge() {
+export default function InstallNudge({ installed = false }: { installed?: boolean }) {
   // Start hidden; reveal only after confirming it wasn't dismissed. Both SSR
   // and the first client render produce null, so there's no hydration flash
   // for users who already dismissed it.
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (installed) return; // add-on confirmed installed — never nudge.
     try {
       if (localStorage.getItem(DISMISS_KEY) !== "1") setVisible(true);
     } catch {
       setVisible(true);
     }
-  }, []);
+  }, [installed]);
+
+  if (installed) return null;
 
   function dismiss() {
     try {

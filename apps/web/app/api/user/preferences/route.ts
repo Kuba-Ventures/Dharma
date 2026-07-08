@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
+import { markAddonInstalled } from "../../../../lib/addonInstall";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +27,10 @@ export async function GET(req: Request) {
     if (userinfoRes.ok) {
       const { email } = await userinfoRes.json() as { email: string };
       const cred = await prisma.googleCredential.findUnique({ where: { email } });
-      if (cred) userId = cred.userId;
+      if (cred) {
+        void markAddonInstalled(cred.userId).catch(() => {});
+        userId = cred.userId;
+      }
     }
   }
 
