@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
+import { markAddonInstalled } from "../../../../lib/addonInstall";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +28,10 @@ async function resolveUserId(req: NextRequest): Promise<string | null> {
     if (userinfoRes.ok) {
       const { email } = (await userinfoRes.json()) as { email: string };
       const cred = await prisma.googleCredential.findUnique({ where: { email } });
-      if (cred) return cred.userId;
+      if (cred) {
+        void markAddonInstalled(cred.userId).catch(() => {});
+        return cred.userId;
+      }
     }
   }
   return null;

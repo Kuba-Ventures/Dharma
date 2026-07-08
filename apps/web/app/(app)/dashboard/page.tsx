@@ -66,6 +66,7 @@ export default async function DashboardPage() {
         cumulativeSecondsSaved: true,
         homeCity: true,
         tourCompletedAt: true,
+        addonInstalledAt: true,
       },
     }),
     prisma.labelPreset.findUnique({ where: { userId } }),
@@ -277,7 +278,7 @@ export default async function DashboardPage() {
 
       {/* Dismissible nudge to install the Gmail add-on (existing users who
           never went through the onboarding install step). */}
-      <InstallNudge />
+      <InstallNudge installed={!!user.addonInstalledAt} />
 
       {/* Running for you */}
       <section data-tour="config">
