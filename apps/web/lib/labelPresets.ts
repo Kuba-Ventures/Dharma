@@ -124,6 +124,24 @@ export function isPresetKey(s: string): s is PresetKey {
   return (PRESET_KEYS as string[]).includes(s);
 }
 
+/** Editor row: the subset of a preset label the shared <LabelEditor> renders. */
+export interface EditorRow {
+  shortName: string;
+  colorKey: string;
+}
+
+/**
+ * Seed editable rows from a built-in preset. Uses displayHex as the colorKey so
+ * the color picker highlights the matching swatch (the palette is keyed by
+ * hex), matching how the config LabelsCard forks a built-in for editing.
+ */
+export function presetEditorRows(preset: BuiltInPresetKey): EditorRow[] {
+  return LABEL_PRESETS[preset].map((l) => ({
+    shortName: l.shortName,
+    colorKey: l.displayHex,
+  }));
+}
+
 /** Sanitize a user-typed string into something Gmail accepts in a label path. */
 function sanitizeLabelSegment(input: string): string {
   return input

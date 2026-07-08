@@ -9,7 +9,31 @@ import {
   isPresetKey,
   resolvePresetSpec,
   uncategorizedLabelName,
+  presetEditorRows,
 } from "./labelPresets";
+
+describe("presetEditorRows", () => {
+  it("seeds rows from a built-in preset using shortName + displayHex", () => {
+    const rows = presetEditorRows("Legal");
+    expect(rows.map((r) => r.shortName)).toEqual([
+      "Contracts",
+      "Client",
+      "Internal",
+      "High-Priority",
+    ]);
+    // colorKey is the hex (displayHex), not the named key, so the picker highlights.
+    for (const r of rows) {
+      expect(r.colorKey).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it("covers every built-in preset without throwing", () => {
+    for (const k of BUILT_IN_PRESET_KEYS) {
+      const rows = presetEditorRows(k);
+      expect(rows.length).toBe(LABEL_PRESETS[k].length);
+    }
+  });
+});
 
 describe("preset key guards", () => {
   it("recognizes the five built-in presets but not Custom", () => {

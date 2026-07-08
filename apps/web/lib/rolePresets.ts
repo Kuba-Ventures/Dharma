@@ -18,7 +18,7 @@
 //   personal            Personal use          → Personal
 //   other               Other                 → General
 
-import type { PresetKey } from "./labelPresets";
+import type { BuiltInPresetKey } from "./labelPresets";
 
 export interface RoleOption {
   /** Stable key stored on User.role and submitted by the quiz. */
@@ -26,11 +26,11 @@ export interface RoleOption {
   /** Human-facing label rendered as the quiz option. */
   label: string;
   /** Label preset this role derives. Always a built-in preset (never Custom). */
-  preset: PresetKey;
+  preset: BuiltInPresetKey;
 }
 
-/** Roles maping to a preset with no dedicated label set fall back to General. */
-export const DEFAULT_PRESET: PresetKey = "General";
+/** Roles mapping to a preset with no dedicated label set fall back to General. */
+export const DEFAULT_PRESET: BuiltInPresetKey = "General";
 
 /** Order here is the order shown in the quiz. */
 export const ROLE_OPTIONS: RoleOption[] = [
@@ -55,7 +55,7 @@ export function isRoleKey(s: string): boolean {
  * work with — the quiz gates on role selection, but this stays total so a
  * stale/hand-edited User.role can never produce an invalid preset.
  */
-export function roleToPresetKey(role: string | null | undefined): PresetKey {
+export function roleToPresetKey(role: string | null | undefined): BuiltInPresetKey {
   if (!role) return DEFAULT_PRESET;
   const match = ROLE_OPTIONS.find((r) => r.key === role);
   return match ? match.preset : DEFAULT_PRESET;
