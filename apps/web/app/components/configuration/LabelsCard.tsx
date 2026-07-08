@@ -7,6 +7,8 @@ import IconTile from "../ui/IconTile";
 import Button from "../ui/Button";
 import Toggle from "../ui/Toggle";
 import ConfirmModal from "../ui/ConfirmModal";
+import LabelEditor from "./LabelEditor";
+import { GMAIL_COLOR_ROWS, DEFAULT_LABEL_COLOR_HEX } from "@/lib/gmailPalette";
 
 const LABELS_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -30,14 +32,9 @@ type CustomLabel = {
   displayHex: string;
 };
 
-// Gmail's full label palette — three vibrancy rows. Hex doubles as the
-// `colorKey` sent to the API; the server maps to Gmail's accepted palette.
-const COLOR_ROWS: string[][] = [
-  ["#cc3a21","#eaa041","#f2c960","#149e60","#3dc789","#2da2bb","#4a86e8","#8e63ce","#b694e8","#e07798"],
-  ["#fb4c2f","#ffad47","#fad165","#16a766","#43d692","#4986e7","#a479e2","#f691b3","#cf8933","#653e9b"],
-  ["#f2b2a8","#ffc8af","#fce8b3","#b3efd3","#a0eac9","#98d7e4","#b6cff5","#e3d7ff","#d0bcf1","#fbd3e0"],
-];
-const DEFAULT_COLOR_HEX = "#4a86e8";
+// Palette + default swatch come from lib/gmailPalette (shared with LabelEditor
+// and the server-side color validation in lib/gmail.ts).
+const DEFAULT_COLOR_HEX = DEFAULT_LABEL_COLOR_HEX;
 
 // Display-side mirror of LABEL_PRESETS in lib/labelPresets.ts. Hexes are the
 // palette values from COLOR_ROWS so the color picker highlights correctly.
@@ -199,7 +196,7 @@ export default function LabelsCard({ initial }: Props) {
   function addLabel() {
     const wasCustom = preset === "Custom";
     const base = wasCustom ? customLabels : builtInSeed(preset);
-    const row = COLOR_ROWS[0];
+    const row = GMAIL_COLOR_ROWS[0];
     const nextColor = row[base.length % row.length];
     const next = [...base, { shortName: "", colorKey: nextColor, displayHex: nextColor }];
     if (!wasCustom) {
@@ -540,40 +537,16 @@ export default function LabelsCard({ initial }: Props) {
                   </span>
                 )}
               </div>
-              <div className="mt-2 space-y-2">
-                {editableLabels.map((label, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <ColorPickerDot
-                      selectedHex={label.colorKey}
-                      onPick={(hex) => updateLabel(idx, { colorKey: hex, displayHex: hex }, true)}
-                    />
-                    <input
-                      type="text"
-                      value={label.shortName}
-                      onChange={(e) => updateLabel(idx, { shortName: e.target.value })}
-                      onBlur={persistCustomState}
-                      placeholder="follow-up"
-                      className="flex-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-1.5 text-sm text-white placeholder:text-white/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeLabel(idx)}
-                      disabled={editableLabels.length <= 1}
-                      aria-label="Remove label"
-                      className="px-2 text-base leading-none text-white/30 transition-colors hover:text-red-400/70 disabled:opacity-30 disabled:hover:text-white/30"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addLabel}
-                className="mt-2 text-[11px] text-white/40 transition-colors hover:text-white/70"
-              >
-                + Add label
-              </button>
+              <LabelEditor
+                rows={editableLabels}
+                onColorChange={(idx, hex) =>
+                  updateLabel(idx, { colorKey: hex, displayHex: hex }, true)
+                }
+                onNameChange={(idx, name) => updateLabel(idx, { shortName: name })}
+                onNameCommit={persistCustomState}
+                onAdd={addLabel}
+                onRemove={removeLabel}
+              />
             </div>
 
             <div>
@@ -651,51 +624,5 @@ export default function LabelsCard({ initial }: Props) {
         onCancel={() => setConfirmingOff(false)}
       />
     </>
-  );
-}
-
-function ColorPickerDot({
-  selectedHex,
-  onPick,
-}: {
-  selectedHex: string;
-  onPick: (hex: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="h-5 w-5 rounded-full border border-white/20 ring-1 ring-black/40"
-        style={{ backgroundColor: selectedHex }}
-        aria-label="Pick color"
-      />
-      {open && (
-        <div className="absolute left-0 top-7 z-20 space-y-1.5 rounded-btn border border-[color:var(--border-subtle)] bg-[#1f1f1f] p-2 shadow-lg">
-          {COLOR_ROWS.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex gap-1.5">
-              {row.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => {
-                    onPick(hex);
-                    setOpen(false);
-                  }}
-                  className={`h-4 w-4 rounded-full transition-transform ${
-                    hex.toLowerCase() === selectedHex.toLowerCase()
-                      ? "scale-125 ring-1 ring-white/50"
-                      : "opacity-80 hover:scale-110 hover:opacity-100"
-                  }`}
-                  style={{ backgroundColor: hex }}
-                  aria-label={hex}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
