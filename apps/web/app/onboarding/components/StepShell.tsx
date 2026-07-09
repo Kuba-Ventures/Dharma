@@ -24,10 +24,13 @@ export default function StepShell({
           <div
             key={i}
             className={`h-1 flex-1 rounded-full ${
+              // Fill the current step and everything before it, so the final
+              // step reads as complete (all bars solid) instead of leaving the
+              // last segment faint. The current step gets a subtle ring.
               i < step
                 ? "bg-brand-400"
                 : i === step
-                  ? "bg-brand-400/60"
+                  ? "bg-brand-400 ring-1 ring-brand-200/40"
                   : "bg-white/[0.08]"
             }`}
           />

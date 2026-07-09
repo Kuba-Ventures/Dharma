@@ -139,11 +139,19 @@ export default function PersonalizeForm({
         </p>
         {toneStatus === "done" && summary ? (
           <>
-            <p className="mt-2 text-sm leading-relaxed text-white">{summary}</p>
+            <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.06em] text-white/45">
+              How you write
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-white">{summary}</p>
             {example && (
-              <pre className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.04] p-3 font-sans text-[12px] text-white/70">
-                {example}
-              </pre>
+              <>
+                <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.06em] text-white/45">
+                  A sample reply in your voice
+                </p>
+                <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.04] p-3 font-sans text-[12px] text-white/70">
+                  {example}
+                </pre>
+              </>
             )}
             <button
               type="button"
