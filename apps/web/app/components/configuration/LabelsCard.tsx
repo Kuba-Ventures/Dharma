@@ -9,6 +9,7 @@ import Toggle from "../ui/Toggle";
 import ConfirmModal from "../ui/ConfirmModal";
 import LabelEditor from "./LabelEditor";
 import { GMAIL_COLOR_ROWS, DEFAULT_LABEL_COLOR_HEX } from "@/lib/gmailPalette";
+import { presetEditorRows, isBuiltInPresetKey } from "@/lib/labelPresets";
 
 const LABELS_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -36,57 +37,16 @@ type CustomLabel = {
 // and the server-side color validation in lib/gmail.ts).
 const DEFAULT_COLOR_HEX = DEFAULT_LABEL_COLOR_HEX;
 
-// Display-side mirror of LABEL_PRESETS in lib/labelPresets.ts. Hexes are the
-// palette values from COLOR_ROWS so the color picker highlights correctly.
-// Editing a built-in preset forks it to Custom seeded from this list — keep in
-// sync if a preset's labels change server-side.
-const BUILT_IN_LABELS: Record<Exclude<Preset, "Custom">, { shortName: string; displayHex: string }[]> = {
-  VC: [
-    { shortName: "Portfolio", displayHex: "#16a766" },
-    { shortName: "Deal-Flow", displayHex: "#fb4c2f" },
-    { shortName: "LP-Relations", displayHex: "#4a86e8" },
-    { shortName: "Internal", displayHex: "#8e63ce" },
-    { shortName: "High-Priority", displayHex: "#ffad47" },
-  ],
-  PE: [
-    { shortName: "Portfolio-Co", displayHex: "#16a766" },
-    { shortName: "Deal", displayHex: "#fb4c2f" },
-    { shortName: "Diligence", displayHex: "#4a86e8" },
-    { shortName: "Internal", displayHex: "#8e63ce" },
-    { shortName: "High-Priority", displayHex: "#ffad47" },
-  ],
-  Legal: [
-    { shortName: "Contracts", displayHex: "#fb4c2f" },
-    { shortName: "Client", displayHex: "#16a766" },
-    { shortName: "Internal", displayHex: "#8e63ce" },
-    { shortName: "High-Priority", displayHex: "#ffad47" },
-  ],
-  General: [
-    { shortName: "Respond", displayHex: "#fb4c2f" },
-    { shortName: "Meeting", displayHex: "#4a86e8" },
-    { shortName: "Informational", displayHex: "#8e63ce" },
-    { shortName: "High-Priority", displayHex: "#ffad47" },
-  ],
-  Personal: [
-    { shortName: "Orders", displayHex: "#16a766" },
-    { shortName: "Shipping", displayHex: "#4a86e8" },
-    { shortName: "Follow-Up", displayHex: "#fb4c2f" },
-    { shortName: "Work", displayHex: "#8e63ce" },
-    { shortName: "Promotions", displayHex: "#f2c960" },
-    { shortName: "Updates", displayHex: "#2da2bb" },
-    { shortName: "Likely-Spam", displayHex: "#cf8933" },
-    { shortName: "High-Priority", displayHex: "#ffad47" },
-  ],
-};
-
-// Seed editable rows from a built-in preset. colorKey doubles as the hex the
-// API maps to Gmail's palette, so we reuse displayHex for both.
+// Seed editable rows from a built-in preset. Sourced from presetEditorRows in
+// lib/labelPresets.ts (the single source of truth, shared with the onboarding
+// personalize step) so the editor can't drift from what gets provisioned.
+// colorKey doubles as the hex the API maps to Gmail's palette.
 function builtInSeed(p: Preset): CustomLabel[] {
-  if (p === "Custom") return [];
-  return (BUILT_IN_LABELS[p] ?? []).map((l) => ({
+  if (!isBuiltInPresetKey(p)) return [];
+  return presetEditorRows(p).map((l) => ({
     shortName: l.shortName,
-    colorKey: l.displayHex,
-    displayHex: l.displayHex,
+    colorKey: l.colorKey,
+    displayHex: l.colorKey,
   }));
 }
 
