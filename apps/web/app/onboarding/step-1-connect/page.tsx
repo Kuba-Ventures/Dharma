@@ -15,14 +15,24 @@ export default async function StepOne() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const cred = await prisma.googleCredential.findUnique({
-    where: { userId: session.user.id },
-    select: { email: true },
-  });
+  const [cred, dbUser] = await Promise.all([
+    prisma.googleCredential.findUnique({
+      where: { userId: session.user.id },
+      select: { email: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { onboardingFlow: true },
+    }),
+  ]);
 
   const connected = !!cred;
-  // Flow shown for a not-yet-pinned user (drives the progress-bar total).
-  const displayFlow = flowForNewUser(process.env.ONBOARDING_V2 === "true");
+  // Progress total reflects the user's actual flow: their pin if set (so a
+  // v2-pinned user sees "of 4" even while the global flag is off), else the
+  // flow a new user would be pinned to from the env flag.
+  const displayFlow = dbUser?.onboardingFlow
+    ? resolveOnboardingFlow(dbUser.onboardingFlow)
+    : flowForNewUser(process.env.ONBOARDING_V2 === "true");
   const total = stepUrlsForFlow(displayFlow).length;
 
   async function advance() {
