@@ -33,14 +33,24 @@ describe("LabelsCard editor (characterization)", () => {
   it("renders the built-in General preset's labels as editable rows", () => {
     render(<LabelsCard initial={INITIAL} />);
     const values = nameInputs().map((i) => i.value);
-    expect(values).toEqual(["Respond", "Meeting", "Informational", "High-Priority"]);
+    expect(values).toEqual([
+      "Clients",
+      "Sales",
+      "Vendors",
+      "Billing",
+      "Product",
+      "Team-Internal",
+      "External",
+      "Follow-Up",
+      "High-Priority",
+    ]);
   });
 
   it("'+ Add label' appends a blank row", () => {
     render(<LabelsCard initial={INITIAL} />);
-    expect(nameInputs()).toHaveLength(4);
+    const before = nameInputs().length;
     fireEvent.click(screen.getByText("+ Add label"));
-    expect(nameInputs()).toHaveLength(5);
+    expect(nameInputs()).toHaveLength(before + 1);
     expect(nameInputs().at(-1)!.value).toBe("");
   });
 
@@ -56,11 +66,11 @@ describe("LabelsCard editor (characterization)", () => {
   it("removes a row, and disables remove when only one row remains", () => {
     render(<LabelsCard initial={INITIAL} />);
     const removeButtons = () => screen.getAllByLabelText("Remove label");
-    expect(nameInputs()).toHaveLength(4);
-    // Remove down to a single row.
-    fireEvent.click(removeButtons()[0]);
-    fireEvent.click(removeButtons()[0]);
-    fireEvent.click(removeButtons()[0]);
+    // Remove down to a single row, whatever the preset length.
+    let guard = 0;
+    while (nameInputs().length > 1 && guard++ < 50) {
+      fireEvent.click(removeButtons()[0]);
+    }
     expect(nameInputs()).toHaveLength(1);
     // The last remaining row's remove control is disabled.
     expect(removeButtons()[0]).toBeDisabled();

@@ -17,8 +17,13 @@ describe("presetEditorRows", () => {
     const rows = presetEditorRows("Legal");
     expect(rows.map((r) => r.shortName)).toEqual([
       "Contracts",
-      "Client",
+      "Clients",
+      "Compliance",
+      "Filings",
+      "Opposing-Counsel",
+      "Billing",
       "Internal",
+      "Follow-Up",
       "High-Priority",
     ]);
     // colorKey is the hex (displayHex), not the named key, so the picker highlights.
