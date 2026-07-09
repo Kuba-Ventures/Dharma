@@ -18,8 +18,16 @@ import {
 } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
-const MAX_THREADS = 25;
-const CONCURRENCY = 5;
+const MAX_THREADS = Number(process.env.BACKSCAN_MAX_THREADS) || 25;
+// The wall-time is dominated by one Haiku classify call per thread, run in
+// serial batches of CONCURRENCY. At 5 a 25-thread tranche is 5 serial batches;
+// at 25 the whole tranche runs as ONE parallel batch (~5x headroom over the
+// old default, comfortably past the 3x target). Gmail's per-user quota
+// (~250 units/s; ~10 units/thread) absorbs the burst fine. The ceiling to
+// watch as usage grows is Anthropic RPM (up to CONCURRENCY concurrent Haiku
+// calls per onboarding user, times simultaneous onboarders) — dial down via
+// BACKSCAN_CONCURRENCY with no redeploy if that ever bites.
+const CONCURRENCY = Number(process.env.BACKSCAN_CONCURRENCY) || 25;
 // Stop *starting* new classification batches past this point so the function
 // returns a partial-but-successful result instead of being killed at the cap
 // (an in-flight batch can still run ~10s).
@@ -265,6 +273,14 @@ async function scanCore(opts: ScanOpts): Promise<ScanResult> {
     }
     await Promise.all(toClassify.slice(i, i + CONCURRENCY).map(processOne));
   }
+
+  // Real timing for the back-scan (the middleware request log doesn't carry
+  // function duration). One line per tranche → grep "[back-scan] done" in the
+  // Vercel runtime logs for actual ms/scanned/tagged as users onboard.
+  console.log(
+    `[back-scan] done in ${Date.now() - startedAt}ms · scanned=${scanned} tagged=${tagged} ` +
+      `skipped=${skipped} incomplete=${incomplete} concurrency=${CONCURRENCY} limit=${limit} pageToken=${pageToken ? "y" : "n"}`,
+  );
 
   return {
     kind: "ok",
