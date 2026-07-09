@@ -198,17 +198,27 @@ export default function PersonalizeForm({
 
       {error && <p className="text-[11px] text-red-300">{error}</p>}
 
-      <div className="flex items-center justify-end gap-3">
-        {busy && (
-          <span className="text-[11px] text-brand-200">
-            {phase === "provisioning"
-              ? "Creating your labels…"
-              : "Labeling your inbox…"}
-          </span>
-        )}
-        <Button variant="primary" onClick={submit} disabled={busy}>
-          {busy ? "Setting up…" : "Sort my inbox"}
-        </Button>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/onboarding/step-2-quiz")}
+          disabled={busy}
+          className="rounded-btn px-3 py-2 text-sm text-white/50 transition-colors hover:text-white disabled:opacity-40"
+        >
+          Back
+        </button>
+        <div className="flex items-center gap-3">
+          {busy && (
+            <span className="text-[11px] text-brand-200">
+              {phase === "provisioning"
+                ? "Creating your labels…"
+                : "Labeling your inbox…"}
+            </span>
+          )}
+          <Button variant="primary" onClick={submit} disabled={busy}>
+            {busy ? "Setting up…" : "Sort my inbox"}
+          </Button>
+        </div>
       </div>
     </div>
   );

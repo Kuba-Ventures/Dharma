@@ -273,7 +273,14 @@ function buildWelcomeCard() {
     .addSection(
       CardService.newCardSection().setHeader('Get started')
         .addWidget(CardService.newTextParagraph()
-          .setText('Open an email and Dharma will draft a reply in your voice. <font color="' + BRAND_SECONDARY + '">Tap a tone</font> — My Tone, Concise, Formal / Legal, or Scheduling.'))
+          .setText('Open an email and Dharma will draft a reply in your voice. <font color="' + BRAND_SECONDARY + '">Tap a tone</font>: My Tone, Concise, Formal / Legal, or Scheduling.'))
+        .addWidget(CardService.newTextButton()
+          .setText('Open your Dharma dashboard')
+          .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+          .setBackgroundColor(BRAND_PRIMARY)
+          .setOpenLink(CardService.newOpenLink().setUrl(DHARMA_API + '/dashboard')))
+        .addWidget(CardService.newTextParagraph()
+          .setText('Change your tone, labels, and scheduling in the dashboard. You are already signed in there.'))
     )
     .build();
 }
@@ -323,7 +330,7 @@ function buildComposeToneCard(subject, threadId) {
   // Instant path: paste notes here → polished text drops straight into the compose box (live, no reopening).
   var instantSection = CardService.newCardSection().setHeader('Polish & insert (instant)')
     .addWidget(CardService.newTextParagraph()
-      .setText('Type or paste your notes here. The polished version drops straight into the compose box — no need to open Drafts.'))
+      .setText('Type or paste your notes here. The polished version drops straight into the compose box. No need to open Drafts.'))
     .addWidget(
       CardService.newTextInput()
         .setFieldName('dharmaNotes')
@@ -1057,7 +1064,7 @@ function buildToneEditCard(profile) {
   var section = CardService.newCardSection();
 
   section.addWidget(CardService.newTextParagraph()
-    .setText('<b>Your style</b> — how Dharma describes your writing. Edit freely.'));
+    .setText('<b>Your style</b>: how Dharma describes your writing. Edit freely.'));
   section.addWidget(CardService.newTextInput()
     .setFieldName('toneProfile')
     .setTitle('Style summary')
@@ -1067,7 +1074,7 @@ function buildToneEditCard(profile) {
   section.addWidget(CardService.newDivider());
 
   section.addWidget(CardService.newTextParagraph()
-    .setText('<b>Greeting</b> — how you typically open emails. Leave blank to skip greetings.'));
+    .setText('<b>Greeting</b>: how you typically open emails. Leave blank to skip greetings.'));
   section.addWidget(CardService.newTextInput()
     .setFieldName('inferredIntro')
     .setTitle('e.g. Hi, or Hey {name},')
@@ -1076,7 +1083,7 @@ function buildToneEditCard(profile) {
   section.addWidget(CardService.newDivider());
 
   section.addWidget(CardService.newTextParagraph()
-    .setText('<b>Sign-off</b> — how you typically close emails. Use \\n for a line break before your name.'));
+    .setText('<b>Sign-off</b>: how you typically close emails. Use \\n for a line break before your name.'));
   section.addWidget(CardService.newTextInput()
     .setFieldName('inferredSignOff')
     .setTitle('e.g. Thanks,\\nAlex')

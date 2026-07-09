@@ -65,7 +65,7 @@ export default async function StepThreePersonalize() {
       total={4}
       eyebrow="Welcome to Dharma"
       title="Your voice and your labels"
-      description="We learned your writing style from your sent mail and picked labels for your role. Tweak anything — then we'll sort your inbox."
+      description="We learned your writing style from your sent mail and picked labels for your role. Tweak anything, then we'll sort your inbox."
     >
       <PersonalizeForm
         initialTone={{
