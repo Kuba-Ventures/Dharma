@@ -162,7 +162,15 @@ export default function QuizForm({ initialName, initialRole, initialCity }: Prop
 
         {error && <p className="text-[11px] text-red-300">{error}</p>}
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => router.push("/onboarding/step-1-connect")}
+            disabled={submitting}
+            className="rounded-btn px-3 py-2 text-sm text-white/50 transition-colors hover:text-white disabled:opacity-40"
+          >
+            Back
+          </button>
           <button
             type="button"
             onClick={submit}

@@ -82,7 +82,7 @@ export default function InboxLanding({
         {done ? (
           <div className="mt-4 space-y-2">
             <p className="text-sm text-brand-200">
-              Opened your inbox in a new tab — you&apos;re all set. ✓
+              Opened your inbox in a new tab. You&apos;re all set. ✓
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <a href="/dashboard" className="text-[13px] text-white/60 transition-colors hover:text-white">
