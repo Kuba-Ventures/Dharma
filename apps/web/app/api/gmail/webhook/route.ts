@@ -6,6 +6,7 @@ import { getNewMessageIds, getMessage, applyGmailLabels, HistoryExpiredError } f
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
+import { shouldRecordClassifiedThread } from "../../../../lib/classifiedThreadGate";
 
 // Allow heavier classification work past the default 15s — caps at 60s to
 // stay under the Pub/Sub ack deadline.
@@ -221,6 +222,7 @@ async function processPush(ctx: PushContext): Promise<void> {
                 labelNamesToApply.push(HIGH_PRIORITY_NAME);
               }
 
+              let appliedLabelCount = 0;
               if (labelNamesToApply.length > 0) {
                 const mappings = await prisma.labelMapping.findMany({
                   where: { userId: ctx.userId, labelName: { in: labelNamesToApply } },
@@ -228,27 +230,44 @@ async function processPush(ctx: PushContext): Promise<void> {
                 const gmailIds = mappings.map((m) => m.gmailLabelId);
                 if (gmailIds.length > 0) {
                   await applyGmailLabels(ctx.userId, messageId, gmailIds);
+                  appliedLabelCount = gmailIds.length;
                   console.log(`[gmail/webhook] Preset labels applied to ${messageId}: ${mappings.map((m) => m.labelName).join(", ")} (priority=${result.priority.toFixed(2)})`);
                 }
               }
 
-              await prisma.classifiedThread.upsert({
-                where: { userId_threadId: { userId: ctx.userId, threadId: msg.threadId } },
-                create: {
+              // Only mark the thread classified when the outcome is final. If we
+              // intended a label but no LabelMapping resolved (provisioning race
+              // / preset switch), leave it unrecorded so a later run reclassifies
+              // instead of stranding it "classified but unlabeled" — which a
+              // non-forced back-scan would then skip forever. See PR #42.
+              if (
+                shouldRecordClassifiedThread({
+                  intendedLabelCount: labelNamesToApply.length,
+                  appliedLabelCount,
+                })
+              ) {
+                await prisma.classifiedThread.upsert({
+                  where: { userId_threadId: { userId: ctx.userId, threadId: msg.threadId } },
+                  create: {
+                    userId: ctx.userId,
+                    threadId: msg.threadId,
+                    labelName: matched?.name ?? null,
+                  },
+                  update: {},
+                });
+
+                await detectAndPersistSignal({
                   userId: ctx.userId,
                   threadId: msg.threadId,
-                  labelName: matched?.name ?? null,
-                },
-                update: {},
-              });
-
-              await detectAndPersistSignal({
-                userId: ctx.userId,
-                threadId: msg.threadId,
-                subject: msg.subject,
-                from: msg.from,
-                body: msg.body,
-              });
+                  subject: msg.subject,
+                  from: msg.from,
+                  body: msg.body,
+                });
+              } else {
+                console.warn(
+                  `[gmail/webhook] Intended labels [${labelNamesToApply.join(", ")}] for thread ${msg.threadId} but no LabelMapping resolved; deferring classification.`,
+                );
+              }
             }
           }
         }
