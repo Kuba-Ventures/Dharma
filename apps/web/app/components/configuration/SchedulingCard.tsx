@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Card from "../ui/Card";
 import StatusPill from "../ui/StatusPill";
 import IconTile from "../ui/IconTile";
@@ -365,10 +365,22 @@ export default function SchedulingCard({ initial }: Props) {
     }
   }
 
-  async function persistPrefs(next: Prefs) {
-    const prev = prefs; // for rollback if the save doesn't land
-    setPrefs(next);
-    setBlockErrors([]);
+  // Debounced, race-safe persistence of scheduling prefs.
+  //
+  // Every edit updates local state immediately (so typing stays responsive),
+  // but the network write is debounced + coalesced. Holding down a key used to
+  // fire one POST per keystroke, flooding /api/preferences/scheduling; the
+  // browser would reset some of those in-flight connections and surface a bogus
+  // "Couldn't reach the server". A monotonic sequence guard additionally lets
+  // only the newest in-flight save reconcile state from the server, so a slow
+  // earlier response can't clobber fresher edits (the "year 0002" flap).
+  const saveSeqRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<Prefs | null>(null);
+
+  const sendPrefs = useCallback(async (next: Prefs) => {
+    const seq = ++saveSeqRef.current;
+    const isLatest = () => seq === saveSeqRef.current;
     try {
       const res = await fetch("/api/preferences/scheduling", {
         method: "POST",
@@ -378,34 +390,67 @@ export default function SchedulingCard({ initial }: Props) {
       // An expired session redirects the API call to /login (HTML), which
       // would otherwise surface as a confusing "couldn't reach server".
       if (res.redirected || /\/login/.test(res.url)) {
-        setPrefs(prev);
-        setBlockErrors(["Your session expired — refresh the page and sign in again."]);
+        if (isLatest())
+          setBlockErrors(["Your session expired — refresh the page and sign in again."]);
         return;
       }
       if (!res.ok) {
-        setPrefs(prev);
-        setBlockErrors(["Couldn’t save your changes — please try again."]);
+        if (isLatest()) setBlockErrors(["Couldn’t save your changes — please try again."]);
         return;
       }
       const data = (await res.json()) as {
         schedulingPreferences?: string | null;
         syncErrors?: string[];
       };
-      // Server may have populated calendarEventIds on mirrored blocks (or
-      // reverted ones that failed to sync). Reflect those back into local
-      // state so the UI matches the server and edits patch the right event.
+      // Only the newest save may reconcile local state from the server, so an
+      // out-of-order earlier response can't overwrite what the user has since
+      // typed. The server may have populated calendarEventIds on mirrored
+      // blocks (or reverted ones that failed to sync); reflect those back so
+      // the UI matches the server and edits patch the right event.
+      if (!isLatest()) return;
       if (typeof data.schedulingPreferences === "string") {
         setPrefs(parsePrefs(data.schedulingPreferences));
       }
-      if (Array.isArray(data.syncErrors) && data.syncErrors.length > 0) {
-        setBlockErrors(data.syncErrors);
-      }
+      setBlockErrors(
+        Array.isArray(data.syncErrors) && data.syncErrors.length > 0 ? data.syncErrors : [],
+      );
     } catch (err) {
-      console.error("[scheduling] persistPrefs failed:", err);
-      setPrefs(prev);
-      setBlockErrors(["Couldn’t reach the server — please try again."]);
+      console.error("[scheduling] sendPrefs failed:", err);
+      if (isLatest()) setBlockErrors(["Couldn’t reach the server — please try again."]);
     }
-  }
+  }, []);
+
+  // Update local state now; persist to the server either immediately (explicit
+  // actions like add/remove block or Add-to-calendar) or debounced (keystroke
+  // edits inside a block).
+  const persistPrefs = useCallback(
+    (next: Prefs, opts?: { immediate?: boolean }) => {
+      setPrefs(next);
+      setBlockErrors([]);
+      pendingRef.current = next;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const flush = () => {
+        debounceRef.current = null;
+        const p = pendingRef.current;
+        pendingRef.current = null;
+        if (p) void sendPrefs(p);
+      };
+      if (opts?.immediate) flush();
+      else debounceRef.current = setTimeout(flush, 500);
+    },
+    [sendPrefs],
+  );
+
+  // Flush any pending debounced save on unmount so a last edit isn't lost.
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
 
   async function persistHours(next: MeetingHour[]) {
     setHours(next);
@@ -564,21 +609,21 @@ export default function SchedulingCard({ initial }: Props) {
                 unit="min"
                 value={prefs.defaultDurationMin}
                 options={[15, 20, 30, 45, 60]}
-                onChange={(v) => persistPrefs({ ...prefs, defaultDurationMin: v })}
+                onChange={(v) => persistPrefs({ ...prefs, defaultDurationMin: v }, { immediate: true })}
               />
               <PrefChip
                 label="Buffer between"
                 unit="min"
                 value={prefs.bufferMin}
                 options={[0, 5, 10, 15, 30]}
-                onChange={(v) => persistPrefs({ ...prefs, bufferMin: v })}
+                onChange={(v) => persistPrefs({ ...prefs, bufferMin: v }, { immediate: true })}
               />
               <PrefChip
                 label="Max meetings / day"
                 unit=""
                 value={prefs.maxPerDay}
                 options={[2, 3, 4, 5, 6, 8]}
-                onChange={(v) => persistPrefs({ ...prefs, maxPerDay: v })}
+                onChange={(v) => persistPrefs({ ...prefs, maxPerDay: v }, { immediate: true })}
               />
             </div>
 
@@ -590,18 +635,21 @@ export default function SchedulingCard({ initial }: Props) {
                 <button
                   type="button"
                   onClick={() =>
-                    persistPrefs({
-                      ...prefs,
-                      blockedWindows: [
-                        ...prefs.blockedWindows,
-                        {
-                          start: "12:00",
-                          end: "13:00",
-                          label: "",
-                          recurrence: defaultRecurrence(activeDays),
-                        },
-                      ],
-                    })
+                    persistPrefs(
+                      {
+                        ...prefs,
+                        blockedWindows: [
+                          ...prefs.blockedWindows,
+                          {
+                            start: "12:00",
+                            end: "13:00",
+                            label: "",
+                            recurrence: defaultRecurrence(activeDays),
+                          },
+                        ],
+                      },
+                      { immediate: true },
+                    )
                   }
                   className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/[0.09]"
                 >
@@ -628,7 +676,7 @@ export default function SchedulingCard({ initial }: Props) {
                       }}
                       onRemove={() => {
                         const next = prefs.blockedWindows.filter((_, i) => i !== idx);
-                        persistPrefs({ ...prefs, blockedWindows: next });
+                        persistPrefs({ ...prefs, blockedWindows: next }, { immediate: true });
                       }}
                       onRequestAdd={() => setConfirmAddIdx(idx)}
                     />
@@ -690,7 +738,7 @@ export default function SchedulingCard({ initial }: Props) {
                 mirrorToCalendar: true,
                 recurrence: cur.recurrence ?? defaultRecurrence(activeDays),
               };
-              persistPrefs({ ...prefs, blockedWindows: next });
+              persistPrefs({ ...prefs, blockedWindows: next }, { immediate: true });
               setConfirmAddIdx(null);
             }}
             onCancel={() => setConfirmAddIdx(null)}
