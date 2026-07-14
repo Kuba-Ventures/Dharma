@@ -3,6 +3,13 @@ import { google, type calendar_v3 } from "googleapis";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../lib/gmail";
+import { withCalendarTimeout } from "../../../../lib/calendarTimeout";
+
+// Bound the function. The calendar-mirror path below makes live Google Calendar
+// calls (each capped by withCalendarTimeout); maxDuration is the outer ceiling
+// so the request can't stay open until the browser itself gives up ("loaded and
+// timed out") with no server-side trace.
+export const maxDuration = 30;
 
 // Per-block recurrence — gives each block event-like control over how it
 // repeats, instead of auto-deriving the schedule from the user's meeting days.
@@ -232,21 +239,25 @@ async function reconcileBlocks(
       if (prevId) {
         // Patch existing event in case label/times/recurrence changed.
         try {
-          await cal.events.patch({
-            calendarId: "primary",
-            eventId: prevId,
-            requestBody: body,
-          });
+          await withCalendarTimeout(
+            (signal) =>
+              cal.events.patch(
+                { calendarId: "primary", eventId: prevId, requestBody: body },
+                { signal },
+              ),
+            "calendar patch",
+          );
           touchedIds.add(prevId);
           reconciled.push({ ...block, calendarEventId: prevId });
         } catch (err) {
           // Likely deleted out-of-band — recreate.
           console.warn("[scheduling] patch failed, recreating:", err);
           try {
-            const res = await cal.events.insert({
-              calendarId: "primary",
-              requestBody: body,
-            });
+            const res = await withCalendarTimeout(
+              (signal) =>
+                cal.events.insert({ calendarId: "primary", requestBody: body }, { signal }),
+              "calendar insert (recreate)",
+            );
             const newId = res.data.id ?? undefined;
             if (newId) touchedIds.add(newId);
             reconciled.push({ ...block, calendarEventId: newId });
@@ -258,10 +269,11 @@ async function reconcileBlocks(
         }
       } else {
         try {
-          const res = await cal.events.insert({
-            calendarId: "primary",
-            requestBody: body,
-          });
+          const res = await withCalendarTimeout(
+            (signal) =>
+              cal.events.insert({ calendarId: "primary", requestBody: body }, { signal }),
+            "calendar insert",
+          );
           const newId = res.data.id ?? undefined;
           if (newId) touchedIds.add(newId);
           reconciled.push({ ...block, calendarEventId: newId });
@@ -277,9 +289,13 @@ async function reconcileBlocks(
         const cal = await getCalendar();
         if (cal) {
           try {
-            await cal.events.delete({ calendarId: "primary", eventId: prevId });
+            await withCalendarTimeout(
+              (signal) =>
+                cal.events.delete({ calendarId: "primary", eventId: prevId }, { signal }),
+              "calendar delete",
+            );
           } catch (err) {
-            // 404 / 410 already-gone is fine.
+            // 404 / 410 already-gone (or a timeout) is fine.
             console.warn("[scheduling] delete-on-untoggle ignored:", err);
           }
         }
@@ -297,7 +313,10 @@ async function reconcileBlocks(
     for (const [eventId] of oldById) {
       if (touchedIds.has(eventId)) continue;
       try {
-        await cal.events.delete({ calendarId: "primary", eventId });
+        await withCalendarTimeout(
+          (signal) => cal.events.delete({ calendarId: "primary", eventId }, { signal }),
+          "calendar orphan delete",
+        );
       } catch (err) {
         console.warn("[scheduling] orphan delete ignored:", err);
       }
