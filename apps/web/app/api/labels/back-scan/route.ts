@@ -1,6 +1,7 @@
-// Raised from 60s: the onboarding path runs a second 25-thread tranche in an
-// after() continuation (same invocation), so the function needs headroom for
-// ~two ~45s budget windows to hit 50 threads inside ~2 minutes.
+// Raised from 60s: both the onboarding and the manual "Sync inbox" paths run a
+// synchronous first page (25 threads) and then keep paginating in an after()
+// continuation (same invocation) until they hit BACKFILL_TARGET (~75) threads,
+// so the function needs headroom for a few ~45s budget windows inside ~2 min.
 export const maxDuration = 120;
 
 import { NextResponse, after } from "next/server";
@@ -18,7 +19,14 @@ import {
 } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
 
+// Page size / first synchronous tranche. One Gmail list page yields up to this
+// many threads; the interactive response returns after this many so the inbox's
+// front page is labeled on arrival without a long wait.
 const MAX_THREADS = Number(process.env.BACKSCAN_MAX_THREADS) || 25;
+// Total threads a full backfill covers (front page + background tail). "Last 75
+// emails" — deep enough to sort the useful part of the inbox, bounded so the
+// cost (one Haiku classify per thread) and Gmail quota stay predictable.
+const BACKFILL_TARGET = Number(process.env.BACKSCAN_BACKFILL_TARGET) || 75;
 // The wall-time is dominated by one Haiku classify call per thread, run in
 // serial batches of CONCURRENCY. At 5 a 25-thread tranche is 5 serial batches;
 // at 25 the whole tranche runs as ONE parallel batch (~5x headroom over the
@@ -62,7 +70,12 @@ function gmailErrorResponse(err: unknown): NextResponse {
 type ScanOpts = {
   userId: string;
   force?: boolean;
-  limit?: number;
+  /**
+   * How many inbox threads to process before stopping. scanCore paginates
+   * across Gmail list pages (MAX_THREADS threads each) until it has handled
+   * this many candidate threads, hits the last page, or runs out of budget.
+   */
+  target?: number;
   pageToken?: string | null;
   /** Skip per-thread signal detection (used by the onboarding scan to protect the budget). */
   skipSignals?: boolean;
@@ -87,7 +100,7 @@ type ScanResult =
 // client, lists a page of inbox threads, classifies each). Callable directly
 // from the route and from an after() continuation — no auth/HTTP inside.
 async function scanCore(opts: ScanOpts): Promise<ScanResult> {
-  const { userId, force = false, limit = MAX_THREADS, pageToken = null, skipSignals = false } = opts;
+  const { userId, force = false, target = MAX_THREADS, pageToken = null, skipSignals = false } = opts;
 
   const [presetRow, cred] = await Promise.all([
     prisma.labelPreset.findUnique({ where: { userId } }),
@@ -131,51 +144,20 @@ async function scanCore(opts: ScanOpts): Promise<ScanResult> {
     include: { rules: true },
   });
 
-  // Pull a page of recent inbox threads. Token refresh and Gmail list failures
-  // classify into an actionable message rather than an opaque 500.
+  // Resolve the Gmail client once. Token refresh / auth failures classify into
+  // an actionable message rather than an opaque 500. Listing is done per-page
+  // inside the pagination loop below.
   let gmail: gmail_v1.Gmail;
-  let messages: gmail_v1.Schema$Message[];
-  let nextPageToken: string | null;
   try {
     const { auth: oauthClient } = await makeAuthForUser(userId);
     gmail = google.gmail({ version: "v1", auth: oauthClient });
-    const listRes = await gmail.users.messages.list({
-      userId: "me",
-      labelIds: ["INBOX"],
-      maxResults: limit * 2,
-      ...(pageToken ? { pageToken } : {}),
-    });
-    messages = listRes.data.messages ?? [];
-    nextPageToken = listRes.data.nextPageToken ?? null;
   } catch (err) {
     return { kind: "gmail_error", err };
   }
 
-  const seenThreads = new Set<string>();
-  const candidates: Array<{ messageId: string; threadId: string }> = [];
-  for (const m of messages) {
-    if (!m.id || !m.threadId) continue;
-    if (seenThreads.has(m.threadId)) continue;
-    seenThreads.add(m.threadId);
-    candidates.push({ messageId: m.id, threadId: m.threadId });
-    if (candidates.length >= limit) break;
-  }
-
-  const alreadySet = force
-    ? new Set<string>()
-    : new Set(
-        (
-          await prisma.classifiedThread.findMany({
-            where: { userId, threadId: { in: candidates.map((c) => c.threadId) } },
-            select: { threadId: true },
-          })
-        ).map((e) => e.threadId),
-      );
-  const toClassify = candidates.filter((c) => !alreadySet.has(c.threadId));
-
   let scanned = 0;
   let tagged = 0;
-  const skipped = alreadySet.size;
+  let skipped = 0;
 
   async function processOne(c: { messageId: string; threadId: string }) {
     scanned++;
@@ -266,20 +248,87 @@ async function scanCore(opts: ScanOpts): Promise<ScanResult> {
 
   const startedAt = Date.now();
   let incomplete = false;
-  for (let i = 0; i < toClassify.length; i += CONCURRENCY) {
+  let processed = 0; // candidate threads consumed (classified + skipped)
+  let currentPageToken: string | null = pageToken;
+  // Token for the page *after* the last one we listed — lets a follow-up call
+  // (the onboarding/sync tail) resume where this one stopped.
+  let resumeToken: string | null = null;
+
+  // Paginate inbox pages until we've handled `target` threads, exhausted the
+  // inbox, or run out of budget. Each page yields up to MAX_THREADS threads.
+  while (processed < target) {
     if (Date.now() - startedAt > BUDGET_MS) {
       incomplete = true;
       break;
     }
-    await Promise.all(toClassify.slice(i, i + CONCURRENCY).map(processOne));
+
+    let messages: gmail_v1.Schema$Message[];
+    let nextPageToken: string | null;
+    try {
+      const listRes = await gmail.users.messages.list({
+        userId: "me",
+        labelIds: ["INBOX"],
+        // One page of messages → at most MAX_THREADS unique threads. We consume
+        // the WHOLE page each iteration (below), so nextPageToken never skips
+        // unconsumed threads — the "recent mail left unlabeled" bug. Overshoot
+        // of `target` is therefore bounded by one page.
+        maxResults: MAX_THREADS,
+        ...(currentPageToken ? { pageToken: currentPageToken } : {}),
+      });
+      messages = listRes.data.messages ?? [];
+      nextPageToken = listRes.data.nextPageToken ?? null;
+    } catch (err) {
+      return { kind: "gmail_error", err };
+    }
+    resumeToken = nextPageToken;
+
+    // Dedupe this page's messages to unique threads. Consume all of them — do
+    // not cap by remaining target, or the resume token would skip the leftover.
+    const seenThreads = new Set<string>();
+    const candidates: Array<{ messageId: string; threadId: string }> = [];
+    for (const m of messages) {
+      if (!m.id || !m.threadId) continue;
+      if (seenThreads.has(m.threadId)) continue;
+      seenThreads.add(m.threadId);
+      candidates.push({ messageId: m.id, threadId: m.threadId });
+      if (candidates.length >= MAX_THREADS) break;
+    }
+    if (candidates.length === 0) break; // empty page → nothing left to do
+    processed += candidates.length;
+
+    const alreadySet = force
+      ? new Set<string>()
+      : new Set(
+          (
+            await prisma.classifiedThread.findMany({
+              where: { userId, threadId: { in: candidates.map((c) => c.threadId) } },
+              select: { threadId: true },
+            })
+          ).map((e) => e.threadId),
+        );
+    skipped += alreadySet.size;
+    const toClassify = candidates.filter((c) => !alreadySet.has(c.threadId));
+
+    for (let i = 0; i < toClassify.length; i += CONCURRENCY) {
+      if (Date.now() - startedAt > BUDGET_MS) {
+        incomplete = true;
+        break;
+      }
+      await Promise.all(toClassify.slice(i, i + CONCURRENCY).map(processOne));
+    }
+    if (incomplete) break;
+
+    if (!nextPageToken) break; // reached the end of the inbox
+    currentPageToken = nextPageToken;
   }
 
   // Real timing for the back-scan (the middleware request log doesn't carry
-  // function duration). One line per tranche → grep "[back-scan] done" in the
-  // Vercel runtime logs for actual ms/scanned/tagged as users onboard.
+  // function duration). Grep "[back-scan] done" in the Vercel runtime logs for
+  // actual ms/scanned/tagged as users onboard or sync.
   console.log(
     `[back-scan] done in ${Date.now() - startedAt}ms · scanned=${scanned} tagged=${tagged} ` +
-      `skipped=${skipped} incomplete=${incomplete} concurrency=${CONCURRENCY} limit=${limit} pageToken=${pageToken ? "y" : "n"}`,
+      `skipped=${skipped} incomplete=${incomplete} target=${target} concurrency=${CONCURRENCY} ` +
+      `pageToken=${pageToken ? "y" : "n"}`,
   );
 
   return {
@@ -288,8 +337,10 @@ async function scanCore(opts: ScanOpts): Promise<ScanResult> {
     tagged,
     skipped,
     incomplete,
-    total: candidates.length,
-    nextPageToken,
+    total: processed,
+    // Budget-interrupted → resume from the page we were on; otherwise hand back
+    // the token after the last processed page (null once the inbox is done).
+    nextPageToken: incomplete ? currentPageToken : resumeToken,
   };
 }
 
@@ -300,9 +351,14 @@ export async function POST(req: Request) {
   }
   const userId = session.user.id;
 
-  // force=true (Sync-inbox button) bypasses dedupe. onboarding=true runs a
-  // second 25-thread tranche via after() and skips signal detection, labeling
-  // ~50 threads across the two tranches within the raised maxDuration.
+  // force=true (Sync-inbox button) bypasses dedupe. onboarding=true skips
+  // signal detection on the first tranche to protect the redirect budget.
+  //
+  // Both paths backfill up to BACKFILL_TARGET (~75) threads: the first
+  // MAX_THREADS (25) run synchronously so the inbox front page is labeled on
+  // arrival, and the remainder run in an after() tail (background, same
+  // invocation) so the response stays fast. Best-effort — tail failures just
+  // leave those threads for live classification to pick up.
   const body = (await req.json().catch(() => ({}))) as {
     force?: boolean;
     onboarding?: boolean;
@@ -313,7 +369,7 @@ export async function POST(req: Request) {
   const first = await scanCore({
     userId,
     force,
-    limit: MAX_THREADS,
+    target: MAX_THREADS,
     skipSignals: onboarding,
   });
 
@@ -324,25 +380,24 @@ export async function POST(req: Request) {
     return gmailErrorResponse(first.err);
   }
 
-  // Onboarding tail: label the next ~25 threads after the response returns, in
-  // the same invocation's extended lifetime. Best-effort — failures just leave
-  // those threads for live classification.
-  if (onboarding && first.nextPageToken) {
+  const remainingTarget = BACKFILL_TARGET - first.total;
+  const tailQueued = !!first.nextPageToken && remainingTarget > 0;
+  if (tailQueued) {
     const pageToken = first.nextPageToken;
     after(async () => {
       try {
         const tail = await scanCore({
           userId,
           force,
-          limit: MAX_THREADS,
+          target: remainingTarget,
           pageToken,
           skipSignals: true,
         });
         if (tail.kind !== "ok") {
-          console.error("[back-scan] onboarding tail non-ok:", tail.kind);
+          console.error("[back-scan] backfill tail non-ok:", tail.kind);
         }
       } catch (err) {
-        console.error("[back-scan] onboarding tail threw:", err);
+        console.error("[back-scan] backfill tail threw:", err);
       }
     });
   }
@@ -353,7 +408,7 @@ export async function POST(req: Request) {
     skipped: first.skipped,
     incomplete: first.incomplete,
     total: first.total,
-    tailQueued: onboarding && !!first.nextPageToken,
+    tailQueued,
   });
 }
 
