@@ -56,7 +56,10 @@ describe("PersonalizeForm", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/onboarding/step-4-inbox"));
 
     expect(bodyOf("/api/labels/provision")).toEqual({ preset: "Legal" });
-    expect(calls().some((c) => c[0] === "/api/labels/back-scan")).toBe(true);
+    // force:true is required — otherwise a pre-existing ClassifiedThread row
+    // (from a poll/webhook that never landed a Gmail label) makes the scan skip
+    // the thread, labeling nothing while "You're all set" claims success.
+    expect(bodyOf("/api/labels/back-scan")).toEqual({ onboarding: true, force: true });
     expect(bodyOf("/api/onboarding/advance")).toEqual({ step: 3 });
   });
 

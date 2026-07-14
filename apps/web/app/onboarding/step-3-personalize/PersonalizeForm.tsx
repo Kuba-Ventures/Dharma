@@ -118,11 +118,17 @@ export default function PersonalizeForm({
 
     // Synchronous first-25 back-scan: gate the redirect on it so the inbox is
     // already labeled on arrival. onboarding=true also queues the next ~25 via
-    // an after() tail server-side. A backfill failure is non-fatal — labels
-    // still apply to new mail — so we proceed either way.
+    // an after() tail server-side. force=true is required: this is the
+    // authoritative "sort my inbox now" step, and a poll/webhook can already
+    // have written a ClassifiedThread row for a front-page thread *without*
+    // landing a Gmail label (e.g. an empty mapping lookup, or Uncategorized
+    // off). A non-forced scan would then skip every such thread — labeling
+    // nothing while the "You're all set" screen claims the inbox was sorted.
+    // A backfill failure is non-fatal — labels still apply to new mail — so we
+    // proceed either way.
     setPhase("labeling");
     try {
-      await post("/api/labels/back-scan", { onboarding: true });
+      await post("/api/labels/back-scan", { onboarding: true, force: true });
     } catch {
       // Non-fatal; continue.
     }
