@@ -4,6 +4,7 @@ import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
+import { shouldRecordClassifiedThread } from "../../../../lib/classifiedThreadGate";
 import { sendOpsAlert } from "../../../../lib/opsAlert";
 
 // Fallback label sweep across all connected accounts. Runs on a cron (see
@@ -196,6 +197,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               labelNamesToApply.push(HIGH_PRIORITY_NAME);
             }
 
+            let appliedLabelCount = 0;
             if (labelNamesToApply.length > 0) {
               const mappings = await prisma.labelMapping.findMany({
                 where: { userId: googleCred.userId, labelName: { in: labelNamesToApply } },
@@ -203,27 +205,44 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
               const gmailIds = mappings.map((m) => m.gmailLabelId);
               if (gmailIds.length > 0) {
                 await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+                appliedLabelCount = gmailIds.length;
                 console.log(`[poll] Preset labels applied to ${messageId}: ${mappings.map((m) => m.labelName).join(", ")} (priority=${result.priority.toFixed(2)})`);
               }
             }
 
-            await prisma.classifiedThread.upsert({
-              where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
-              create: {
+            // Only mark the thread classified when the outcome is final. If we
+            // intended a label but no LabelMapping resolved (provisioning race
+            // / preset switch), leave it unrecorded so a later run reclassifies
+            // instead of stranding it "classified but unlabeled" — which a
+            // non-forced back-scan would then skip forever. See PR #42.
+            if (
+              shouldRecordClassifiedThread({
+                intendedLabelCount: labelNamesToApply.length,
+                appliedLabelCount,
+              })
+            ) {
+              await prisma.classifiedThread.upsert({
+                where: { userId_threadId: { userId: googleCred.userId, threadId: msg.threadId } },
+                create: {
+                  userId: googleCred.userId,
+                  threadId: msg.threadId,
+                  labelName: matched?.name ?? null,
+                },
+                update: {},
+              });
+
+              await detectAndPersistSignal({
                 userId: googleCred.userId,
                 threadId: msg.threadId,
-                labelName: matched?.name ?? null,
-              },
-              update: {},
-            });
-
-            await detectAndPersistSignal({
-              userId: googleCred.userId,
-              threadId: msg.threadId,
-              subject: msg.subject,
-              from: msg.from,
-              body: msg.body,
-            });
+                subject: msg.subject,
+                from: msg.from,
+                body: msg.body,
+              });
+            } else {
+              console.warn(
+                `[poll] Intended labels [${labelNamesToApply.join(", ")}] for thread ${msg.threadId} but no LabelMapping resolved; deferring classification.`,
+              );
+            }
           } catch (err) {
             console.error(`[poll] Preset classification failed for ${messageId}:`, err);
           }
