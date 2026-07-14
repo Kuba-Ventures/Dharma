@@ -60,6 +60,10 @@ const DEFAULT_PREFS: Prefs = {
   blockedWindows: [],
 };
 
+// Client-side ceiling below the browser's (long) default, so a wedged save
+// fails with a clear message instead of "loading" forever.
+const SAVE_TIMEOUT_MS = 20000;
+
 function parsePrefs(raw: string | null): Prefs {
   if (!raw) return DEFAULT_PREFS;
   try {
@@ -377,25 +381,43 @@ export default function SchedulingCard({ initial }: Props) {
   const saveSeqRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<Prefs | null>(null);
+  // Last prefs the server confirmed — the rollback target when an explicit
+  // action (add/remove/Add-to-calendar) fails, so the optimistic state can't
+  // get stuck (e.g. a block wedged on "Adding…").
+  const serverPrefsRef = useRef<Prefs>(parsePrefs(initial.schedulingPreferences));
 
-  const sendPrefs = useCallback(async (next: Prefs) => {
+  const sendPrefs = useCallback(async (next: Prefs, immediate: boolean) => {
     const seq = ++saveSeqRef.current;
     const isLatest = () => seq === saveSeqRef.current;
+    // Roll optimistic state back to the last server-confirmed prefs, but only
+    // for explicit actions — debounced keystroke saves must keep what the user
+    // has since typed rather than snap it back.
+    const rollbackIfImmediate = () => {
+      if (immediate) setPrefs(serverPrefsRef.current);
+    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SAVE_TIMEOUT_MS);
     try {
       const res = await fetch("/api/preferences/scheduling", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ schedulingPreferences: JSON.stringify(next) }),
+        signal: controller.signal,
       });
       // An expired session redirects the API call to /login (HTML), which
       // would otherwise surface as a confusing "couldn't reach server".
       if (res.redirected || /\/login/.test(res.url)) {
-        if (isLatest())
+        if (isLatest()) {
+          rollbackIfImmediate();
           setBlockErrors(["Your session expired — refresh the page and sign in again."]);
+        }
         return;
       }
       if (!res.ok) {
-        if (isLatest()) setBlockErrors(["Couldn’t save your changes — please try again."]);
+        if (isLatest()) {
+          rollbackIfImmediate();
+          setBlockErrors(["Couldn’t save your changes — please try again."]);
+        }
         return;
       }
       const data = (await res.json()) as {
@@ -409,14 +431,26 @@ export default function SchedulingCard({ initial }: Props) {
       // the UI matches the server and edits patch the right event.
       if (!isLatest()) return;
       if (typeof data.schedulingPreferences === "string") {
-        setPrefs(parsePrefs(data.schedulingPreferences));
+        const reconciled = parsePrefs(data.schedulingPreferences);
+        serverPrefsRef.current = reconciled;
+        setPrefs(reconciled);
       }
       setBlockErrors(
         Array.isArray(data.syncErrors) && data.syncErrors.length > 0 ? data.syncErrors : [],
       );
     } catch (err) {
       console.error("[scheduling] sendPrefs failed:", err);
-      if (isLatest()) setBlockErrors(["Couldn’t reach the server — please try again."]);
+      if (isLatest()) {
+        rollbackIfImmediate();
+        const timedOut = err instanceof DOMException && err.name === "AbortError";
+        setBlockErrors([
+          timedOut
+            ? "That took too long — please try again."
+            : "Couldn’t reach the server — please try again.",
+        ]);
+      }
+    } finally {
+      clearTimeout(timer);
     }
   }, []);
 
@@ -432,14 +466,14 @@ export default function SchedulingCard({ initial }: Props) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      const flush = () => {
+      const flush = (immediate: boolean) => {
         debounceRef.current = null;
         const p = pendingRef.current;
         pendingRef.current = null;
-        if (p) void sendPrefs(p);
+        if (p) void sendPrefs(p, immediate);
       };
-      if (opts?.immediate) flush();
-      else debounceRef.current = setTimeout(flush, 500);
+      if (opts?.immediate) flush(true);
+      else debounceRef.current = setTimeout(() => flush(false), 500);
     },
     [sendPrefs],
   );
