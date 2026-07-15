@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 export type MeetingHour = {
   dayOfWeek: number;
@@ -37,6 +37,14 @@ function to12h(h: number): string {
   return String(hour);
 }
 
+// DayState[] -> the wire format the parent persists (one row per active day).
+function toActiveHours(days: DayState[]): MeetingHour[] {
+  return days
+    .map((d, i) => ({ dayOfWeek: i, hourStart: d.hourStart, hourEnd: d.hourEnd, active: d.active }))
+    .filter((d) => d.active)
+    .map(({ dayOfWeek, hourStart, hourEnd }) => ({ dayOfWeek, hourStart, hourEnd }));
+}
+
 function seedDays(initial: MeetingHour[]): DayState[] {
   const days: DayState[] = Array.from({ length: 7 }, () => ({
     active: false,
@@ -64,42 +72,22 @@ export default function MeetingHoursGrid({ initialHours, onChange }: Props) {
   const [bulkStart, setBulkStart] = useState(firstActive?.hourStart ?? 9);
   const [bulkEnd, setBulkEnd] = useState(firstActive?.hourEnd ?? 17);
 
-  // Push changes upward whenever active blocks change. Skip the very first
-  // render so we don't fire a save before the user has touched anything.
-  const firstRender = useRef(true);
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    const hours: MeetingHour[] = days
-      .map((d, i) => ({
-        dayOfWeek: i,
-        hourStart: d.hourStart,
-        hourEnd: d.hourEnd,
-        active: d.active,
-      }))
-      .filter((d) => d.active)
-      .map(({ dayOfWeek, hourStart, hourEnd }) => ({
-        dayOfWeek,
-        hourStart,
-        hourEnd,
-      }));
-    onChange?.(hours);
-  }, [days, onChange]);
-
+  // Notify the parent from the handlers themselves, not an effect keyed on
+  // callback identity — the parent's onChange is a fresh closure every render,
+  // so an effect depending on it would refire (and re-save) on every
+  // re-render of the parent, not just when the user changes something here.
   function toggleDay(dayIdx: number) {
-    setDays((prev) =>
-      prev.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d)),
-    );
+    const next = days.map((d, i) => (i === dayIdx ? { ...d, active: !d.active } : d));
+    setDays(next);
+    onChange?.(toActiveHours(next));
   }
 
   function applyBulk() {
-    setDays((prev) =>
-      prev.map((d) =>
-        d.active ? { ...d, hourStart: bulkStart, hourEnd: bulkEnd } : d,
-      ),
+    const next = days.map((d) =>
+      d.active ? { ...d, hourStart: bulkStart, hourEnd: bulkEnd } : d,
     );
+    setDays(next);
+    onChange?.(toActiveHours(next));
   }
 
   const totalHoursPerWeek = days.reduce(

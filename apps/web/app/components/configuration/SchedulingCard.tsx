@@ -488,11 +488,25 @@ export default function SchedulingCard({ initial }: Props) {
 
   async function persistHours(next: MeetingHour[]) {
     setHours(next);
-    await fetch("/api/preferences/meeting-hours", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ hours: next }),
-    });
+    try {
+      const res = await fetch("/api/preferences/meeting-hours", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hours: next }),
+      });
+      // An expired session redirects to /login (HTML, still a 200), which
+      // would otherwise look like a silent success — see persistPrefs above.
+      if (res.redirected || /\/login/.test(res.url)) {
+        setBlockErrors(["Your session expired — refresh the page and sign in again."]);
+        return;
+      }
+      if (!res.ok) {
+        setBlockErrors(["Couldn’t save your meeting hours — please try again."]);
+      }
+    } catch (err) {
+      console.error("[scheduling] persistHours failed:", err);
+      setBlockErrors(["Couldn’t reach the server — please try again."]);
+    }
   }
 
   function onToggle(next: boolean) {
@@ -537,14 +551,6 @@ export default function SchedulingCard({ initial }: Props) {
       body: JSON.stringify({ enabled: false }),
     });
   }
-
-  // Debounce hours saves a little so dragging doesn't hammer the API.
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      // No-op: child onChange already saves.
-    }, 0);
-    return () => clearTimeout(handle);
-  }, []);
 
   return (
     <>
