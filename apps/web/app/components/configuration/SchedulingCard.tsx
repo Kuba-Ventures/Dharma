@@ -415,6 +415,12 @@ export default function SchedulingCard({ initial }: Props) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ hours: next }),
       });
+      // An expired session redirects to /login (HTML, still a 200), which
+      // would otherwise look like a silent success — see persistPrefs above.
+      if (res.redirected || /\/login/.test(res.url)) {
+        setBlockErrors(["Your session expired — refresh the page and sign in again."]);
+        return;
+      }
       if (!res.ok) {
         setBlockErrors(["Couldn’t save your meeting hours — please try again."]);
       }
