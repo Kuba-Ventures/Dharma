@@ -409,11 +409,19 @@ export default function SchedulingCard({ initial }: Props) {
 
   async function persistHours(next: MeetingHour[]) {
     setHours(next);
-    await fetch("/api/preferences/meeting-hours", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ hours: next }),
-    });
+    try {
+      const res = await fetch("/api/preferences/meeting-hours", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hours: next }),
+      });
+      if (!res.ok) {
+        setBlockErrors(["Couldn’t save your meeting hours — please try again."]);
+      }
+    } catch (err) {
+      console.error("[scheduling] persistHours failed:", err);
+      setBlockErrors(["Couldn’t reach the server — please try again."]);
+    }
   }
 
   function onToggle(next: boolean) {
@@ -458,14 +466,6 @@ export default function SchedulingCard({ initial }: Props) {
       body: JSON.stringify({ enabled: false }),
     });
   }
-
-  // Debounce hours saves a little so dragging doesn't hammer the API.
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      // No-op: child onChange already saves.
-    }, 0);
-    return () => clearTimeout(handle);
-  }, []);
 
   return (
     <>
