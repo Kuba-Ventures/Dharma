@@ -164,6 +164,22 @@ const FREQ_LABELS: Record<Recurrence["freq"], string> = {
   monthly: "Monthly",
 };
 
+// One-click day selections for weekly recurrence. Each just sets `days`;
+// the model (freq: "weekly" + days[]) already supports these — this is a
+// shortcut so users don't have to tap each pill (0=Sun..6=Sat).
+const DAY_PRESETS: { label: string; days: number[] }[] = [
+  { label: "Weekdays", days: [1, 2, 3, 4, 5] },
+  { label: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
+  { label: "Weekends", days: [0, 6] },
+];
+
+// Order-independent set equality for two day arrays.
+function sameDays(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((d) => set.has(d));
+}
+
 function sanitizeRecurrence(r: Partial<Recurrence>): Recurrence {
   const freq: Recurrence["freq"] =
     r.freq === "none" || r.freq === "daily" || r.freq === "weekly" || r.freq === "monthly"
@@ -818,6 +834,9 @@ function BlockRow({
     else set.add(d);
     setRec({ days: [...set].sort((a, b) => a - b) });
   }
+  function setDays(days: number[]) {
+    setRec({ days: [...days].sort((a, b) => a - b) });
+  }
 
   const intervalUnit =
     rec.freq === "daily" ? "day(s)" : rec.freq === "weekly" ? "week(s)" : "month(s)";
@@ -955,28 +974,50 @@ function BlockRow({
         )}
       </div>
 
-      {/* weekly day chips */}
+      {/* weekly day chips + quick-select presets */}
       {rec.freq === "weekly" && (
-        <div className="flex items-center gap-1">
-          {WD_INITIAL.map((lbl, d) => {
-            const on = (rec.days ?? []).includes(d);
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => toggleDay(d)}
-                aria-pressed={on}
-                aria-label={WD_FULL[d]}
-                className={`h-7 w-7 rounded-full text-[11px] transition-colors ${
-                  on
-                    ? "bg-brand-400 text-black font-medium"
-                    : "border border-[color:var(--border-subtle)] bg-white/[0.04] text-white/55 hover:bg-white/[0.09]"
-                }`}
-              >
-                {lbl}
-              </button>
-            );
-          })}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1">
+            {WD_INITIAL.map((lbl, d) => {
+              const on = (rec.days ?? []).includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDay(d)}
+                  aria-pressed={on}
+                  aria-label={WD_FULL[d]}
+                  className={`h-7 w-7 rounded-full text-[11px] transition-colors ${
+                    on
+                      ? "bg-brand-400 text-black font-medium"
+                      : "border border-[color:var(--border-subtle)] bg-white/[0.04] text-white/55 hover:bg-white/[0.09]"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {DAY_PRESETS.map((p) => {
+              const active = sameDays(rec.days ?? [], p.days);
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setDays(p.days)}
+                  aria-pressed={active}
+                  className={`rounded-btn px-2 py-0.5 text-[10px] transition-colors ${
+                    active
+                      ? "border border-brand-400/60 bg-brand-400/15 text-brand-200"
+                      : "border border-[color:var(--border-subtle)] bg-white/[0.04] text-white/50 hover:bg-white/[0.09]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
