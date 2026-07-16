@@ -347,6 +347,11 @@ export default function SchedulingCard({ initial }: Props) {
   const [confirmAddIdx, setConfirmAddIdx] = useState<number | null>(null);
   // Per-block calendar sync errors returned by the last save.
   const [blockErrors, setBlockErrors] = useState<string[]>([]);
+  // Save indicator for block/pref edits. Driven by sendPrefs (the single
+  // network path all block edits funnel through) so the user gets visible
+  // confirmation an auto-save landed. Errors are surfaced via blockErrors.
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-dismiss the error banner so a transient blip doesn't linger.
   useEffect(() => {
@@ -405,6 +410,11 @@ export default function SchedulingCard({ initial }: Props) {
   const sendPrefs = useCallback(async (next: Prefs, immediate: boolean) => {
     const seq = ++saveSeqRef.current;
     const isLatest = () => seq === saveSeqRef.current;
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = null;
+    }
+    setSaveStatus("saving");
     // Roll optimistic state back to the last server-confirmed prefs, but only
     // for explicit actions — debounced keystroke saves must keep what the user
     // has since typed rather than snap it back.
@@ -425,6 +435,7 @@ export default function SchedulingCard({ initial }: Props) {
       if (res.redirected || /\/login/.test(res.url)) {
         if (isLatest()) {
           rollbackIfImmediate();
+          setSaveStatus("idle");
           setBlockErrors(["Your session expired — refresh the page and sign in again."]);
         }
         return;
@@ -432,6 +443,7 @@ export default function SchedulingCard({ initial }: Props) {
       if (!res.ok) {
         if (isLatest()) {
           rollbackIfImmediate();
+          setSaveStatus("idle");
           setBlockErrors(["Couldn’t save your changes — please try again."]);
         }
         return;
@@ -451,13 +463,21 @@ export default function SchedulingCard({ initial }: Props) {
         serverPrefsRef.current = reconciled;
         setPrefs(reconciled);
       }
-      setBlockErrors(
-        Array.isArray(data.syncErrors) && data.syncErrors.length > 0 ? data.syncErrors : [],
-      );
+      const hadSyncErrors = Array.isArray(data.syncErrors) && data.syncErrors.length > 0;
+      setBlockErrors(hadSyncErrors ? data.syncErrors! : []);
+      // Only confirm "Saved" on a clean save — a sync error surfaces its own
+      // banner and shouldn't read as success.
+      if (hadSyncErrors) {
+        setSaveStatus("idle");
+      } else {
+        setSaveStatus("saved");
+        savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      }
     } catch (err) {
       console.error("[scheduling] sendPrefs failed:", err);
       if (isLatest()) {
         rollbackIfImmediate();
+        setSaveStatus("idle");
         const timedOut = err instanceof DOMException && err.name === "AbortError";
         setBlockErrors([
           timedOut
@@ -498,6 +518,7 @@ export default function SchedulingCard({ initial }: Props) {
   useEffect(
     () => () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     },
     [],
   );
@@ -685,9 +706,21 @@ export default function SchedulingCard({ initial }: Props) {
 
             <Card variant="elevated">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
-                  No meetings between
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
+                    No meetings between
+                  </span>
+                  {saveStatus !== "idle" && (
+                    <span
+                      aria-live="polite"
+                      className={`text-[10px] transition-opacity ${
+                        saveStatus === "saved" ? "text-brand-200" : "text-white/40"
+                      }`}
+                    >
+                      {saveStatus === "saving" ? "Saving…" : "Saved ✓"}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
