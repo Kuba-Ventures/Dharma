@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-// Profile moved to its own top-level /profile route. Bookmarks still work.
+// Profile lives on the combined "Profile & settings" page at /settings now.
+// Kept as a redirect so older bookmarks still work.
 export default function SettingsProfileRedirect() {
-  redirect("/profile");
+  redirect("/settings");
 }

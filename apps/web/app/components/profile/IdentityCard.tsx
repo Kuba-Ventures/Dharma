@@ -10,81 +10,23 @@ import {
   JEWEL_STROKE,
 } from "../../../lib/badgeIcons";
 
-type City = { name: string; state: string };
-
 type Props = {
   user: {
     image: string | null;
     name: string | null;
     firstName: string | null;
     email: string | null;
-    homeCity: string | null;
-    timezone: string | null;
     createdAt: string;
   };
   displayBadge: Badge | null;
 };
 
-export default function IdentityCard({
-  user,
-  displayBadge,
-}: Props) {
+export default function IdentityCard({ user, displayBadge }: Props) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(user.firstName ?? user.name?.split(" ")[0] ?? "");
-  const [cityQuery, setCityQuery] = useState(user.homeCity ?? "");
-  const [cityMatches, setCityMatches] = useState<Array<City & { timezone: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
-
-  async function searchCity(q: string) {
-    setCityQuery(q);
-    if (!q.trim()) {
-      setCityMatches([]);
-      return;
-    }
-    const res = await fetch(`/api/geo/cities?q=${encodeURIComponent(q)}`);
-    if (res.ok) {
-      const d = (await res.json()) as { matches: Array<City & { timezone: string }> };
-      setCityMatches(d.matches);
-    }
-  }
-
-  async function selectCity(c: City) {
-    setCityQuery(`${c.name}, ${c.state}`);
-    setCityMatches([]);
-    setSaving(true);
-    await fetch("/api/profile/update", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ homeCity: c }),
-    });
-    setSaving(false);
-    setSavedAt(Date.now());
-    router.refresh();
-  }
-
-  // Fallback when the typed city isn't in the autocomplete list — small
-  // towns and non-US cities. Parses "City, State" if the comma is present;
-  // otherwise saves the whole string as the name. /api/profile/update keeps
-  // it as free text (no lat/lng/timezone seeding).
-  async function saveTypedCity() {
-    const value = cityQuery.trim();
-    if (!value || value === user.homeCity) return;
-    // Skip if the typed value matches a dropdown option exactly — selectCity
-    // will fire on click.
-    if (cityMatches.some((c) => `${c.name}, ${c.state}` === value)) return;
-    const [name, state] = value.split(",").map((s) => s.trim());
-    setSaving(true);
-    await fetch("/api/profile/update", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ homeCity: { name, state: state || "" } }),
-    });
-    setSaving(false);
-    setSavedAt(Date.now());
-    router.refresh();
-  }
 
   async function saveName() {
     setSaving(true);
@@ -163,54 +105,6 @@ export default function IdentityCard({
             </div>
             <p className="mt-0.5 text-[11px] text-white/40">{user.email}</p>
           </div>
-
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">
-              Home city
-            </p>
-            <input
-              value={cityQuery}
-              onChange={(e) => searchCity(e.target.value)}
-              onBlur={saveTypedCity}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  saveTypedCity();
-                }
-              }}
-              placeholder="e.g. San Francisco, CA"
-              className="w-full rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-3 py-2 text-sm text-white"
-            />
-            {cityMatches.length > 0 && (
-              <ul className="mt-1 max-h-40 overflow-y-auto rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)]">
-                {cityMatches.map((c) => (
-                  <li key={`${c.name}-${c.state}`}>
-                    <button
-                      type="button"
-                      onClick={() => selectCity(c)}
-                      className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/[0.05]"
-                    >
-                      <span>
-                        {c.name}, {c.state}
-                      </span>
-                      <span className="text-[11px] text-white/40">{c.timezone}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {cityQuery.trim() && cityMatches.length === 0 && cityQuery !== user.homeCity && (
-              <p className="mt-1 text-[11px] text-white/50">
-                Not in our list. Press Enter or tab away to save{" "}
-                <span className="text-brand-200">{cityQuery}</span> as typed.
-              </p>
-            )}
-            {user.timezone && (
-              <p className="mt-1 text-[11px] text-white/40">
-                Timezone: <span className="text-brand-200">{user.timezone}</span>
-              </p>
-            )}
-          </div>
         </div>
 
         <div className="text-right">
@@ -226,10 +120,6 @@ export default function IdentityCard({
       {saving && (
         <p className="mt-3 text-[11px] text-white/40">Saving…</p>
       )}
-
-      <p className="mt-4 rounded-btn border border-[color:var(--border-brand)] bg-brand-400/8 px-3 py-2 text-[11px] text-white/60">
-        Dharma never shares your name, email, or city. Local data only, used to set your time zone.
-      </p>
     </div>
   );
 }
