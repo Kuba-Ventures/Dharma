@@ -12,19 +12,11 @@ import {
 } from "../../../lib/badges";
 import { buildSnapshot } from "../../../lib/badgeSnapshot";
 import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
-import { effectiveTier } from "../../../lib/effectiveTier";
 import IdentityCard from "../../components/profile/IdentityCard";
-import TierLadder from "../../components/profile/TierLadder";
 import BadgeCase from "../../components/profile/BadgeCase";
 import GuidedTour, { type TourStep } from "../../components/GuidedTour";
 
 const PROFILE_TOUR: TourStep[] = [
-  {
-    selector: '[data-tour="profile-tier"]',
-    title: "Your tier",
-    description:
-      "Tiers level up as Dharma saves you more time. Here's where you are and what's next on the ladder.",
-  },
   {
     selector: '[data-tour="profile-badges"]',
     title: "Badges",
@@ -62,9 +54,8 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [sheetBadgeIds, tierLabel, snapshot] = await Promise.all([
+  const [sheetBadgeIds, snapshot] = await Promise.all([
     sheetIdentityBadgesForEmail(user.email),
-    effectiveTier(user.cumulativeSecondsSaved, user.email),
     buildSnapshot(userId),
   ]);
 
@@ -114,7 +105,6 @@ export default async function ProfilePage() {
           email: user.email,
           homeCity: user.homeCity,
           timezone: user.timezone,
-          tier: tierLabel,
           createdAt: user.createdAt.toISOString(),
         }}
         earnedBadges={earnedBadgeObjects}
@@ -122,10 +112,6 @@ export default async function ProfilePage() {
       />
 
       <GuidedTour id="profile" steps={PROFILE_TOUR} />
-
-      <div data-tour="profile-tier">
-        <TierLadder secondsSaved={user.cumulativeSecondsSaved} displayTier={tierLabel} />
-      </div>
 
       <div data-tour="profile-badges">
         <BadgeCase

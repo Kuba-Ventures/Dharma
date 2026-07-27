@@ -16,7 +16,6 @@ type Props = {
     firstName?: string | null;
     name?: string | null;
     email?: string | null;
-    tier?: string | null;
   };
   displayBadge?: Badge | null;
 };
@@ -24,7 +23,6 @@ type Props = {
 export default function ProfileChip({ user, displayBadge }: Props) {
   const displayName =
     user.firstName ?? user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "You";
-  const tier = user.tier ?? "Apprentice";
 
   return (
     <div className="mt-3 flex items-center gap-1.5 border-t border-[color:var(--border-subtle)] pt-3">
@@ -74,18 +72,9 @@ export default function ProfileChip({ user, displayBadge }: Props) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] text-white">{displayName}</p>
-          {displayBadge ? (
-            <>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-brand-200">
-                {displayBadge.title}
-              </p>
-              <p className="text-[9px] uppercase tracking-wide text-white/35">
-                {tier}
-              </p>
-            </>
-          ) : (
-            <p className="text-[10px] uppercase tracking-wide text-brand-200">
-              {tier}
+          {displayBadge && (
+            <p className="text-[11px] font-medium uppercase tracking-wide text-brand-200">
+              {displayBadge.title}
             </p>
           )}
         </div>
