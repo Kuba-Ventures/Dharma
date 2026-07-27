@@ -108,6 +108,27 @@ export function getBadge(id: string): Badge | undefined {
   return BADGES.find((b) => b.id === id);
 }
 
+// Founder badge is pinned in code to these product-owner accounts. It's the
+// ONLY badge shown on profile surfaces (avatar overlay + nav chip) — see the
+// profile page and app layout, which no longer derive a display badge from
+// earned badges. Independent of FOUNDER_EMAILS / the earning path so it holds
+// even if that config changes. Lowercased at compare time.
+const FORCED_FOUNDER_EMAILS = new Set<string>([
+  "finley@qsbsrollover.com",
+  "mrfinleyunderwood@gmail.com",
+  "thegodavarthi@gmail.com",
+]);
+
+// The badge to display for a user on profile surfaces: the Founder badge for a
+// pinned account, otherwise null (no badge shown). This is the single source of
+// truth for the avatar/nav display badge now that the badge picker is gone.
+export function forcedDisplayBadge(email: string | null | undefined): Badge | null {
+  if (email && FORCED_FOUNDER_EMAILS.has(email.toLowerCase())) {
+    return getBadge("founder") ?? null;
+  }
+  return null;
+}
+
 // Legacy achievement ids retired in past catalog changes. Any old UserBadge row
 // or saved displayBadgeId pointing at one of these resolves to its nearest
 // replacement so nothing dangles. "mountain-mover" (the retired geo/milestone
