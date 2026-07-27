@@ -6,7 +6,7 @@ import { getRecentActivity } from "../../../../lib/recentActivity";
 // → { events: ActivityEvent[] }
 //
 // Mixed stream for the dashboard's Recent activity feed: drafts, signals,
-// milestone unlocks, and recent classifications. Sorted desc.
+// and recent classifications. Sorted desc.
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id)

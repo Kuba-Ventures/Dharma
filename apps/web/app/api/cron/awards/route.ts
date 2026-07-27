@@ -9,10 +9,6 @@ import {
 } from "../../../../lib/badges";
 import { buildSnapshot, foundingCohortIds } from "../../../../lib/badgeSnapshot";
 import {
-  effectiveMilestones,
-  effectiveUnlockedMilestoneIds,
-} from "../../../../lib/milestoneResolution";
-import {
   appendRow,
   batchUpdateCells,
   ensureHeaders,
@@ -52,11 +48,10 @@ export async function GET(req: Request) {
   await setColumnDropdown("Users", "E", IDENTITY_BADGE_IDS);
   await setColumnDropdown("Users", "B", TIER_IDS);
 
-  // --- Pass 1: cumulative seconds + tier + milestone persistence ---
+  // --- Pass 1: cumulative seconds + tier ---
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, createdAt: true, homeCity: true },
+    select: { id: true, email: true, createdAt: true },
   });
-  let milestonesAwarded = 0;
   let achievementsAwarded = 0;
   // First-100-by-signup cohort, computed once and reused per user.
   const foundingIds = await foundingCohortIds();
@@ -96,59 +91,6 @@ export async function GET(req: Request) {
         data: { cumulativeSecondsSaved, tier },
       });
       if (u.email) tierByEmail.set(u.email.toLowerCase(), { id: u.id, earned: tier });
-
-      const unlockedIds = await effectiveUnlockedMilestoneIds(
-        cumulativeSecondsSaved,
-        u.homeCity,
-      );
-      const userMilestones = await effectiveMilestones(u.homeCity);
-      for (const milestoneId of unlockedIds) {
-        const def = userMilestones.find((m) => m.id === milestoneId);
-        if (!def) continue;
-        try {
-          await prisma.milestoneDef.upsert({
-            where: { id: def.id },
-            create: {
-              id: def.id,
-              category: def.category,
-              title: def.title,
-              description: def.description,
-              threshold: def.threshold,
-              copyTemplate: def.title,
-              gradient: def.gradient,
-            },
-            update: {
-              category: def.category,
-              title: def.title,
-              description: def.description,
-              threshold: def.threshold,
-              gradient: def.gradient,
-            },
-          });
-          const before = await prisma.userMilestone.findUnique({
-            where: {
-              userId_milestoneId: { userId: u.id, milestoneId: def.id },
-            },
-            select: { id: true },
-          });
-          if (!before) {
-            await prisma.userMilestone.create({
-              data: { userId: u.id, milestoneId: def.id },
-            });
-            milestonesAwarded += 1;
-          }
-        } catch (err) {
-          errors.push({
-            email: u.email,
-            step: `milestone:${def.id}`,
-            message: err instanceof Error ? err.message : String(err),
-          });
-          console.error(
-            `[cron] milestone ${def.id} failed for ${u.email}:`,
-            err,
-          );
-        }
-      }
 
       // --- Pass 1.5: award achievement badges from a derived snapshot ---
       // Idempotent: skip ids already granted (the unique constraint backstops).
@@ -265,7 +207,6 @@ export async function GET(req: Request) {
     badgesGranted: grantedCount,
     achievementsAwarded,
     tiersComped,
-    milestonesAwarded,
     errors: errors.length > 0 ? errors : undefined,
   });
 }

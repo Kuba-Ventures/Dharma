@@ -11,13 +11,11 @@ import {
   type BadgeGroup,
 } from "../../../lib/badges";
 import { buildSnapshot } from "../../../lib/badgeSnapshot";
-import { effectiveMilestones } from "../../../lib/milestoneResolution";
 import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
 import { effectiveTier } from "../../../lib/effectiveTier";
 import IdentityCard from "../../components/profile/IdentityCard";
 import TierLadder from "../../components/profile/TierLadder";
 import BadgeCase from "../../components/profile/BadgeCase";
-import MilestoneLibrary from "../../components/profile/MilestoneLibrary";
 import GuidedTour, { type TourStep } from "../../components/GuidedTour";
 
 const PROFILE_TOUR: TourStep[] = [
@@ -31,7 +29,7 @@ const PROFILE_TOUR: TourStep[] = [
     selector: '[data-tour="profile-badges"]',
     title: "Badges",
     description:
-      "Earn badges for milestones — training your tone, labeling mail, hitting time-saved goals, and more.",
+      "Earn badges as you go — training your tone, labeling mail, hitting time-saved goals, and more.",
   },
 ];
 
@@ -64,8 +62,7 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [allMilestones, sheetBadgeIds, tierLabel, snapshot] = await Promise.all([
-    effectiveMilestones(user.homeCity),
+  const [sheetBadgeIds, tierLabel, snapshot] = await Promise.all([
     sheetIdentityBadgesForEmail(user.email),
     effectiveTier(user.cumulativeSecondsSaved, user.email),
     buildSnapshot(userId),
@@ -85,10 +82,8 @@ export default async function ProfilePage() {
   );
 
   const badgeGroups = (
-    ["drafts", "time_saved", "organization", "tone", "onboarding", "tenure", "geo"] as BadgeGroup[]
+    ["drafts", "time_saved", "organization", "tone", "onboarding", "tenure"] as BadgeGroup[]
   ).map((g) => groupProgress(g, snapshot));
-
-  const firstName = user.firstName ?? user.name?.split(" ")[0] ?? null;
 
   // Resolve which badge to highlight on the avatar.
   const earnedSet = new Set(earnedBadges);
@@ -139,14 +134,6 @@ export default async function ProfilePage() {
           groupProgress={badgeGroups}
         />
       </div>
-
-      <MilestoneLibrary
-        secondsSaved={user.cumulativeSecondsSaved}
-        homeCity={user.homeCity}
-        firstName={firstName}
-        tier={tierLabel}
-        milestones={allMilestones}
-      />
     </div>
   );
 }

@@ -325,7 +325,7 @@ export default function IdentityCard({
       )}
 
       <p className="mt-4 rounded-btn border border-[color:var(--border-brand)] bg-brand-400/8 px-3 py-2 text-[11px] text-white/60">
-        Dharma never shares your name, email, or city. Local data only, used to personalize milestones.
+        Dharma never shares your name, email, or city. Local data only, used to set your time zone.
       </p>
     </div>
   );

@@ -1,6 +1,6 @@
 // Top US metros for home-city autocomplete during onboarding. Each entry
-// carries lat/lng and an IANA timezone so we can seed milestones tied to the
-// city. Curated by population; v2 should ingest the SimpleMaps CC-BY dataset
+// carries lat/lng and an IANA timezone so we can resolve the user's time zone
+// for scheduling. Curated by population; v2 should ingest the SimpleMaps CC-BY dataset
 // for full coverage. Adding rows here is safe — no schema change required.
 
 export type City = {

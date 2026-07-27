@@ -22,7 +22,7 @@ export default async function StepTwo() {
       total={5}
       eyebrow="Welcome to Dharma"
       title="Where do you call home?"
-      description="Your home city personalizes the milestones Dharma surfaces: local trails, peaks, and cross-town distances tied to time you save."
+      description="Your home city sets your time zone so Dharma schedules sends and reminders at the right local hours."
     >
       <CityPicker initial={user?.homeCity ?? ""} detectedTimezone={detectedTimezone} />
     </StepShell>

@@ -4,15 +4,12 @@ import { google } from "googleapis";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { makeAuthForUser } from "../../../lib/gmail";
-import { effectiveNextLockedMilestone } from "../../../lib/milestoneResolution";
-import { applyTemplate } from "../../../lib/milestones";
 import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
 import TierStrip from "../../components/dashboard/TierStrip";
 import { effectiveTier } from "../../../lib/effectiveTier";
 import SyncInboxButton from "../../components/dashboard/SyncInboxButton";
-import NextMilestoneStrip from "../../components/dashboard/NextMilestoneStrip";
 import ActivityFeed from "../../components/dashboard/ActivityFeed";
 import SignalsPeek from "../../components/dashboard/SignalsPeek";
 import DashboardMetrics from "../../components/dashboard/DashboardMetrics";
@@ -238,22 +235,6 @@ export default async function DashboardPage() {
   const labelsActive = labelPreset?.enabled ?? false;
   const schedulingActive = user.schedulingEnabled;
 
-  // Resolve next milestone server-side so the dashboard renders without a
-  // client fetch flash.
-  const nextMilestoneRaw = await effectiveNextLockedMilestone(
-    user.cumulativeSecondsSaved,
-    user.homeCity,
-  );
-  const nextMilestone = nextMilestoneRaw
-    ? {
-        id: nextMilestoneRaw.id,
-        title: applyTemplate(nextMilestoneRaw.title, {
-          firstName,
-          city: user.homeCity,
-        }),
-        threshold: nextMilestoneRaw.threshold,
-      }
-    : null;
   const showNps =
     draftCount >= 10 &&
     (!user.nextNpsPromptAt || user.nextNpsPromptAt < new Date());
@@ -488,11 +469,6 @@ export default async function DashboardPage() {
       </section>
 
       {showNps && <NpsPrompt firstName={firstName} />}
-
-      <NextMilestoneStrip
-        next={nextMilestone}
-        cumulativeSecondsSaved={user.cumulativeSecondsSaved}
-      />
 
       {/* Recent activity */}
       <section>

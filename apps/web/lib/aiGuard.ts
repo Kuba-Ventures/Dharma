@@ -137,8 +137,8 @@ export async function checkAiGuard(
   return { allowed: true };
 }
 
-// Lightweight variant for non-user-initiated pipelines (classify, signal,
-// milestones driven by inbound email / cron). These shouldn't 429 a webhook;
+// Lightweight variant for non-user-initiated pipelines (classify, signal
+// detection driven by inbound email / cron). These shouldn't 429 a webhook;
 // they should just pause AI work when the kill switch is on or the global
 // ceiling is hit. Returns true if the pipeline may proceed.
 export async function pipelineAiAllowed(): Promise<boolean> {

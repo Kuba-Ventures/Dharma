@@ -8,7 +8,6 @@ const TILE_LABELS: Record<string, string> = {
   "metric-drafts-week": "Drafts this week",
   "metric-reply-rate": "Reply rate (7d)",
   "metric-time-saved": "Time saved (week)",
-  "milestone-hero-welcome": "Welcome milestone",
   "metrics-replyrate-hero": "Reply rate hero",
   "metrics-timesaved-chart": "Time saved chart",
   "metrics-by-label": "Volume by label",
@@ -29,11 +28,7 @@ export default async function HiddenStatsPage() {
   // the user can still restore it.
   const items = user.dismissedTiles.map((id) => ({
     id,
-    label:
-      TILE_LABELS[id] ??
-      (id.startsWith("milestone-hero-")
-        ? `Milestone hero (${id.replace("milestone-hero-", "")})`
-        : id),
+    label: TILE_LABELS[id] ?? id,
   }));
 
   return (

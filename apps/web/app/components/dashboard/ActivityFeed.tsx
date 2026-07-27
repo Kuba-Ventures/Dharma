@@ -1,6 +1,6 @@
 // Recent activity feed for the dashboard. Server-rendered mixed event stream
-// (drafts + signals + milestone unlocks + recent classifications with label
-// chips). Replaces the InboxPanel slot.
+// (drafts + signals + recent classifications with label chips). Replaces the
+// InboxPanel slot.
 
 import type { ActivityEvent } from "../../../lib/recentActivity";
 
@@ -45,17 +45,6 @@ function eventIcon(kind: ActivityEvent["kind"]) {
           />
         </svg>
       );
-    case "milestone":
-      return (
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <path
-            d="M2 11 L5 6 L7.5 9 L9.5 7 L12 11 Z"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
     case "classified":
       return (
         <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -76,8 +65,6 @@ function tintForKind(kind: ActivityEvent["kind"]): string {
       return "text-brand-200";
     case "signal":
       return "text-amber-200";
-    case "milestone":
-      return "text-emerald-200";
     case "classified":
       return "text-white/45";
   }

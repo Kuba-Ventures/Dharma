@@ -5,10 +5,6 @@
 import { prisma } from "./prisma";
 import { timeSavedSeconds } from "./timeSaved";
 import { identityBadgesForEmail, type MetricSnapshot } from "./badges";
-import {
-  effectiveMilestones,
-  effectiveUnlockedMilestoneIds,
-} from "./milestoneResolution";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -25,7 +21,6 @@ const EMPTY_SNAPSHOT: MetricSnapshot = {
   dayOne: false,
   founding100: false,
   oneYear: false,
-  geoMilestone: false,
 };
 
 type BuildOpts = {
@@ -53,7 +48,6 @@ export async function buildSnapshot(userId: string, opts: BuildOpts = {}): Promi
     select: {
       email: true,
       createdAt: true,
-      homeCity: true,
       toneSummary: true,
       toneProfile: true,
       onboardingCompletedAt: true,
@@ -89,13 +83,6 @@ export async function buildSnapshot(userId: string, opts: BuildOpts = {}): Promi
   const calendarConnected =
     !!user.googleCredential || !!user.microsoftCredential || !!user.appleCredential;
 
-  // Geo milestone (the "mountain-mover" tie-in) — reuse the milestone resolver.
-  const [unlocked, milestones] = await Promise.all([
-    effectiveUnlockedMilestoneIds(timeSavedSec, user.homeCity),
-    effectiveMilestones(user.homeCity),
-  ]);
-  const geoMilestone = unlocked.some((id) => !!milestones.find((m) => m.id === id)?.requiredCity);
-
   const founding100 = opts.foundingIds
     ? opts.foundingIds.has(userId)
     : (beforeCount ?? Infinity) < 100;
@@ -113,6 +100,5 @@ export async function buildSnapshot(userId: string, opts: BuildOpts = {}): Promi
     dayOne: identityBadgesForEmail(user.email).includes("beta"),
     founding100,
     oneYear: nowMs - user.createdAt.getTime() >= ONE_YEAR_MS,
-    geoMilestone,
   };
 }

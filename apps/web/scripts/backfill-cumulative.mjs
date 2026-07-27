@@ -1,7 +1,7 @@
 // One-off backfill: populate cumulativeSecondsSaved + tier for every user
 // from their existing UsageEvent + ClassifiedThread totals. This is the same
 // calculation /api/cron/awards runs nightly — running it once now seeds the
-// dashboard MilestoneHero and TierLadder with real numbers instead of
+// dashboard tier strip and TierLadder with real numbers instead of
 // everyone showing 0.
 //
 // Usage: cd apps/web && node scripts/backfill-cumulative.mjs

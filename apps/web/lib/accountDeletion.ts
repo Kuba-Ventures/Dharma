@@ -22,7 +22,7 @@ export type DeletionReport = {
 // delete cascades GoogleCredential away (schema.prisma onDelete: Cascade).
 // Deleting the User row cascades to every child table (credentials, labels,
 // classified threads, usage events, signals, feedback, sessions, accounts,
-// milestones, badges, meeting hours) — see the relations on `model User`.
+// badges, meeting hours) — see the relations on `model User`.
 //
 // Immediate hard delete satisfies the privacy policy's "within 30 days"
 // commitment with room to spare.
