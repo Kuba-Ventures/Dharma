@@ -37,11 +37,8 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type Milestone = { date: string; title: string };
-
 type Props = {
   days?: number;
-  milestones?: Milestone[];
 };
 
 // SVG viewBox geometry (shared by the path builder and the overlay so the
@@ -56,7 +53,7 @@ function yFracFor(secondsSaved: number, peak: number): number {
   return yView / VB_H;
 }
 
-export default function TimeSavedChart({ days = 30, milestones = [] }: Props) {
+export default function TimeSavedChart({ days = 30 }: Props) {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [hover, setHover] = useState<number | null>(null);
@@ -103,7 +100,6 @@ export default function TimeSavedChart({ days = 30, milestones = [] }: Props) {
 
   if (loading) return <Skeleton className="h-60" />;
 
-  const milestoneMap = new Map(milestones.map((m) => [m.date, m.title]));
   const xFrac = (i: number) => (n <= 1 ? 0 : i / (n - 1));
   const active = hover != null && points[hover] ? points[hover] : null;
   // Keep the tooltip box inside the plot horizontally.
@@ -160,26 +156,6 @@ export default function TimeSavedChart({ days = 30, milestones = [] }: Props) {
                   strokeWidth="1.5"
                   strokeLinejoin="round"
                 />
-                {points.map((p, i) => {
-                  const title = milestoneMap.get(p.date);
-                  if (!title) return null;
-                  const x = xFrac(i) * VB_W;
-                  const y = yFracFor(p.secondsSaved, peak) * VB_H;
-                  return (
-                    <g key={p.date}>
-                      <circle cx={x} cy={y} r="4" fill="#1D9E75" />
-                      <text
-                        x={x}
-                        y={y - 10}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fill="#AFA9EC"
-                      >
-                        {title}
-                      </text>
-                    </g>
-                  );
-                })}
               </>
             )}
           </svg>

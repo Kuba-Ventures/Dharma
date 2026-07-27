@@ -9,8 +9,7 @@ export type BadgeGroup =
   | "time_saved"
   | "tone"
   | "organization"
-  | "tenure"
-  | "geo";
+  | "tenure";
 
 // Which field of a MetricSnapshot gates a given achievement badge.
 export type BadgeMetric =
@@ -23,8 +22,7 @@ export type BadgeMetric =
   | "dealHawk"
   | "dayOne"
   | "founding100"
-  | "oneYear"
-  | "geoMilestone";
+  | "oneYear";
 
 export type Badge = {
   id: string;
@@ -100,9 +98,6 @@ export const BADGES: Badge[] = [
   { id: "day_one", title: "Day One", description: "Here from the beta.", kind: "achievement", icon: "flask", color: "brand", group: "tenure", metric: "dayOne" },
   { id: "founding_100", title: "Founding 100", description: "One of the first 100.", kind: "achievement", icon: "shield", color: "brand", group: "tenure", metric: "founding100" },
   { id: "one_year", title: "One Year", description: "One year with Dharma.", kind: "achievement", icon: "hourglass", color: "brand", group: "tenure", metric: "oneYear" },
-
-  // ── Achievement: geo (kept from the original system) ───────────────────────
-  { id: "mountain-mover", title: "Mountain mover", description: "Unlocked your first geographic milestone.", kind: "achievement", icon: "mountain", color: "brand", group: "geo", metric: "geoMilestone" },
 ];
 
 // Identity badge IDs only — used to populate the Users sheet dropdown.
@@ -113,9 +108,11 @@ export function getBadge(id: string): Badge | undefined {
   return BADGES.find((b) => b.id === id);
 }
 
-// Legacy achievement ids retired in the Phase 1 catalog overhaul. Any old
-// UserBadge row or saved displayBadgeId pointing at one of these resolves to
-// its nearest replacement so nothing dangles. (mountain-mover was kept.)
+// Legacy achievement ids retired in past catalog changes. Any old UserBadge row
+// or saved displayBadgeId pointing at one of these resolves to its nearest
+// replacement so nothing dangles. "mountain-mover" (the retired geo/milestone
+// badge) is intentionally NOT aliased — it has no equivalent, so stale rows
+// simply fail getBadge() and are filtered out of rendering.
 export const LEGACY_BADGE_ALIASES: Record<string, string> = {
   "welcome-aboard": "all_wired_up",
   "tone-deaf-no-more": "sounds_like_you",
@@ -167,7 +164,6 @@ export type MetricSnapshot = {
   dayOne: boolean;
   founding100: boolean;
   oneYear: boolean;
-  geoMilestone: boolean;
 };
 
 function isEarned(badge: Badge, s: MetricSnapshot): boolean {
@@ -192,8 +188,6 @@ function isEarned(badge: Badge, s: MetricSnapshot): boolean {
       return s.founding100;
     case "oneYear":
       return s.oneYear;
-    case "geoMilestone":
-      return s.geoMilestone;
     default:
       return false;
   }
@@ -229,8 +223,8 @@ export type GroupProgress = {
   earnedInGroup: string[];
 };
 
-// Progress toward the next unearned tier in a group — mirrors the milestone
-// "progress to next" pattern. pct fills within the current tier band.
+// Progress toward the next unearned tier in a group. pct fills within the
+// current tier band.
 export function groupProgress(group: BadgeGroup, s: MetricSnapshot): GroupProgress {
   const inGroup = BADGES.filter((b) => b.kind === "achievement" && b.group === group).sort(
     (a, b) => (a.threshold ?? 0) - (b.threshold ?? 0),

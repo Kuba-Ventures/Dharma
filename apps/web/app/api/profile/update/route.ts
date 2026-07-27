@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { findCityByName } from "../../../../lib/cities";
-import { generateMilestonesForCity } from "../../../../lib/milestoneGenerator";
-import { MILESTONES } from "../../../../lib/milestones";
 
 // PATCH { firstName?, homeCity? { name, state }, timezone? }
 //
-// Updates editable identity fields. Changing the home city re-seeds the
-// milestone library for the user (different city = different landmarks).
+// Updates editable identity fields (name, home city, timezone, display badge).
 export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user?.id)
@@ -70,29 +66,6 @@ export async function PATCH(req: Request) {
       timezone: true,
     },
   });
-
-  // If the user just set or changed their home city, seed milestones for it.
-  // Skip cities the in-memory library already covers (SF, NYC, Charlotte,
-  // DC, Boston). Fire-and-forget via waitUntil so the response is fast.
-  if (data.homeCity && updated.homeCity) {
-    const alreadyHandled = MILESTONES.some(
-      (m) => m.requiredCity === updated.homeCity,
-    );
-    if (!alreadyHandled) {
-      try {
-        waitUntil(
-          generateMilestonesForCity(updated.homeCity).catch((err) =>
-            console.error("[profile/update] milestone seed failed:", err),
-          ),
-        );
-      } catch {
-        // waitUntil not available in dev — fire without awaiting.
-        void generateMilestonesForCity(updated.homeCity).catch((err) =>
-          console.error("[profile/update] milestone seed failed:", err),
-        );
-      }
-    }
-  }
 
   return NextResponse.json(updated);
 }

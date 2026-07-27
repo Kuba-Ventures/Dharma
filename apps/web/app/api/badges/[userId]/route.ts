@@ -19,7 +19,6 @@ const PROGRESS_GROUPS: BadgeGroup[] = [
   "tone",
   "onboarding",
   "tenure",
-  "geo",
 ];
 
 // GET /api/badges/:userId — earned badges + per-group progress. Self-only

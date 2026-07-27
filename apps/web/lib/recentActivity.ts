@@ -1,6 +1,6 @@
 // Aggregates events for the dashboard's Recent activity feed and the
 // /api/activity/recent route. Mixed stream: drafts created, signals fired,
-// milestones unlocked, recent classifications (with label chips).
+// recent classifications (with label chips).
 //
 // Server-side helper — read-only. Used both as a direct import from server
 // components and as the data source for the public API route.
@@ -21,12 +21,6 @@ export type ActivityEvent =
       threadId: string | null;
     }
   | {
-      kind: "milestone";
-      at: Date;
-      title: string;
-      milestoneId: string;
-    }
-  | {
       kind: "classified";
       at: Date;
       title: string;
@@ -40,7 +34,7 @@ export async function getRecentActivity(
 ): Promise<ActivityEvent[]> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // last 30d
 
-  const [drafts, signals, milestones, classified, labelMappings] = await Promise.all([
+  const [drafts, signals, classified, labelMappings] = await Promise.all([
     prisma.usageEvent.findMany({
       where: { userId, eventType: "draft", createdAt: { gte: cutoff } },
       orderBy: { createdAt: "desc" },
@@ -52,17 +46,6 @@ export async function getRecentActivity(
       orderBy: { createdAt: "desc" },
       take: limit,
       select: { id: true, createdAt: true, kind: true, threadId: true, payload: true },
-    }),
-    prisma.userMilestone.findMany({
-      where: { userId, achievedAt: { gte: cutoff } },
-      orderBy: { achievedAt: "desc" },
-      take: limit,
-      select: {
-        id: true,
-        achievedAt: true,
-        milestoneId: true,
-        milestone: { select: { title: true } },
-      },
     }),
     prisma.classifiedThread.findMany({
       where: { userId, classifiedAt: { gte: cutoff }, labelName: { not: null } },
@@ -100,14 +83,6 @@ export async function getRecentActivity(
       title,
       signalKind: s.kind,
       threadId: s.threadId,
-    });
-  }
-  for (const m of milestones) {
-    events.push({
-      kind: "milestone",
-      at: m.achievedAt,
-      title: `Unlocked: ${m.milestone.title}`,
-      milestoneId: m.milestoneId,
     });
   }
   for (const c of classified) {

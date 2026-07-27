@@ -1,5 +1,5 @@
-// Slim one-line tier strip. Replaces the large MilestoneHero banner on the
-// dashboard. Renders: tier name + thin progress bar + "Xm saved · Ym to {next}".
+// Slim one-line tier strip on the dashboard. Renders: tier name + thin
+// progress bar + "Xm saved · Ym to {next}".
 
 import { progressToNext } from "../../../lib/tiers";
 

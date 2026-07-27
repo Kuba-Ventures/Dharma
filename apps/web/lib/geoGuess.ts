@@ -8,9 +8,8 @@
 // We resolve those against the bundled city dataset and return a match ONLY
 // when it snaps to a real City record (with lat/lng/timezone). A near-miss
 // returns null so the caller leaves the field empty for the user to type — we
-// never write a coordless city, because homeCityLat/homeCityLng/timezone seed
-// the milestone library and timezone scheduling, and a null-coord write would
-// silently break both.
+// never write a coordless city, because homeCityLat/homeCityLng/timezone drive
+// timezone-aware scheduling, and a null-coord write would silently break it.
 //
 // Browser geolocation is intentionally NOT used (next.config.ts denies the
 // geolocation Permissions-Policy). This header read is the only geo source.

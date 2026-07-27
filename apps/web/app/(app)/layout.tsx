@@ -86,7 +86,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         dayOne: false,
         founding100: false,
         oneYear: false,
-        geoMilestone: false,
       }),
     ].map(resolveBadgeId),
   );
