@@ -1,4 +1,5 @@
 import ExtensionTokenCard from "../../../components/settings/ExtensionTokenCard";
+import RestartOnboardingCard from "../../../components/settings/RestartOnboardingCard";
 import DeleteAccountCard from "../../../components/settings/DeleteAccountCard";
 import SettingsBackLink from "../../../components/settings/SettingsBackLink";
 
@@ -17,6 +18,7 @@ export default function AdvancedSettingsPage() {
       </header>
 
       <ExtensionTokenCard />
+      <RestartOnboardingCard />
       <DeleteAccountCard />
     </div>
   );
