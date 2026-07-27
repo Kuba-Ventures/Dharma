@@ -46,24 +46,3 @@ export function tierRank(id: string): number {
 export function isComp(earned: Tier, override: string): boolean {
   return tierRank(override) > tierRank(earned);
 }
-
-export function nextTier(currentTier: Tier): TierSpec | null {
-  const idx = TIERS.findIndex((t) => t.id === currentTier);
-  if (idx === -1 || idx === TIERS.length - 1) return null;
-  return TIERS[idx + 1];
-}
-
-export function progressToNext(secondsSaved: number): {
-  current: Tier;
-  next: TierSpec | null;
-  progress: number; // 0..1
-} {
-  const current = tierFor(secondsSaved);
-  const next = nextTier(current);
-  if (!next) return { current, next: null, progress: 1 };
-  const idx = TIERS.findIndex((t) => t.id === current);
-  const lower = TIERS[idx].threshold;
-  const range = next.threshold - lower;
-  const progress = range === 0 ? 1 : Math.min(1, (secondsSaved - lower) / range);
-  return { current, next, progress };
-}
