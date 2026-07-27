@@ -1,92 +1,31 @@
 import { redirect } from "next/navigation";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
-import {
-  BADGES,
-  getBadge,
-  identityBadgesForEmail,
-  earnedAchievementBadges,
-  groupProgress,
-  resolveBadgeId,
-  type BadgeGroup,
-} from "../../../lib/badges";
-import { buildSnapshot } from "../../../lib/badgeSnapshot";
-import { sheetIdentityBadgesForEmail } from "../../../lib/adminSheet";
+import { forcedDisplayBadge } from "../../../lib/badges";
 import IdentityCard from "../../components/profile/IdentityCard";
-import BadgeCase from "../../components/profile/BadgeCase";
-import GuidedTour, { type TourStep } from "../../components/GuidedTour";
-
-const PROFILE_TOUR: TourStep[] = [
-  {
-    selector: '[data-tour="profile-badges"]',
-    title: "Badges",
-    description:
-      "Earn badges as you go — training your tone, labeling mail, hitting time-saved goals, and more.",
-  },
-];
 
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
-  const [user, userBadges] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        image: true,
-        name: true,
-        firstName: true,
-        email: true,
-        homeCity: true,
-        timezone: true,
-        tier: true,
-        displayBadgeId: true,
-        cumulativeSecondsSaved: true,
-        createdAt: true,
-      },
-    }),
-    prisma.userBadge.findMany({
-      where: { userId },
-      select: { badgeId: true },
-    }),
-  ]);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      image: true,
+      name: true,
+      firstName: true,
+      email: true,
+      homeCity: true,
+      timezone: true,
+      createdAt: true,
+    },
+  });
 
   if (!user) redirect("/login");
 
-  const [sheetBadgeIds, snapshot] = await Promise.all([
-    sheetIdentityBadgesForEmail(user.email),
-    buildSnapshot(userId),
-  ]);
-
-  // Merge persisted (sheet identity + prior awards), live env identity, and
-  // freshly derived achievements; map retired ids forward.
-  const earnedBadges = Array.from(
-    new Set(
-      [
-        ...userBadges.map((b) => b.badgeId),
-        ...identityBadgesForEmail(user.email),
-        ...sheetBadgeIds,
-        ...earnedAchievementBadges(snapshot),
-      ].map(resolveBadgeId),
-    ),
-  );
-
-  const badgeGroups = (
-    ["drafts", "time_saved", "organization", "tone", "onboarding", "tenure"] as BadgeGroup[]
-  ).map((g) => groupProgress(g, snapshot));
-
-  // Resolve which badge to highlight on the avatar.
-  const earnedSet = new Set(earnedBadges);
-  const earnedBadgeObjects = BADGES.filter((b) => earnedSet.has(b.id));
-  const resolvedDisplayId = user.displayBadgeId ? resolveBadgeId(user.displayBadgeId) : null;
-  const displayBadge =
-    (resolvedDisplayId && getBadge(resolvedDisplayId) && earnedSet.has(resolvedDisplayId)
-      ? getBadge(resolvedDisplayId)
-      : null) ??
-    // Default: highest-priority earned identity badge
-    BADGES.find((b) => b.kind === "identity" && earnedSet.has(b.id)) ??
-    null;
+  // Only the pinned Founder accounts show a badge; everyone else shows none.
+  const displayBadge = forcedDisplayBadge(user.email);
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -107,19 +46,8 @@ export default async function ProfilePage() {
           timezone: user.timezone,
           createdAt: user.createdAt.toISOString(),
         }}
-        earnedBadges={earnedBadgeObjects}
         displayBadge={displayBadge}
       />
-
-      <GuidedTour id="profile" steps={PROFILE_TOUR} />
-
-      <div data-tour="profile-badges">
-        <BadgeCase
-          earnedIds={earnedBadges}
-          displayBadgeId={resolvedDisplayId}
-          groupProgress={badgeGroups}
-        />
-      </div>
     </div>
   );
 }

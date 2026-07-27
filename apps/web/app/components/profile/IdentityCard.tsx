@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Button from "../ui/Button";
 import type { Badge } from "../../../lib/badges";
 import {
   BADGE_ICON_PATHS,
   BADGE_COLOR_BG,
-  BASQUIAT_OUTLINE,
-  BASQUIAT_YELLOW,
   JEWEL_FILL,
   JEWEL_STROKE,
 } from "../../../lib/badgeIcons";
@@ -25,13 +22,11 @@ type Props = {
     timezone: string | null;
     createdAt: string;
   };
-  earnedBadges: Badge[];
   displayBadge: Badge | null;
 };
 
 export default function IdentityCard({
   user,
-  earnedBadges,
   displayBadge,
 }: Props) {
   const router = useRouter();
@@ -41,30 +36,6 @@ export default function IdentityCard({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
-  const [showBadgePicker, setShowBadgePicker] = useState(false);
-  const [chosenBadge, setChosenBadge] = useState<Badge | null>(displayBadge);
-
-  // Re-sync local state with the prop after parent re-renders (e.g. after
-  // BadgeCase's setDisplay → router.refresh()). Without this, picking a
-  // badge from the BadgeCase grid wouldn't update the avatar overlay
-  // until a manual page reload.
-  useEffect(() => {
-    setChosenBadge(displayBadge);
-  }, [displayBadge]);
-
-  async function pickDisplayBadge(b: Badge | null) {
-    setChosenBadge(b);
-    setShowBadgePicker(false);
-    setSaving(true);
-    await fetch("/api/profile/update", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ displayBadgeId: b?.id ?? null }),
-    });
-    setSaving(false);
-    setSavedAt(Date.now());
-    router.refresh();
-  }
 
   async function searchCity(q: string) {
     setCityQuery(q);
@@ -152,93 +123,28 @@ export default function IdentityCard({
               {initials}
             </div>
           )}
-          {chosenBadge && (
-            <button
-              type="button"
-              onClick={() => setShowBadgePicker((v) => !v)}
-              aria-label={`Change display badge (currently ${chosenBadge.title})`}
-              className={`absolute -bottom-3 -right-3 transition-transform hover:scale-110 ${chosenBadge.color === "yellow" ? "" : BADGE_COLOR_BG[chosenBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
+          {displayBadge && (
+            <span
+              aria-label={displayBadge.title}
+              className={`absolute -bottom-3 -right-3 ${displayBadge.color === "yellow" ? "" : BADGE_COLOR_BG[displayBadge.color].split(" ").filter((c) => c.startsWith("text-")).join(" ")}`}
             >
-              {chosenBadge.iconImage ? (
+              {displayBadge.iconImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={chosenBadge.iconImage} alt="" width={42} height={42} />
+                <img src={displayBadge.iconImage} alt="" width={42} height={42} />
               ) : (
                 <svg width="42" height="42" viewBox="0 0 14 14" fill="none">
                   <path
-                    d={BADGE_ICON_PATHS[chosenBadge.icon]}
-                    stroke={JEWEL_STROKE[chosenBadge.color]}
-                    strokeWidth={chosenBadge.color === "yellow" ? 1.6 : 1.3}
+                    d={BADGE_ICON_PATHS[displayBadge.icon]}
+                    stroke={JEWEL_STROKE[displayBadge.color]}
+                    strokeWidth={displayBadge.color === "yellow" ? 1.6 : 1.3}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    fill={JEWEL_FILL[chosenBadge.color]}
+                    fill={JEWEL_FILL[displayBadge.color]}
                     fillOpacity={1}
                   />
                 </svg>
               )}
-            </button>
-          )}
-          {!chosenBadge && earnedBadges.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowBadgePicker(true)}
-              className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-white/20 text-[11px] text-white/40 transition-colors hover:text-white/80"
-              aria-label="Display a badge"
-            >
-              +
-            </button>
-          )}
-
-          {showBadgePicker && (
-            <div className="absolute left-0 top-[72px] z-20 w-56 rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-app)] p-2 shadow-xl">
-              <p className="mb-1 px-2 text-[10px] uppercase tracking-[0.08em] text-white/40">
-                Display on profile
-              </p>
-              <div className="grid grid-cols-1 gap-0.5">
-                {earnedBadges.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => pickDisplayBadge(b)}
-                    className={`flex items-center gap-2 rounded-btn px-2 py-1.5 text-left text-[12px] transition-colors ${
-                      chosenBadge?.id === b.id
-                        ? "bg-white/[0.06] text-white"
-                        : "text-white/70 hover:bg-white/[0.04] hover:text-white"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full ${BADGE_COLOR_BG[b.color]}`}
-                    >
-                      {b.iconImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={b.iconImage} alt="" width={11} height={11} />
-                      ) : (
-                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                          <path
-                            d={BADGE_ICON_PATHS[b.icon]}
-                            stroke={JEWEL_STROKE[b.color]}
-                            strokeWidth={1.3}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            fill={JEWEL_FILL[b.color]}
-                            fillOpacity={1}
-                          />
-                        </svg>
-                      )}
-                    </span>
-                    {b.title}
-                  </button>
-                ))}
-                {chosenBadge && (
-                  <button
-                    type="button"
-                    onClick={() => pickDisplayBadge(null)}
-                    className="mt-1 rounded-btn px-2 py-1.5 text-left text-[11px] text-white/40 hover:text-white/70"
-                  >
-                    Hide badge
-                  </button>
-                )}
-              </div>
-            </div>
+            </span>
           )}
         </div>
 
