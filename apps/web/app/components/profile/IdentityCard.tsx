@@ -23,7 +23,6 @@ type Props = {
     email: string | null;
     homeCity: string | null;
     timezone: string | null;
-    tier: string;
     createdAt: string;
   };
   earnedBadges: Badge[];
@@ -309,9 +308,7 @@ export default function IdentityCard({
         </div>
 
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">Tier</p>
-          <p className="font-display text-lg text-brand-200">{user.tier}</p>
-          <p className="mt-1 text-[10px] text-white/30">
+          <p className="text-[10px] text-white/30">
             Joined {new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
           </p>
         </div>

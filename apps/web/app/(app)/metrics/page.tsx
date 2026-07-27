@@ -16,7 +16,7 @@ const METRICS_TOUR: TourStep[] = [
     selector: '[data-tour="metrics-time-saved"]',
     title: "Time saved",
     description:
-      "The hours Dharma has saved you drafting and sorting. This is what drives your tier as it climbs.",
+      "The hours Dharma has saved you drafting and sorting, climbing as you go.",
   },
 ];
 
