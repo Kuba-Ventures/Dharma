@@ -6,6 +6,7 @@ import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { SAMPLE_SCENARIOS, scenarioById } from "../../../../../lib/sampleScenarios";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
 import { stripEmDashes } from "../../../../../lib/stripEmDashes";
+import { TONE_INSTRUCTIONS, toneUsesSignOff } from "../../../../../lib/toneInstructions";
 
 // POST { scenarioId? } → { scenarioId, label, draft }
 // Generates a fresh sample draft in the user's current tone, against the
@@ -55,17 +56,43 @@ export async function POST(req: Request) {
     `Use a ${(user.tone || "concise").toLowerCase()} tone.`;
   const signOff = user.inferredSignOff || "Best,";
 
-  const prompt = `Write a short email draft in this person's voice for the scenario below.
+  // Preview the user's ACTIVE mode, not just their personal voice. The card is
+  // a live preview of the selected tone card, so the mode's instruction has to
+  // drive length and formality (this is why selecting Concise used to still
+  // produce a long, chatty draft — the mode was never applied here). Scheduling
+  // has no instruction string (it's calendar-aware elsewhere) and falls back to
+  // plain voice, which is the right behavior for a no-calendar preview.
+  const toneKey = user.tone || "Concise";
+  const modeInstruction = TONE_INSTRUCTIONS[toneKey];
 
-Voice profile: ${voice}
-
-End the email with exactly this sign-off (verbatim, including punctuation/newlines): ${JSON.stringify(signOff)}
-
-Scenario: ${scenario.prompt}
-
-Never use em-dashes (—) or en-dashes (–); use commas or periods instead.
-
-Return only the email body. No subject line. No commentary.`;
+  const lines = [
+    `Write a short email draft for the scenario below${modeInstruction ? "" : " in this person's voice"}.`,
+    ``,
+    `Voice profile (word choice and personality): ${voice}`,
+  ];
+  if (modeInstruction) {
+    lines.push(
+      ``,
+      `Tone directive (controls length and formality; overrides the voice profile wherever they conflict): ${modeInstruction}`,
+    );
+  }
+  // Blunt modes (Concise) omit the sign-off on purpose — the directive already
+  // forbids pleasantries, and forcing "Talk soon," back on undoes that.
+  if (toneUsesSignOff(toneKey)) {
+    lines.push(
+      ``,
+      `End the email with exactly this sign-off (verbatim, including punctuation/newlines): ${JSON.stringify(signOff)}`,
+    );
+  }
+  lines.push(
+    ``,
+    `Scenario: ${scenario.prompt}`,
+    ``,
+    `Never use em-dashes (—) or en-dashes (–); use commas or periods instead.`,
+    ``,
+    `Return only the email body. No subject line. No commentary.`,
+  );
+  const prompt = lines.join("\n");
 
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
