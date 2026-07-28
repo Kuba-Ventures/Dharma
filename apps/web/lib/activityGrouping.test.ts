@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupActivity, type ActivityEvent } from "./recentActivity";
+import { groupActivity, type ActivityEvent } from "./activityGrouping";
 
 const at = (iso: string) => new Date(iso);
 

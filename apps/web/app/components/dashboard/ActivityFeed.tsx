@@ -2,7 +2,7 @@
 // (drafts + signals + recent classifications with label chips). Replaces the
 // InboxPanel slot.
 
-import { groupActivity, type ActivityEvent } from "../../../lib/recentActivity";
+import { groupActivity, type ActivityEvent } from "../../../lib/activityGrouping";
 
 type Props = {
   events: ActivityEvent[];

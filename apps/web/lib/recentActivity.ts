@@ -6,55 +6,13 @@
 // components and as the data source for the public API route.
 
 import { prisma } from "./prisma";
+import type { ActivityEvent } from "./activityGrouping";
 
-export type ActivityEvent =
-  | {
-      kind: "draft";
-      at: Date;
-      title: string;
-    }
-  | {
-      kind: "signal";
-      at: Date;
-      title: string;
-      signalKind: string;
-      threadId: string | null;
-    }
-  | {
-      kind: "classified";
-      at: Date;
-      title: string;
-      labelName: string | null;
-      labelColor: string | null;
-    };
-
-// Display row for the feed. Consecutive draft events collapse into a single
-// row carrying a count ("Drafted 6 replies"); signals and classifications stay
-// as individual rows since each carries distinct information.
-export type ActivityRow =
-  | { kind: "draft"; at: Date; count: number }
-  | Extract<ActivityEvent, { kind: "signal" }>
-  | Extract<ActivityEvent, { kind: "classified" }>;
-
-// Collapse runs of adjacent draft events into one counted row. Events arrive
-// newest-first, so the first draft in a run carries the most recent timestamp,
-// which the group keeps. Pure + order-preserving — safe to unit test.
-export function groupActivity(events: ActivityEvent[]): ActivityRow[] {
-  const rows: ActivityRow[] = [];
-  for (const e of events) {
-    if (e.kind === "draft") {
-      const last = rows[rows.length - 1];
-      if (last && last.kind === "draft") {
-        last.count += 1;
-        continue;
-      }
-      rows.push({ kind: "draft", at: e.at, count: 1 });
-    } else {
-      rows.push(e);
-    }
-  }
-  return rows;
-}
+// Re-exported so existing importers (ActivityFeed, the /api/activity/recent
+// route) can keep pulling the type from here. The pure grouping helper and the
+// types now live in ./activityGrouping so they can be unit-tested without
+// loading the prisma client.
+export type { ActivityEvent, ActivityRow } from "./activityGrouping";
 
 export async function getRecentActivity(
   userId: string,
