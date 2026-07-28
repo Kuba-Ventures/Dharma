@@ -8,6 +8,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@dharma/calendar-core": "*",
     "@dharma/types": "*",
     "googleapis": "^173.0.0"
   },

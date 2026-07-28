@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { google } from "googleapis";
+import { google, type calendar_v3 } from "googleapis";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { makeAuthForUser } from "../../../lib/gmail";
+import { listVisibleCalendarIds } from "../../../lib/googleCalendars";
 import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
@@ -141,9 +142,13 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
-  // try/catch so a Calendar API blip doesn't fail the whole dashboard
-  // render — falls back to null and the tile shows a graceful "—".
+  // Meetings for the current calendar week (Sun-Sat, UTC) plus an upcoming
+  // list. Read across every calendar the user has visible in Google Calendar
+  // (Work, Personal, …), not just primary — otherwise the card shows only
+  // Dharma's own blocks (which live on primary) and misses real meetings on
+  // other calendars (issue #74). Wrapped in try/catch so a Calendar API blip
+  // doesn't fail the whole dashboard render — falls back to null and the tile
+  // shows a graceful "—".
   type UpcomingMeeting = { id: string; summary: string; startISO: string };
   const { meetingsThisWeek, upcomingMeetings } = await (async (): Promise<{
     meetingsThisWeek: number | null;
@@ -160,35 +165,78 @@ export default async function DashboardPage() {
 
       const { auth: oauthClient } = await makeAuthForUser(userId);
       const calendar = google.calendar({ version: "v3", auth: oauthClient });
+      const calendarIds = await listVisibleCalendarIds(calendar);
 
-      const [weekRes, upcomingRes] = await Promise.all([
-        calendar.events.list({
-          calendarId: "primary",
+      // Fan out one events.list per visible calendar and merge. One calendar
+      // being unreadable shouldn't blank the whole card, so tolerate individual
+      // failures (Promise.allSettled) rather than failing the batch.
+      const listAll = async (
+        params: Omit<calendar_v3.Params$Resource$Events$List, "calendarId">,
+      ): Promise<calendar_v3.Schema$Event[]> => {
+        const results = await Promise.allSettled(
+          calendarIds.map((calendarId) => calendar.events.list({ ...params, calendarId })),
+        );
+        const events: calendar_v3.Schema$Event[] = [];
+        for (const r of results) {
+          if (r.status === "fulfilled") events.push(...(r.value.data.items ?? []));
+          else console.error("[dashboard] events.list failed for a calendar:", r.reason);
+        }
+        return events;
+      };
+
+      const [weekEvents, upcomingEvents] = await Promise.all([
+        listAll({
           timeMin: startOfWeek.toISOString(),
           timeMax: endOfWeek.toISOString(),
           maxResults: 250,
           singleEvents: true,
           eventTypes: ["default"],
         }),
-        calendar.events.list({
-          calendarId: "primary",
+        listAll({
           timeMin: now.toISOString(),
-          maxResults: 25, // headroom so cancelled-event filtering still yields 10
+          maxResults: 25, // per calendar; headroom before we merge + slice to 10
           singleEvents: true,
           orderBy: "startTime",
           eventTypes: ["default"],
         }),
       ]);
 
-      const count = (weekRes.data.items ?? []).filter(
-        (e) => e.status !== "cancelled" && e.start?.dateTime,
-      ).length;
+      const isRealMeeting = (e: calendar_v3.Schema$Event) =>
+        e.status !== "cancelled" && !!e.start?.dateTime;
+      // Stable identity for de-duping the same event across calendars.
+      const keyOf = (e: calendar_v3.Schema$Event) =>
+        e.id ?? `${e.start?.dateTime}-${e.summary}`;
 
-      const upcoming: UpcomingMeeting[] = (upcomingRes.data.items ?? [])
-        .filter((e) => e.status !== "cancelled" && e.start?.dateTime)
+      // De-dupe by event id (an event added to two of the user's calendars
+      // appears once) before counting.
+      const weekSeen = new Set<string>();
+      let count = 0;
+      for (const e of weekEvents) {
+        if (!isRealMeeting(e)) continue;
+        const k = keyOf(e);
+        if (weekSeen.has(k)) continue;
+        weekSeen.add(k);
+        count += 1;
+      }
+
+      // Merge upcoming across calendars: chronological sort (numeric, so mixed
+      // UTC offsets compare correctly), de-dupe, then take the soonest 10.
+      const upcomingSeen = new Set<string>();
+      const upcoming: UpcomingMeeting[] = upcomingEvents
+        .filter(isRealMeeting)
+        .sort(
+          (a, b) =>
+            new Date(a.start!.dateTime!).getTime() - new Date(b.start!.dateTime!).getTime(),
+        )
+        .filter((e) => {
+          const k = keyOf(e);
+          if (upcomingSeen.has(k)) return false;
+          upcomingSeen.add(k);
+          return true;
+        })
         .slice(0, 10)
         .map((e) => ({
-          id: e.id ?? `${e.start?.dateTime}-${e.summary}`,
+          id: keyOf(e),
           summary: e.summary?.trim() || "(no title)",
           startISO: e.start!.dateTime!,
         }));
