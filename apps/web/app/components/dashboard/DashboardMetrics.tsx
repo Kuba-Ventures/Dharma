@@ -84,11 +84,21 @@ export default function DashboardMetrics() {
         value={String(data?.draftsThisWeek ?? 0)}
         sub={draftsGroup?.next ? <NextBadgeSub group={draftsGroup} /> : undefined}
       />
-      <MetricTile
-        dismissId="metric-reply-rate"
-        label="Reply rate (7d)"
-        value={data?.replyRate7d == null ? "—" : `${Math.round(data.replyRate7d * 100)}%`}
-      />
+      {data?.replyRate7d == null ? (
+        <MetricTile
+          dismissId="metric-reply-rate"
+          label="Reply rate (7d)"
+          value="Not enough replies yet"
+          sub="Resumes once your replies land"
+          muted
+        />
+      ) : (
+        <MetricTile
+          dismissId="metric-reply-rate"
+          label="Reply rate (7d)"
+          value={`${Math.round(data.replyRate7d * 100)}%`}
+        />
+      )}
       <MetricTile
         dismissId="metric-time-saved"
         label="Time saved (week)"

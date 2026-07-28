@@ -2,7 +2,7 @@
 // (drafts + signals + recent classifications with label chips). Replaces the
 // InboxPanel slot.
 
-import type { ActivityEvent } from "../../../lib/recentActivity";
+import { groupActivity, type ActivityEvent } from "../../../lib/activityGrouping";
 
 type Props = {
   events: ActivityEvent[];
@@ -82,12 +82,20 @@ export default function ActivityFeed({ events }: Props) {
     );
   }
 
+  const rows = groupActivity(events);
+
   return (
     <ul className="divide-y divide-white/[0.06] rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)]">
-      {events.map((e, i) => (
+      {rows.map((e, i) => (
         <li key={`${e.kind}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
           <span className={tintForKind(e.kind)}>{eventIcon(e.kind)}</span>
-          <span className="flex-1 truncate text-[13px] text-white/80">{e.title}</span>
+          <span className="flex-1 truncate text-[13px] text-white/80">
+            {e.kind === "draft"
+              ? e.count === 1
+                ? "Drafted a reply"
+                : `Drafted ${e.count} replies`
+              : e.title}
+          </span>
           {e.kind === "classified" && e.labelName && (
             <span
               className="shrink-0 rounded-full px-2 py-0.5 text-[10px]"

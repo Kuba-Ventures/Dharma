@@ -6,27 +6,13 @@
 // components and as the data source for the public API route.
 
 import { prisma } from "./prisma";
+import type { ActivityEvent } from "./activityGrouping";
 
-export type ActivityEvent =
-  | {
-      kind: "draft";
-      at: Date;
-      title: string;
-    }
-  | {
-      kind: "signal";
-      at: Date;
-      title: string;
-      signalKind: string;
-      threadId: string | null;
-    }
-  | {
-      kind: "classified";
-      at: Date;
-      title: string;
-      labelName: string | null;
-      labelColor: string | null;
-    };
+// Re-exported so existing importers (ActivityFeed, the /api/activity/recent
+// route) can keep pulling the type from here. The pure grouping helper and the
+// types now live in ./activityGrouping so they can be unit-tested without
+// loading the prisma client.
+export type { ActivityEvent, ActivityRow } from "./activityGrouping";
 
 export async function getRecentActivity(
   userId: string,

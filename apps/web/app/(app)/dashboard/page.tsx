@@ -222,6 +222,9 @@ export default async function DashboardPage() {
     { key: "Scheduling", label: "Sched." },
   ];
   const toneByKey = new Map(toneBreakdown.map((r) => [r.tone, r]));
+  // Static, deliberately uneven skeleton heights for the empty-state preview —
+  // decorative only (aria-hidden), never rendered as real percentages.
+  const TONE_PREVIEW_HEIGHTS = [42, 60, 34, 52];
 
   const firstName =
     user.firstName ?? user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "there";
@@ -309,9 +312,32 @@ export default async function DashboardPage() {
                       })}
                     </div>
                   ) : (
-                    <p className="mt-2 text-[11px] text-white/30">
-                      Tone usage shows up once you generate drafts.
-                    </p>
+                    <div className="mt-3 flex min-h-[7rem] flex-1 flex-col">
+                      <span className="text-[10px] uppercase tracking-[0.08em] text-white/25">
+                        Preview
+                      </span>
+                      <div className="mt-2 flex flex-1 gap-3" aria-hidden="true">
+                        {TONE_MODES.map((mode, i) => (
+                          <div
+                            key={mode.key}
+                            className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                          >
+                            <div className="flex w-full flex-1 items-end overflow-hidden rounded-sm bg-white/[0.04]">
+                              <div
+                                className="w-full bg-white/[0.06]"
+                                style={{ height: `${TONE_PREVIEW_HEIGHTS[i]}%` }}
+                              />
+                            </div>
+                            <span className="w-full truncate text-center text-[10px] text-white/30">
+                              {mode.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] text-white/30">
+                        Your tone mix appears here once you generate drafts.
+                      </p>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -345,7 +371,7 @@ export default async function DashboardPage() {
                             className="h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: row.color }}
                           />
-                          <span className="w-20 shrink-0 truncate text-white/70">
+                          <span className="w-24 shrink-0 truncate text-white/70">
                             {row.name}
                           </span>
                           <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
@@ -388,7 +414,13 @@ export default async function DashboardPage() {
                       ? "Meetings this week unavailable"
                       : `${meetingsThisWeek} meeting${meetingsThisWeek === 1 ? "" : "s"} this week`}
                   </p>
-                  {upcomingMeetings.length > 0 && (
+                  {upcomingMeetings.length === 0 ? (
+                    <div className="flex flex-1 items-center justify-center py-4 text-center text-[11px] text-white/25">
+                      {meetingsThisWeek === null
+                        ? "Calendar sync is catching up"
+                        : "No upcoming meetings"}
+                    </div>
+                  ) : (
                     <ul className="mt-2 space-y-1">
                       {upcomingMeetings.map((m) => {
                         const start = new Date(m.startISO);
