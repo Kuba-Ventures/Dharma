@@ -1,4 +1,21 @@
-import SignalDetectionCard from "./SignalDetectionCard";
+"use client";
+
+import { useState } from "react";
+import Card from "../ui/Card";
+import StatusPill from "../ui/StatusPill";
+import IconTile from "../ui/IconTile";
+import Toggle from "../ui/Toggle";
+
+const SIGNAL_ICON = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path
+      d="M8 1l1.8 5L15 8l-5.2 2L8 15l-1.8-5L1 8l5.2-2L8 1z"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 // Illustrative signals shown while detection is still rolling out. These are
 // fixed examples (not the viewer's mail) so every account sees the same
@@ -47,18 +64,61 @@ const EXAMPLE_SIGNALS: {
   },
 ];
 
-export default function SignalsSection({ enabled }: { enabled: boolean }) {
+export default function SignalsSection({ enabled: initialEnabled }: { enabled: boolean }) {
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [pending, setPending] = useState(false);
   const [hero, ...rest] = EXAMPLE_SIGNALS;
 
-  return (
-    <div>
-      <p className="mb-5 text-sm text-white/60">
-        Latent intent your inbox would otherwise bury, kept separate from
-        rule-based labels. Cold threads (overdue replies) and pattern shifts are
-        coming.
-      </p>
+  async function onToggle(next: boolean) {
+    setPending(true);
+    const prev = enabled;
+    setEnabled(next);
+    try {
+      const res = await fetch("/api/preferences/signal-detection", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) setEnabled(prev);
+    } catch {
+      setEnabled(prev);
+    } finally {
+      setPending(false);
+    }
+  }
 
-      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+  return (
+    <Card>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <IconTile tone="brand">
+            <span className="text-brand-200">{SIGNAL_ICON}</span>
+          </IconTile>
+          <div>
+            <h3 className="font-display text-lg text-white">Signals</h3>
+            <div className="mt-1">
+              <StatusPill tone={enabled ? "active" : "muted"}>
+                {enabled ? "Active · Haiku pass per thread" : "Off"}
+              </StatusPill>
+            </div>
+          </div>
+        </div>
+        <Toggle
+          checked={enabled}
+          onChange={onToggle}
+          disabled={pending}
+          aria-label="Toggle signal detection"
+        />
+      </div>
+
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-white/60">
+          Latent intent your inbox would otherwise bury, kept separate from
+          rule-based labels. Surfaces emails worth your attention (buried intent
+          and cold threads) in the Signals tab. Costs ≈ $0.001 per classified
+          thread and is capped daily per user.
+        </p>
+
         {/* Featured example — one vivid signal, fully rendered, so the value
             of the feature is obvious before it's even live. */}
         <div>
@@ -72,7 +132,7 @@ export default function SignalsSection({ enabled }: { enabled: boolean }) {
               Example
             </span>
           </div>
-          <div className="overflow-hidden rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)]">
+          <div className="overflow-hidden rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card-elevated)]">
             <div className="border-b border-[color:var(--border-subtle)] px-4 py-3">
               <p className="text-sm font-medium text-white">{hero.title}</p>
             </div>
@@ -89,36 +149,36 @@ export default function SignalsSection({ enabled }: { enabled: boolean }) {
           </div>
         </div>
 
-        {/* Detection toggle + the remaining examples, kept compact alongside
-            the featured one. */}
-        <div className="space-y-3">
-          <SignalDetectionCard initial={{ enabled }} />
-          <p className="px-0.5 text-[11px] uppercase tracking-[0.08em] text-white/40">
+        {/* Remaining examples in an even two-up grid. */}
+        <div>
+          <p className="mb-2 text-[10px] uppercase tracking-[0.08em] text-white/40">
             More examples
           </p>
-          {rest.map((s) => (
-            <div
-              key={s.title}
-              className="rounded-card border border-dashed border-[color:var(--border-subtle)] bg-[color:var(--bg-card)] p-3 opacity-80"
-            >
-              <div className="mb-1.5">
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${s.chipClass}`}
-                >
-                  {s.kindLabel}
-                </span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {rest.map((s) => (
+              <div
+                key={s.title}
+                className="rounded-card border border-dashed border-[color:var(--border-subtle)] bg-[color:var(--bg-card-elevated)] p-3 opacity-90"
+              >
+                <div className="mb-1.5">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${s.chipClass}`}
+                  >
+                    {s.kindLabel}
+                  </span>
+                </div>
+                <p className="text-[13px] font-medium text-white">{s.title}</p>
+                <p className="text-[11px] text-white/50">{s.subject}</p>
               </div>
-              <p className="text-[13px] font-medium text-white">{s.title}</p>
-              <p className="text-[11px] text-white/50">{s.subject}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      <p className="mt-4 text-[11px] text-white/40">
-        Signal surfacing is still rolling out — these are examples, not your
-        mail.
-      </p>
-    </div>
+        <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
+          Signal surfacing is still rolling out — these are examples, not your
+          mail.
+        </p>
+      </div>
+    </Card>
   );
 }
