@@ -72,9 +72,8 @@ const NAV: Item[] = [
     ),
   },
   {
-    label: "Profile",
-    href: "/profile",
-    lockable: true,
+    label: "Profile & Settings",
+    href: "/settings",
     icon: (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
         <circle cx="7.5" cy="5" r="2.6" fill="currentColor" fillOpacity="0.85" />
@@ -84,28 +83,6 @@ const NAV: Item[] = [
           strokeWidth="1.4"
           fill="none"
           opacity="0.85"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M7.5 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm0-1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"
-          fill="currentColor"
-          fillOpacity="0.85"
-        />
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M6.073 1.26a.5.5 0 0 1 .491-.26h1.872a.5.5 0 0 1 .49.26l.34.68a5.405 5.405 0 0 1 .9.522l.745-.15a.5.5 0 0 1 .538.237l.936 1.621a.5.5 0 0 1-.063.583l-.513.57a5.5 5.5 0 0 1 0 1.054l.513.57a.5.5 0 0 1 .063.583L10.449 8.35a.5.5 0 0 1-.538.238l-.745-.15a5.405 5.405 0 0 1-.9.521l-.34.681a.5.5 0 0 1-.49.26H5.564a.5.5 0 0 1-.491-.26l-.34-.68a5.405 5.405 0 0 1-.9-.522l-.745.15a.5.5 0 0 1-.538-.237L1.614 7.73a.5.5 0 0 1 .063-.583l.513-.57a5.5 5.5 0 0 1 0-1.054l-.513-.57a.5.5 0 0 1-.063-.583L2.55 2.75a.5.5 0 0 1 .538-.238l.745.15a5.405 5.405 0 0 1 .9-.521l.34-.681z"
-          fill="currentColor"
-          fillOpacity="0.85"
         />
       </svg>
     ),

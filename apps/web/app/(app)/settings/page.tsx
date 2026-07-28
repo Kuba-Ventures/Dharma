@@ -1,4 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "../../../lib/auth";
+import { prisma } from "../../../lib/prisma";
+import { forcedDisplayBadge } from "../../../lib/badges";
+import IdentityCard from "../../components/profile/IdentityCard";
 
 // Live Google Workspace Marketplace listing for the Dharma Gmail add-on.
 const MARKETPLACE_URL =
@@ -22,15 +27,46 @@ const SECTIONS = [
   },
 ] as const;
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      image: true,
+      name: true,
+      firstName: true,
+      email: true,
+      createdAt: true,
+    },
+  });
+  if (!user) redirect("/login");
+
+  // Only the pinned Founder accounts show a badge; everyone else shows none.
+  const displayBadge = forcedDisplayBadge(user.email);
+
   return (
     <div className="max-w-3xl">
       <header className="mb-6">
         <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-brand-200">
-          Settings
+          Profile &amp; settings
         </p>
-        <h1 className="font-display text-3xl text-white">Account and preferences</h1>
+        <h1 className="font-display text-3xl text-white">Your account</h1>
       </header>
+
+      <div className="mb-4">
+        <IdentityCard
+          user={{
+            image: user.image,
+            name: user.name,
+            firstName: user.firstName,
+            email: user.email,
+            createdAt: user.createdAt.toISOString(),
+          }}
+          displayBadge={displayBadge}
+        />
+      </div>
 
       <section className="mb-4 rounded-card border border-[color:var(--border-brand)] bg-brand-400/[0.06] p-5">
         <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">

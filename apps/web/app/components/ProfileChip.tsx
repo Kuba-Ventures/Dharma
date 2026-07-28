@@ -27,7 +27,7 @@ export default function ProfileChip({ user, displayBadge }: Props) {
   return (
     <div className="mt-3 flex items-center gap-1.5 border-t border-[color:var(--border-subtle)] pt-3">
       <Link
-        href="/profile"
+        href="/settings"
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-card p-1.5 transition-colors hover:bg-white/[0.04]"
       >
         <div className="relative shrink-0">
