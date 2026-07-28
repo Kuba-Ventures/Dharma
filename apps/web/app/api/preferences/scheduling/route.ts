@@ -4,7 +4,12 @@ import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { withCalendarTimeout } from "../../../../lib/calendarTimeout";
+import {
+  DHARMA_BLOCK_DESCRIPTION,
+  DHARMA_BLOCK_EXT_KEY,
+} from "../../../../lib/dharmaBlock";
 import { pruneExpiredBlocks, todayISOInZone } from "../../../../lib/expiredBlocks";
+import { isInvalidGrant } from "../../../../lib/googleErrors";
 
 // Bound the function. The calendar-mirror path below makes live Google Calendar
 // calls (each capped by withCalendarTimeout); maxDuration is the outer ceiling
@@ -44,8 +49,7 @@ const DAY_RRULE_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
 // Google Calendar event color "1" = Lavender (#7986CB), the nearest preset to
 // Dharma's brand indigo. Calendar only supports its fixed 11-color palette.
 const DHARMA_EVENT_COLOR_ID = "1";
-const BLOCK_DESCRIPTION =
-  "Created by Dharma. Edit or remove this block in Configuration → Scheduling on your dashboard.";
+const BLOCK_DESCRIPTION = DHARMA_BLOCK_DESCRIPTION;
 
 function safeParse(raw: string | null | undefined): Prefs {
   if (!raw) return {};
@@ -142,6 +146,10 @@ function buildEventBody(
   const event: calendar_v3.Schema$Event = {
     summary,
     description: BLOCK_DESCRIPTION,
+    // Durable machine marker so surfaces like the dashboard "meetings this
+    // week" card can exclude Dharma blocks without string-matching the
+    // description (issue #86).
+    extendedProperties: { private: { [DHARMA_BLOCK_EXT_KEY]: "1" } },
     start: { dateTime: startDT, timeZone: tz },
     end: { dateTime: endDT, timeZone: tz },
     transparency: "opaque",
@@ -172,8 +180,7 @@ function calendarErrorMessage(err: unknown): string {
   // (e.g. the user revoked access, or the OAuth client rotated). The library
   // surfaces this as `invalid_grant (400)`, which is meaningless to a user —
   // translate it into an actionable reconnect prompt.
-  const oauthErrCode = typeof apiErr === "string" ? apiErr : undefined;
-  if (oauthErrCode === "invalid_grant" || e?.message === "invalid_grant") {
+  if (isInvalidGrant(err)) {
     return "Google access expired — sign out and sign back in to reconnect, then add the block again";
   }
   const detail =
