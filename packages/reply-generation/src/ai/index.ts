@@ -23,8 +23,9 @@ export async function* generateConfirmationReply(
 Rules:
 - Write ONLY the email body. No subject line. No preamble.
 - Mirror the tone: casual request → casual reply, formal → formal.
-- Confirm the proposed time works. Keep it 1–2 sentences.
-- Do not sign off with a name.`;
+- Confirm the proposed time works. Keep it 1-2 sentences.
+- Do not sign off with a name.
+- Never use em-dashes or en-dashes; use commas or periods instead.`;
 
   const userMessage = `The person proposed this time and asked if it works:\n\n"${originalRequest}"\n\nThe time ${formatted} is free on my calendar. Write a short reply confirming it works.`;
 
@@ -80,7 +81,9 @@ Rules:
           usage?: { input_tokens?: number; output_tokens?: number };
         };
         if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
-          yield event.delta.text;
+          // Safety net for the "no em/en dashes" prompt rule: convert any that
+          // slip through to commas as the reply streams out.
+          yield event.delta.text.replace(/\s*[—–]\s*/g, ", ");
         }
         if (event.type === "message_start" && event.message?.usage?.input_tokens) {
           inputTokens = event.message.usage.input_tokens;
@@ -123,7 +126,8 @@ Rules:
 - Choose 2-3 of the available time slots and include them naturally in the text. Times are in ET.
 - End with a friendly call to action (e.g. "let me know what works").
 - Do not sign off with a name; the user will add their own signature.
-- NEVER claim the other person's proposed times "don't work" unless explicitly told they conflict.${preferenceLine}`;
+- NEVER claim the other person's proposed times "don't work" unless explicitly told they conflict.
+- Never use em-dashes or en-dashes; use commas or periods instead.${preferenceLine}`;
 
   const conflict = allOfferedTimesBusy
     ? "Unfortunately those specific times don't work on my calendar, but"
@@ -184,7 +188,9 @@ Rules:
           usage?: { input_tokens?: number; output_tokens?: number };
         };
         if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
-          yield event.delta.text;
+          // Safety net for the "no em/en dashes" prompt rule: convert any that
+          // slip through to commas as the reply streams out.
+          yield event.delta.text.replace(/\s*[—–]\s*/g, ", ");
         }
         if (event.type === "message_start" && event.message?.usage?.input_tokens) {
           inputTokens = event.message.usage.input_tokens;

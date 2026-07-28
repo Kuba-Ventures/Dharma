@@ -13,7 +13,7 @@ import { google } from "googleapis";
 
 // Hard rules applied to every draft regardless of tone
 const WRITING_RULES = `\
-- Never use em-dashes. Use a comma or period instead.
+- Never use em-dashes or en-dashes. Use a comma or period instead.
 - No generic openers like "Thanks for reaching out" or "Hope you're well".
 - No subject line.`;
 
@@ -351,7 +351,9 @@ Reply draft:`;
     content: Array<{ text: string }>;
     usage?: { input_tokens: number; output_tokens: number };
   };
-  const replyBody = (claudeData.content[0]?.text?.trim() ?? "").replace(/\u2014/g, ",");
+  const replyBody = (claudeData.content[0]?.text?.trim() ?? "")
+    .replace(/\s*[\u2014\u2013]\s*/g, ", ")
+    .replace(/ {2,}/g, " ");
 
   if (claudeData.usage) {
     await logUsage({
