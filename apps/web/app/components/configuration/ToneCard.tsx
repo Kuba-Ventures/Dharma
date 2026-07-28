@@ -24,7 +24,7 @@ const TONE_CARDS: Array<{ key: string; label: string; description: string }> = [
   {
     key: "Concise",
     label: "Concise",
-    description: "2-4 sentences. No filler. Get to the point.",
+    description: "1-3 sentences. Blunt. Answer first, no pleasantries.",
   },
   {
     key: "Formal / Legal",

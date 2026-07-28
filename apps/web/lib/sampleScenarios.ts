@@ -29,12 +29,6 @@ export const SAMPLE_SCENARIOS = [
       "Ask a mutual contact (named Jordan) to introduce you to a founder at a portfolio company you're researching. 3 sentences, low-friction.",
   },
   {
-    id: "thanking-referral",
-    label: "Thanking someone for a referral",
-    prompt:
-      "Thank a contact for referring a potential client your way. Mention the intro went well and you'll keep them posted. 3 sentences.",
-  },
-  {
     id: "deadline-push",
     label: "Pushing back a deadline by two days",
     prompt:
