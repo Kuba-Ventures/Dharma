@@ -316,7 +316,13 @@ export default async function DashboardPage() {
                       <span className="text-[10px] uppercase tracking-[0.08em] text-white/25">
                         Preview
                       </span>
-                      <div className="mt-2 flex flex-1 gap-3" aria-hidden="true">
+                      {/* Ghost preview: brand-purple bars at reduced opacity so
+                          the card reads as "waiting for data", not real usage.
+                          Decorative only — no real percentages are shown. */}
+                      <div
+                        className="mt-2 flex flex-1 gap-3 opacity-60"
+                        aria-hidden="true"
+                      >
                         {TONE_MODES.map((mode, i) => (
                           <div
                             key={mode.key}
@@ -324,18 +330,18 @@ export default async function DashboardPage() {
                           >
                             <div className="flex w-full flex-1 items-end overflow-hidden rounded-sm bg-white/[0.04]">
                               <div
-                                className="w-full bg-white/[0.06]"
+                                className="w-full bg-brand-400"
                                 style={{ height: `${TONE_PREVIEW_HEIGHTS[i]}%` }}
                               />
                             </div>
-                            <span className="w-full truncate text-center text-[10px] text-white/30">
+                            <span className="w-full truncate text-center text-[10px] text-white/40">
                               {mode.label}
                             </span>
                           </div>
                         ))}
                       </div>
                       <p className="mt-2 text-[11px] text-white/30">
-                        Your tone mix appears here once you generate drafts.
+                        Ghost preview — fills in once you generate drafts.
                       </p>
                     </div>
                   )}
@@ -360,40 +366,26 @@ export default async function DashboardPage() {
                   <p className="text-[11px] text-white/50">
                     {mappingCount} provisioned · {taggedThisWeek} tagged this week
                   </p>
-                  {labelBreakdown.length > 0 && (
-                    <ul className="mt-2 space-y-1.5">
-                      {labelBreakdown.map((row) => (
-                        <li
-                          key={row.name}
-                          className="flex items-center gap-2 text-[11px]"
-                        >
+                  {/* Compact proportional bars: one per label with volume this
+                      week, sorted longest-first, width = share of the busiest
+                      label. Hover reveals the label name, count, and share. */}
+                  {labelBreakdown.some((row) => row.tagged > 0) && (
+                    <div className="mt-3 flex flex-1 flex-col justify-center gap-2">
+                      {labelBreakdown
+                        .filter((row) => row.tagged > 0)
+                        .sort((a, b) => b.tagged - a.tagged)
+                        .map((row) => (
                           <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: row.color }}
+                            key={row.name}
+                            className="block h-2 rounded-full"
+                            style={{
+                              width: `${Math.max(8, (row.tagged / labelMaxTagged) * 100)}%`,
+                              backgroundColor: row.color,
+                            }}
+                            title={`${row.name}: ${row.tagged} · ${Math.round((row.tagged / labelLabeledTotal) * 100)}%`}
                           />
-                          <span className="w-24 shrink-0 truncate text-white/70">
-                            {row.name}
-                          </span>
-                          <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
-                            <span
-                              className="absolute left-0 top-0 h-full rounded-full"
-                              style={{
-                                width: `${(row.tagged / labelMaxTagged) * 100}%`,
-                                backgroundColor: row.color,
-                              }}
-                            />
-                          </span>
-                          <span className="w-14 shrink-0 text-right text-white/40">
-                            {row.tagged}
-                            {row.tagged > 0 && (
-                              <span className="ml-1 text-white/25">
-                                · {Math.round((row.tagged / labelLabeledTotal) * 100)}%
-                              </span>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                        ))}
+                    </div>
                   )}
                 </div>
               ) : (
@@ -409,19 +401,20 @@ export default async function DashboardPage() {
             stat={
               schedulingActive ? (
                 <div className="flex flex-1 flex-col">
-                  <p className="text-[11px] text-white/50">
-                    {meetingsThisWeek === null
-                      ? "Meetings this week unavailable"
-                      : `${meetingsThisWeek} meeting${meetingsThisWeek === 1 ? "" : "s"} this week`}
-                  </p>
-                  {upcomingMeetings.length === 0 ? (
+                  {meetingsThisWeek === null ? (
                     <div className="flex flex-1 items-center justify-center py-4 text-center text-[11px] text-white/25">
-                      {meetingsThisWeek === null
-                        ? "Calendar sync is catching up"
-                        : "No upcoming meetings"}
+                      Calendar sync is catching up
                     </div>
                   ) : (
-                    <ul className="mt-2 space-y-1">
+                    <>
+                      <p className="font-display text-3xl leading-none text-white">
+                        {meetingsThisWeek}
+                      </p>
+                      <p className="mt-1 text-[11px] text-white/50">
+                        meeting{meetingsThisWeek === 1 ? "" : "s"} this week
+                      </p>
+                      {upcomingMeetings.length > 0 && (
+                        <ul className="mt-3 space-y-1">
                       {upcomingMeetings.map((m) => {
                         const start = new Date(m.startISO);
                         // Vercel functions run in UTC. Without an explicit
@@ -454,21 +447,33 @@ export default async function DashboardPage() {
                           </li>
                         );
                       })}
-                    </ul>
+                        </ul>
+                      )}
+                    </>
                   )}
-                  <ul className="mt-auto border-t border-white/[0.06] pt-4">
-                    <li className="flex items-center gap-2 text-[11px]">
-                      <span className="flex-1 truncate text-white/70">
-                        Scheduled with Dharma
-                      </span>
-                      <span className="shrink-0 tabular-nums text-white/40">
-                        {schedulingDraftsThisWeek}
-                      </span>
-                    </li>
-                  </ul>
+                  <div className="mt-auto flex items-center justify-between border-t border-white/[0.06] pt-3 text-[11px]">
+                    <span className="text-white/40">Scheduled with Dharma</span>
+                    <span className="tabular-nums text-white/60">
+                      {schedulingDraftsThisWeek}
+                    </span>
+                  </div>
                 </div>
               ) : (
-                "Not proposing times"
+                <div className="flex flex-1 flex-col">
+                  <p className="text-[11px] text-white/50">Scheduling is paused</p>
+                  <div className="mt-auto flex items-center gap-1.5 pt-4 text-[12px] font-medium text-brand-200">
+                    Connect a calendar to book meetings
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path
+                        d="M5 3l4 4-4 4"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                </div>
               )
             }
           />
