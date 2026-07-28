@@ -346,6 +346,9 @@ export default function SchedulingCard({ initial }: Props) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   // Index of the block awaiting "Add to calendar" confirmation, or null.
   const [confirmAddIdx, setConfirmAddIdx] = useState<number | null>(null);
+  // Index of the most recently added block — it opens with its editor expanded;
+  // every other block rests as a condensed summary until the user edits it.
+  const [expandNewIdx, setExpandNewIdx] = useState<number | null>(null);
   // Per-block calendar sync errors returned by the last save.
   const [blockErrors, setBlockErrors] = useState<string[]>([]);
   // Save indicator for block/pref edits. Driven by sendPrefs (the single
@@ -737,7 +740,8 @@ export default function SchedulingCard({ initial }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setExpandNewIdx(prefs.blockedWindows.length);
                     persistPrefs(
                       {
                         ...prefs,
@@ -752,8 +756,8 @@ export default function SchedulingCard({ initial }: Props) {
                         ],
                       },
                       { immediate: true },
-                    )
-                  }
+                    );
+                  }}
                   className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/[0.09]"
                 >
                   + Add block
@@ -772,6 +776,7 @@ export default function SchedulingCard({ initial }: Props) {
                       key={idx}
                       block={b}
                       activeDays={activeDays}
+                      defaultExpanded={idx === expandNewIdx}
                       onChange={(nb) => {
                         const next = [...prefs.blockedWindows];
                         next[idx] = nb;
@@ -855,12 +860,14 @@ export default function SchedulingCard({ initial }: Props) {
 function BlockRow({
   block,
   activeDays,
+  defaultExpanded,
   onChange,
   onRemove,
   onRequestAdd,
 }: {
   block: BlockedWindow;
   activeDays: number[];
+  defaultExpanded: boolean;
   onChange: (b: BlockedWindow) => void;
   onRemove: () => void;
   onRequestAdd: () => void;
@@ -871,12 +878,21 @@ function BlockRow({
   const colorHex =
     GOOGLE_EVENT_COLORS.find((c) => c.id === (block.colorId ?? DEFAULT_COLOR_ID))?.hex ?? "#7986CB";
 
-  // Expansion: a block defaults to the editor until it's on the calendar, then
-  // collapses to a condensed summary. `override` lets the user toggle, and
-  // resets whenever sync state flips (add → collapse, remove → reopen).
-  const [override, setOverride] = useState<boolean | null>(null);
-  useEffect(() => setOverride(null), [synced]);
-  const expanded = override ?? !synced;
+  // Expansion: every block defaults to a condensed summary so the full editor
+  // is only visible while you're actually editing. A freshly-added block opens
+  // expanded (defaultExpanded). `override` is the user's explicit toggle
+  // (Edit ⇄ Minimize); it's cleared when calendar-sync state flips so adding a
+  // block to the calendar collapses the editor back to its summary. The reset
+  // is guarded against the mount pass so it can't wipe defaultExpanded.
+  const [override, setOverride] = useState<boolean | null>(defaultExpanded ? true : null);
+  const prevSynced = useRef(synced);
+  useEffect(() => {
+    if (prevSynced.current !== synced) {
+      prevSynced.current = synced;
+      setOverride(null);
+    }
+  }, [synced]);
+  const expanded = override ?? false;
 
   function setRec(patch: Partial<Recurrence>) {
     onChange({ ...block, recurrence: sanitizeRecurrence({ ...rec, ...patch }) });
@@ -898,7 +914,8 @@ function BlockRow({
   const miniInputCls =
     "rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-1 text-xs text-white";
 
-  // Condensed summary — shown once a block is on the calendar.
+  // Condensed summary — the default resting state for every block. Tap it (or
+  // Edit) to open the full editor; Minimize collapses back here.
   if (!expanded) {
     return (
       <li className="rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] px-3 py-2.5">
@@ -949,20 +966,22 @@ function BlockRow({
 
   return (
     <li className="rounded-card border border-[color:var(--border-subtle)] bg-white/[0.02] p-3 space-y-2.5">
-      {synced && (
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] uppercase tracking-[0.06em] text-brand-200/70">
-            Editing block
-          </span>
-          <button
-            type="button"
-            onClick={() => setOverride(false)}
-            className="rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/[0.09]"
-          >
-            Done
-          </button>
-        </div>
-      )}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-[0.06em] text-brand-200/70">
+          Editing block
+        </span>
+        <button
+          type="button"
+          onClick={() => setOverride(false)}
+          className="flex items-center gap-1 rounded-btn border border-[color:var(--border-subtle)] bg-white/[0.05] px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/[0.09]"
+          aria-label="Minimize block editor"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+            <path d="M2 5h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          Minimize
+        </button>
+      </div>
       {/* time + label + remove */}
       <div className="flex items-center gap-2">
         <input
