@@ -5,6 +5,7 @@ import { logUsage } from "../../../../../lib/usage";
 import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { SAMPLE_SCENARIOS, scenarioById } from "../../../../../lib/sampleScenarios";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
+import { stripEmDashes } from "../../../../../lib/stripEmDashes";
 
 // POST { scenarioId? } → { scenarioId, label, draft }
 // Generates a fresh sample draft in the user's current tone, against the
@@ -62,6 +63,8 @@ End the email with exactly this sign-off (verbatim, including punctuation/newlin
 
 Scenario: ${scenario.prompt}
 
+Never use em-dashes (—) or en-dashes (–); use commas or periods instead.
+
 Return only the email body. No subject line. No commentary.`;
 
   const res = await fetch(ANTHROPIC_URL, {
@@ -94,7 +97,7 @@ Return only the email body. No subject line. No commentary.`;
     });
   }
 
-  const draft = data.content[0]?.text?.trim() ?? "";
+  const draft = stripEmDashes(data.content[0]?.text?.trim() ?? "");
 
   return NextResponse.json({
     scenarioId: scenario.id,
