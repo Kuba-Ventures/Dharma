@@ -10,6 +10,7 @@ import MeetingHoursGrid, {
   type MeetingHour,
 } from "../MeetingHoursGrid";
 import WeekAvailability from "./WeekAvailability";
+import { pruneExpiredBlocks, todayISOInZone } from "../../../lib/expiredBlocks";
 
 const CAL_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -337,10 +338,26 @@ const TZ_OPTIONS: TzOption[] = [
   { offset: "UTC+14:00", label: "Line Islands, Kiribati",                  zone: "Pacific/Kiritimati" },
 ];
 
+// Detect timezone if user has no value set yet (best-effort). Hoisted so the
+// initial expired-block prune can judge "today" in the user's own zone.
+const detectedTz =
+  typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+
 export default function SchedulingCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [confirmingOff, setConfirmingOff] = useState(false);
-  const [prefs, setPrefs] = useState<Prefs>(parsePrefs(initial.schedulingPreferences));
+  // Auto-clear blocks whose event has fully passed (a one-off in the past, or a
+  // recurring block whose repeats have run out) on load, so the card never
+  // shows a finished event. If any were dropped we persist the cleanup once on
+  // mount (see effect below), which also removes the mirrored calendar event.
+  const [initialPrune] = useState(() => {
+    const parsed = parsePrefs(initial.schedulingPreferences);
+    const today = todayISOInZone(initial.timezone ?? detectedTz);
+    const { kept, expired } = pruneExpiredBlocks(parsed.blockedWindows, today);
+    const prefs: Prefs = expired.length ? { ...parsed, blockedWindows: kept } : parsed;
+    return { prefs, hadExpired: expired.length > 0 };
+  });
+  const [prefs, setPrefs] = useState<Prefs>(initialPrune.prefs);
   const [hours, setHours] = useState<MeetingHour[]>(initial.hours);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -367,9 +384,6 @@ export default function SchedulingCard({ initial }: Props) {
   // Days the user takes meetings — the default day-set for a new block.
   const activeDays = [...new Set(hours.map((h) => h.dayOfWeek))].sort((a, b) => a - b);
 
-  // Detect timezone if user has no value set yet (best-effort).
-  const detectedTz =
-    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
   const [tz, setTz] = useState<string>(initial.timezone ?? detectedTz);
 
   const hoursSummary = summarizeHours(hours);
@@ -409,7 +423,7 @@ export default function SchedulingCard({ initial }: Props) {
   // Last prefs the server confirmed — the rollback target when an explicit
   // action (add/remove/Add-to-calendar) fails, so the optimistic state can't
   // get stuck (e.g. a block wedged on "Adding…").
-  const serverPrefsRef = useRef<Prefs>(parsePrefs(initial.schedulingPreferences));
+  const serverPrefsRef = useRef<Prefs>(initialPrune.prefs);
 
   const sendPrefs = useCallback(async (next: Prefs, immediate: boolean) => {
     const seq = ++saveSeqRef.current;
@@ -526,6 +540,17 @@ export default function SchedulingCard({ initial }: Props) {
     },
     [],
   );
+
+  // If load-time pruning dropped expired blocks, persist the cleaned set once so
+  // the DB and any mirrored Google Calendar events are removed too — the server
+  // reconcile deletes events for blocks that no longer exist. Runs a single
+  // time on mount; the pruned prefs are already what's rendered.
+  const cleanupSentRef = useRef(false);
+  useEffect(() => {
+    if (cleanupSentRef.current || !initialPrune.hadExpired) return;
+    cleanupSentRef.current = true;
+    void sendPrefs(initialPrune.prefs, true);
+  }, [initialPrune, sendPrefs]);
 
   async function persistHours(next: MeetingHour[]) {
     setHours(next);
