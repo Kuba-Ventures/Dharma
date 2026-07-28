@@ -9,6 +9,7 @@ import ConfirmModal from "../ui/ConfirmModal";
 import MeetingHoursGrid, {
   type MeetingHour,
 } from "../MeetingHoursGrid";
+import AvailabilityBar from "./AvailabilityBar";
 
 const CAL_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -148,7 +149,7 @@ function summarizeHours(hours: MeetingHour[]): string | null {
       const dayLabel =
         r.days.length === 1
           ? DAY_NAMES[r.days[0]]
-          : `${DAY_NAMES[r.days[0]]}–${DAY_NAMES[r.days[r.days.length - 1]]}`;
+          : `${DAY_NAMES[r.days[0]]}-${DAY_NAMES[r.days[r.days.length - 1]]}`;
       return `${dayLabel} ${to12h(r.start)}–${to12h(r.end)}`;
     })
     .join(", ");
@@ -678,6 +679,7 @@ export default function SchedulingCard({ initial }: Props) {
                 </div>
               </div>
               <MeetingHoursGrid initialHours={hours} onChange={persistHours} />
+              <AvailabilityBar hours={hours} blocks={prefs.blockedWindows} />
             </Card>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
