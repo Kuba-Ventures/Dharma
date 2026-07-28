@@ -594,10 +594,21 @@ export default function SchedulingCard({ initial }: Props) {
     setSyncMessage(null);
     try {
       const res = await fetch("/api/calendar/google/sync", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        syncErrors?: string[];
+      };
       if (res.ok) {
-        setSyncMessage("Calendar resynced");
+        // The resync re-mirrors blocks to Google Calendar; surface any
+        // per-block failures instead of a misleading "resynced".
+        const blockErrs = Array.isArray(data.syncErrors) ? data.syncErrors : [];
+        if (blockErrs.length > 0) {
+          setBlockErrors(blockErrs);
+          setSyncMessage("Some blocks didn’t sync");
+        } else {
+          setSyncMessage("Calendar resynced");
+        }
       } else {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
         setSyncMessage(data.error ?? "Sync failed");
       }
     } catch {
