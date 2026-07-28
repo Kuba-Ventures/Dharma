@@ -4,6 +4,38 @@ export interface CalendarProvider {
   getEvents(start: Date, end: Date): Promise<TimeSlot[]>;
 }
 
+// A Google Calendar `calendarList` entry reduced to the fields we use to decide
+// whether it belongs to the user's visible schedule. Kept structural so a full
+// googleapis `calendar_v3.Schema$CalendarListEntry` assigns to it directly.
+export type CalendarListEntryLike = {
+  id?: string | null;
+  selected?: boolean | null;
+  deleted?: boolean | null;
+  primary?: boolean | null;
+};
+
+// The calendars that make up a user's *visible* schedule: the ones ticked
+// (shown) in their Google Calendar UI. This is what both the dashboard card and
+// the free-busy engine read from, so meetings on the user's Work / Personal
+// calendars are seen — not just `primary` (issue #74).
+//
+// Rules: primary is always kept even when Google omits `selected` on it;
+// deleted entries and entries without an id are dropped; ids are de-duplicated
+// preserving order. Falls back to ["primary"] so callers never get an empty set
+// (e.g. when calendarList is unavailable or returns nothing).
+export function visibleCalendarIds(entries: CalendarListEntryLike[]): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    if (!e.id || e.deleted) continue;
+    if (!(e.selected || e.primary)) continue;
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    ids.push(e.id);
+  }
+  return ids.length > 0 ? ids : ["primary"];
+}
+
 // Merges events from multiple providers concurrently.
 // Individual provider failures are logged and skipped so one broken
 // credential doesn't block the whole response.
