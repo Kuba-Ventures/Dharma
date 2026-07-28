@@ -9,6 +9,7 @@ import {
   DHARMA_BLOCK_EXT_KEY,
 } from "../../../../lib/dharmaBlock";
 import { pruneExpiredBlocks, todayISOInZone } from "../../../../lib/expiredBlocks";
+import { isInvalidGrant } from "../../../../lib/googleErrors";
 
 // Bound the function. The calendar-mirror path below makes live Google Calendar
 // calls (each capped by withCalendarTimeout); maxDuration is the outer ceiling
@@ -179,8 +180,7 @@ function calendarErrorMessage(err: unknown): string {
   // (e.g. the user revoked access, or the OAuth client rotated). The library
   // surfaces this as `invalid_grant (400)`, which is meaningless to a user —
   // translate it into an actionable reconnect prompt.
-  const oauthErrCode = typeof apiErr === "string" ? apiErr : undefined;
-  if (oauthErrCode === "invalid_grant" || e?.message === "invalid_grant") {
+  if (isInvalidGrant(err)) {
     return "Google access expired — sign out and sign back in to reconnect, then add the block again";
   }
   const detail =
