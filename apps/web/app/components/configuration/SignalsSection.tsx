@@ -88,7 +88,7 @@ export default function SignalsSection({ enabled: initialEnabled }: { enabled: b
   }
 
   return (
-    <Card>
+    <Card variant="bare">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <IconTile tone="brand">

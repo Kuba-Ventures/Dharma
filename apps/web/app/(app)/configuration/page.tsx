@@ -140,21 +140,14 @@ export default async function ConfigurationPage() {
 
   return (
     <div className="max-w-3xl">
-      <header className="mb-8">
-        <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-brand-200">
-          Configuration
-        </p>
-        <h1 className="font-display text-3xl text-white">
-          Tone, labels, scheduling, signals
-        </h1>
-        <p className="mt-2 text-sm text-white/60">
-          Everything Dharma runs on your behalf. Pause any of it anytime.
-        </p>
-      </header>
-
       <GuidedTour id="config" steps={CONFIG_TOUR} />
 
-      <ConfigTabs sections={sections} />
+      <ConfigTabs
+        sections={sections}
+        eyebrow="Configuration"
+        title="Tone, labels, scheduling & signals"
+        subtitle="Everything Dharma runs on your behalf. Pause any of it anytime."
+      />
     </div>
   );
 }
