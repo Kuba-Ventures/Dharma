@@ -6,6 +6,7 @@ import { makeAuthForUser } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
 import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
+import { stripEmDashes } from "../../../../../lib/stripEmDashes";
 import { google } from "googleapis";
 
 // Analyze the user's most recent 15 sent emails. Per the May 23 spec: fewer
@@ -85,11 +86,13 @@ Analyze their tone and writing style carefully. Pay close attention to:
 
 Return a JSON object with exactly four fields:
 {
-  "summary": "A 1-2 sentence description of their writing style starting with 'Writes with...' Focus on tone, formality, and sentence structure only. Do not mention the person's name, do not mention specific greetings or sign-offs.",
+  "summary": "2-3 sentences in second person ('You write...'). The first sentence or two describe their tone, formality, and typical sentence length. The final sentence states how they open and close, in exactly this shape: \\"You usually open with '<their typical greeting>' and sign off with '<their typical closing>'.\\" Use their real patterns; if they skip greetings or sign-offs, say that instead. Do not mention the person's name.",
   "example": "A short sample email (3-6 sentences) written in their exact style. Use a professional but realistic scenario like following up on a project. Use their actual patterns. End the email at the closing word only (e.g. 'Thanks,' or 'Best,'). Do not include any name or title after it.",
   "intro": "The exact text they most commonly use to open emails, including punctuation, but with the recipient's name replaced by a placeholder if present. Examples: 'Hi {{name}},', 'Hey,', 'Hello,', or '' if they typically skip greetings. One short string, no explanation.",
-  "signOff": "The exact text they most commonly use to close emails, including punctuation and a trailing newline + their first name if they sign with their name. Examples: 'Thanks,\\nMara', 'Best,\\nMarcus', '— Alex', or '' if they typically skip sign-offs. One short string, no explanation."
+  "signOff": "The exact text they most commonly use to close emails, including punctuation and a trailing newline + their first name if they sign with their name. Examples: 'Thanks,\\nMara', 'Best,\\nMarcus', or '' if they typically skip sign-offs. One short string, no explanation."
 }
+
+Never use em-dashes (—) or en-dashes (–) anywhere in your output; use commas or periods instead.
 
 JSON only, no other text.`;
 
@@ -130,11 +133,13 @@ JSON only, no other text.`;
     throw new Error("Missing summary or example in Claude response");
   }
 
+  // Belt-and-suspenders: the prompt forbids em/en dashes, but strip any that
+  // slip through so the stored voice profile and sample never contain them.
   return {
-    summary: parsed.summary,
-    example: parsed.example,
-    intro: parsed.intro ?? "",
-    signOff: parsed.signOff ?? "",
+    summary: stripEmDashes(parsed.summary),
+    example: stripEmDashes(parsed.example),
+    intro: stripEmDashes(parsed.intro ?? ""),
+    signOff: stripEmDashes(parsed.signOff ?? ""),
   };
 }
 
@@ -223,7 +228,7 @@ export async function POST(req: NextRequest) {
 
 Style profile: ${result.summary}
 
-Rules: max 18 words. No adverbs like "professionally" or "effectively". No mention of name. Voice description only — concrete, not generic.
+Rules: max 18 words. No adverbs like "professionally" or "effectively". No mention of name. Voice description only, concrete, not generic. Never use em-dashes or en-dashes.
 
 Return just the completing phrase. No quotes, no preamble.`;
 
@@ -241,7 +246,8 @@ Return just the completing phrase. No quotes, no preamble.`;
           content: Array<{ text: string }>;
           usage?: { input_tokens: number; output_tokens: number };
         };
-        toneSummary = data.content[0]?.text?.trim()?.replace(/^["']|["']$/g, "") ?? null;
+        const sonnetRaw = data.content[0]?.text?.trim()?.replace(/^["']|["']$/g, "") ?? null;
+        toneSummary = sonnetRaw ? stripEmDashes(sonnetRaw) : null;
         if (data.usage) {
           await logUsage({
             userId,

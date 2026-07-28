@@ -24,7 +24,7 @@ const TONE_CARDS: Array<{ key: string; label: string; description: string }> = [
   {
     key: "Concise",
     label: "Concise",
-    description: "2–4 sentences. No filler. Get to the point.",
+    description: "2-4 sentences. No filler. Get to the point.",
   },
   {
     key: "Formal / Legal",
@@ -210,6 +210,8 @@ export default function ToneCard({ initial }: Props) {
 
         {enabled && (
           <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4">
             <div>
               <span className="text-[10px] uppercase tracking-[0.08em] text-white/40">
                 Active mode
@@ -298,7 +300,9 @@ export default function ToneCard({ initial }: Props) {
                 </Card>
               );
             })()}
+              </div>
 
+              <div>
             <Card variant="elevated">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[10px] uppercase tracking-[0.08em] text-brand-200">
@@ -316,6 +320,8 @@ export default function ToneCard({ initial }: Props) {
                 {draft || "Regenerate to see a sample in your tone."}
               </pre>
             </Card>
+              </div>
+            </div>
 
             <p className="rounded-card border border-[color:var(--border-brand)] bg-brand-400/8 px-4 py-2 text-[12px] text-white/70">
               Dharma reads only your sent mail to learn your voice. Nothing is
