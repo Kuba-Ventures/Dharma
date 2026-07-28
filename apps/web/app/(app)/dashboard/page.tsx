@@ -274,6 +274,7 @@ export default async function DashboardPage() {
             iconTone="brand"
             title="Tone"
             status={toneActive ? "Active" : "Paused"}
+            active={toneActive}
             stat={
               toneActive ? (
                 <div className="flex flex-1 flex-col">
@@ -360,6 +361,7 @@ export default async function DashboardPage() {
                 ? `Active · ${presetSpec?.displayName ?? labelPreset?.preset ?? ""}`.trim()
                 : "Paused"
             }
+            active={labelsActive}
             stat={
               labelsActive ? (
                 <div>
@@ -412,6 +414,7 @@ export default async function DashboardPage() {
             iconTone="brand-deeper"
             title="Scheduling"
             status={schedulingActive ? "Active" : "Paused"}
+            active={schedulingActive}
             stat={
               schedulingActive ? (
                 <div className="flex flex-1 flex-col">
