@@ -366,26 +366,40 @@ export default async function DashboardPage() {
                   <p className="text-[11px] text-white/50">
                     {mappingCount} provisioned · {taggedThisWeek} tagged this week
                   </p>
-                  {/* Compact proportional bars: one per label with volume this
-                      week, sorted longest-first, width = share of the busiest
-                      label. Hover reveals the label name, count, and share. */}
+                  {/* Labeled bar chart: label name, a proportional bar in the
+                      label's own color, and count · share. Sorted busiest-first;
+                      zero-volume labels are hidden to keep it tight. */}
                   {labelBreakdown.some((row) => row.tagged > 0) && (
-                    <div className="mt-3 flex flex-1 flex-col justify-center gap-2">
+                    <ul className="mt-3 space-y-1.5">
                       {labelBreakdown
                         .filter((row) => row.tagged > 0)
                         .sort((a, b) => b.tagged - a.tagged)
                         .map((row) => (
-                          <span
+                          <li
                             key={row.name}
-                            className="block h-2 rounded-full"
-                            style={{
-                              width: `${Math.max(8, (row.tagged / labelMaxTagged) * 100)}%`,
-                              backgroundColor: row.color,
-                            }}
-                            title={`${row.name}: ${row.tagged} · ${Math.round((row.tagged / labelLabeledTotal) * 100)}%`}
-                          />
+                            className="flex items-center gap-2 text-[11px]"
+                          >
+                            <span className="w-24 shrink-0 truncate text-white/70">
+                              {row.name}
+                            </span>
+                            <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
+                              <span
+                                className="absolute left-0 top-0 h-full rounded-full"
+                                style={{
+                                  width: `${Math.max(6, (row.tagged / labelMaxTagged) * 100)}%`,
+                                  backgroundColor: row.color,
+                                }}
+                              />
+                            </span>
+                            <span className="w-14 shrink-0 text-right tabular-nums text-white/40">
+                              {row.tagged}
+                              <span className="ml-1 text-white/25">
+                                · {Math.round((row.tagged / labelLabeledTotal) * 100)}%
+                              </span>
+                            </span>
+                          </li>
                         ))}
-                    </div>
+                    </ul>
                   )}
                 </div>
               ) : (
