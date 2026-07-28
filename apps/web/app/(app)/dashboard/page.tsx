@@ -4,6 +4,7 @@ import { google } from "googleapis";
 import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { makeAuthForUser } from "../../../lib/gmail";
+import { isInvalidGrant } from "../../../lib/googleErrors";
 import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
@@ -143,13 +144,18 @@ export default async function DashboardPage() {
 
   // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
   // try/catch so a Calendar API blip doesn't fail the whole dashboard
-  // render — falls back to null and the tile shows a graceful "—".
+  // render — falls back to null and the tile shows a graceful message.
+  // `calendarError` distinguishes a transient blip (retry will fix it) from a
+  // dead OAuth grant (invalid_grant), which never self-resolves — the tile then
+  // shows an actionable reconnect prompt instead of "sync is catching up".
   type UpcomingMeeting = { id: string; summary: string; startISO: string };
-  const { meetingsThisWeek, upcomingMeetings } = await (async (): Promise<{
+  const { meetingsThisWeek, upcomingMeetings, calendarError } = await (async (): Promise<{
     meetingsThisWeek: number | null;
     upcomingMeetings: UpcomingMeeting[];
+    calendarError: "reconnect" | "blip" | null;
   }> => {
-    if (!user.schedulingEnabled) return { meetingsThisWeek: null, upcomingMeetings: [] };
+    if (!user.schedulingEnabled)
+      return { meetingsThisWeek: null, upcomingMeetings: [], calendarError: null };
     try {
       const now = new Date();
       const startOfWeek = new Date(
@@ -193,10 +199,14 @@ export default async function DashboardPage() {
           startISO: e.start!.dateTime!,
         }));
 
-      return { meetingsThisWeek: count, upcomingMeetings: upcoming };
+      return { meetingsThisWeek: count, upcomingMeetings: upcoming, calendarError: null };
     } catch (err) {
       console.error("[dashboard] calendar query failed:", err);
-      return { meetingsThisWeek: null, upcomingMeetings: [] };
+      return {
+        meetingsThisWeek: null,
+        upcomingMeetings: [],
+        calendarError: isInvalidGrant(err) ? "reconnect" : "blip",
+      };
     }
   })();
 
@@ -419,9 +429,20 @@ export default async function DashboardPage() {
               schedulingActive ? (
                 <div className="flex flex-1 flex-col">
                   {meetingsThisWeek === null ? (
-                    <div className="flex flex-1 items-center justify-center py-4 text-center text-[11px] text-white/25">
-                      Calendar sync is catching up
-                    </div>
+                    calendarError === "reconnect" ? (
+                      <div className="flex flex-1 flex-col items-center justify-center gap-1 py-4 text-center">
+                        <span className="text-[11px] text-white/50">
+                          Google access expired
+                        </span>
+                        <span className="text-[11px] text-brand-200">
+                          Sign out and back in to reconnect
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-1 items-center justify-center py-4 text-center text-[11px] text-white/25">
+                        Calendar sync is catching up
+                      </div>
+                    )
                   ) : (
                     <>
                       <p className="font-display text-3xl leading-none text-white">
