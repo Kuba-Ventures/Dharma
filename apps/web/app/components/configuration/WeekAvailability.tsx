@@ -29,6 +29,21 @@ export default function WeekAvailability({
         <span className="text-[10px] text-white/35">shaded = open · colored = a block</span>
       </div>
 
+      {/* Day labels sit in their own row above the grid, aligned to each column
+          (the w-6 spacer mirrors the time-axis column), instead of overlapping
+          the blocks inside each column. */}
+      <div className="mb-1 flex gap-1.5">
+        <div className="w-6 shrink-0" />
+        {wk.days.map((day) => (
+          <span
+            key={day.dayOfWeek}
+            className="flex-1 text-center text-[10px] font-medium uppercase tracking-[0.08em] text-white/55"
+          >
+            {day.label}
+          </span>
+        ))}
+      </div>
+
       <div className="flex gap-1.5">
         <div className="flex w-6 shrink-0 flex-col justify-between py-4 text-right text-[8px] text-white/35">
           <span>{shortHour(wk.scaleStart)}</span>
@@ -54,9 +69,6 @@ export default function WeekAvailability({
                 background: "rgba(29,158,117,0.16)",
               }}
             />
-            <span className="absolute inset-x-0 top-0 z-10 pt-1 text-center text-[9px] text-white/45">
-              {day.label}
-            </span>
             {day.bands.map((b, i) => (
               <div
                 key={i}
