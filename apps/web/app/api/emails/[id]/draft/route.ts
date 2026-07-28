@@ -134,7 +134,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 ${buildDateContext(body)}
 
-You are drafting a reply on behalf of ${fullName}. Read the email below and write an appropriate reply draft. Do not include a subject line. ${signOffBlock}${introHint}
+You are drafting a reply on behalf of ${fullName}. Read the email below and write an appropriate reply draft. Do not include a subject line. Never use em-dashes or en-dashes; use commas or periods instead. ${signOffBlock}${introHint}
 
 Email from: ${from}
 Subject: ${subject}
@@ -158,7 +158,10 @@ Reply draft:`;
     content: Array<{ text: string }>;
     usage?: { input_tokens: number; output_tokens: number };
   };
-  const replyBody = claudeData.content[0]?.text?.trim() ?? "";
+  // Never ship em/en dashes in drafted replies (matches thread-draft).
+  const replyBody = (claudeData.content[0]?.text?.trim() ?? "")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/ {2,}/g, " ");
 
   if (claudeData.usage) {
     await logUsage({
