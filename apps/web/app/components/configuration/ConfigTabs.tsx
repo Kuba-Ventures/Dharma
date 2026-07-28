@@ -82,7 +82,7 @@ export default function ConfigTabs({
               onClick={() => select(s.key)}
               className={`rounded-btn px-4 py-2 text-sm transition-colors ${
                 on
-                  ? "bg-brand-400/15 text-white"
+                  ? "bg-[color-mix(in_srgb,var(--brand-400)_15%,transparent)] text-white"
                   : "text-white/55 hover:text-white"
               }`}
             >
