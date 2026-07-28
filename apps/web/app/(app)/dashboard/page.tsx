@@ -5,6 +5,7 @@ import { auth } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { makeAuthForUser } from "../../../lib/gmail";
 import { isInvalidGrant } from "../../../lib/googleErrors";
+import { isDharmaBlockEvent } from "../../../lib/dharmaBlock";
 import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
@@ -186,12 +187,14 @@ export default async function DashboardPage() {
         }),
       ]);
 
+      // Dharma blocks (focus/hold windows) are mirrored to the calendar as
+      // ordinary events, so exclude them — they are not meetings (issue #86).
       const count = (weekRes.data.items ?? []).filter(
-        (e) => e.status !== "cancelled" && e.start?.dateTime,
+        (e) => e.status !== "cancelled" && e.start?.dateTime && !isDharmaBlockEvent(e),
       ).length;
 
       const upcoming: UpcomingMeeting[] = (upcomingRes.data.items ?? [])
-        .filter((e) => e.status !== "cancelled" && e.start?.dateTime)
+        .filter((e) => e.status !== "cancelled" && e.start?.dateTime && !isDharmaBlockEvent(e))
         .slice(0, 10)
         .map((e) => ({
           id: e.id ?? `${e.start?.dateTime}-${e.summary}`,
