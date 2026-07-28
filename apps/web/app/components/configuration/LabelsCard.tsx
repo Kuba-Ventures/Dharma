@@ -7,7 +7,7 @@ import IconTile from "../ui/IconTile";
 import Button from "../ui/Button";
 import Toggle from "../ui/Toggle";
 import ConfirmModal from "../ui/ConfirmModal";
-import LabelEditor from "./LabelEditor";
+import LabelTags from "./LabelTags";
 import { GMAIL_COLOR_ROWS, DEFAULT_LABEL_COLOR_HEX } from "@/lib/gmailPalette";
 import { presetEditorRows, isBuiltInPresetKey } from "@/lib/labelPresets";
 
@@ -493,11 +493,11 @@ export default function LabelsCard({ initial }: Props) {
                 </span>
                 {preset !== "Custom" && (
                   <span className="text-[10px] text-white/30">
-                    Edit a color or name to customize
+                    Tap a label to rename or recolor
                   </span>
                 )}
               </div>
-              <LabelEditor
+              <LabelTags
                 rows={editableLabels}
                 onColorChange={(idx, hex) =>
                   updateLabel(idx, { colorKey: hex, displayHex: hex }, true)
