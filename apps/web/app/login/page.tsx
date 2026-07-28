@@ -8,7 +8,12 @@ import Link from "next/link";
 
 function LoginContent() {
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/";
+  // Default to the dashboard, not the marketing landing page. Signing out via
+  // the profile menu lands on /login with no callbackUrl, so a "/" default sent
+  // freshly re-authenticated users back to the public home page — which looks
+  // exactly like sign-in failed (issue #83). The app layout at /(app) handles
+  // redirecting to onboarding for users who haven't finished it.
+  const callbackUrl = params.get("callbackUrl") ?? "/dashboard";
   // Optional login_hint via ?hint=email — kept for power-user URLs but no
   // longer surfaced in the UI now that the OAuth carryover bug is fixed.
   const hint = params.get("hint")?.trim() ?? "";
