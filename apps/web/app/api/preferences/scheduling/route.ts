@@ -167,6 +167,14 @@ function calendarErrorMessage(err: unknown): string {
     response?: { data?: { error?: { message?: string } | string } };
   };
   const apiErr = e?.response?.data?.error;
+  // OAuth token refresh failed: the stored Google grant is expired or revoked
+  // (e.g. the user revoked access, or the OAuth client rotated). The library
+  // surfaces this as `invalid_grant (400)`, which is meaningless to a user —
+  // translate it into an actionable reconnect prompt.
+  const oauthErrCode = typeof apiErr === "string" ? apiErr : undefined;
+  if (oauthErrCode === "invalid_grant" || e?.message === "invalid_grant") {
+    return "Google access expired — sign out and sign back in to reconnect, then add the block again";
+  }
   const detail =
     (typeof apiErr === "object" ? apiErr?.message : apiErr) ||
     e?.errors?.[0]?.message ||
