@@ -207,7 +207,12 @@ export function resolvePresetSpec(args: {
       const shortName = sanitizeLabelSegment(o.shortName ?? "");
       if (!shortName) return null;
       const colorKey: GmailColorKey = (o.colorKey ?? "gray") as GmailColorKey;
-      const displayHex = o.displayHex ?? "#999999";
+      // Mirror the Configuration editor (LabelsCard.parseCustomLabels): when a
+      // stored custom label has no displayHex, fall back to its colorKey (which
+      // holds the hex/color) rather than gray. Older custom presets persisted
+      // colorKey only, so defaulting to gray left the dashboard Labels bars
+      // colorless while the config chips stayed colored.
+      const displayHex = o.displayHex ?? colorKey;
       return {
         name: name ? `${name}/${shortName}` : shortName,
         shortName,
