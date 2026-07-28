@@ -1,25 +1,35 @@
-// Pure geometry for the Scheduling card's "typical weekday" availability bar.
-// No calendar calls: it derives a representative weekday window from the user's
-// meeting hours, then places the blocks that recur on a weekday as bands within
-// that window. One-off and weekend-only blocks are left off the typical-day bar
-// (they still appear in the blocks list below it).
+// Pure geometry for the Scheduling card's week-availability grid. No calendar
+// calls: it derives a shared time scale from the user's meeting hours, then for
+// each active weekday places the open window plus the blocks that fall on that
+// day as positioned bands. Percentages are relative to the shared scale so the
+// day columns line up against one time axis.
 
 export type DayHour = { dayOfWeek: number; hourStart: number; hourEnd: number };
 export type DayBlock = {
   start: string; // "HH:MM" 24h
   end: string;
   label?: string;
-  recurrence?: { freq?: string; days?: number[] };
+  hex?: string; // resolved display color (caller maps colorId → hex)
+  recurrence?: { freq?: string; days?: number[]; date?: string };
 };
 
-export type AvailabilityBand = { startPct: number; widthPct: number; label: string };
-export type DayAvailability = {
-  startHour: number;
-  endHour: number;
-  bands: AvailabilityBand[];
+export type WeekBand = { topPct: number; heightPct: number; label: string; hex: string };
+export type WeekDayColumn = {
+  dayOfWeek: number;
+  label: string;
+  openTopPct: number;
+  openHeightPct: number;
+  bands: WeekBand[];
+};
+export type WeekAvailability = {
+  scaleStart: number;
+  scaleEnd: number;
+  days: WeekDayColumn[];
 };
 
-const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5];
+const DOW_LABEL = ["S", "M", "T", "W", "T", "F", "S"];
+const DEFAULT_HEX = "#7986CB";
 
 function parseHHMM(s: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec((s ?? "").trim());
@@ -30,53 +40,66 @@ function parseHHMM(s: string): number | null {
   return h * 60 + min;
 }
 
-// A block belongs on the typical weekday bar if it recurs on at least one
-// weekday: daily, or weekly with a weekday in its `days`.
-export function recursOnWeekday(block: DayBlock): boolean {
+// Which weekdays (0=Sun..6=Sat) a block lands on: daily → all, weekly → its
+// days, one-off/monthly → the weekday of its anchor date.
+export function blockWeekdays(block: DayBlock): Set<number> {
   const freq = block.recurrence?.freq;
-  if (freq === "daily") return true;
-  if (freq === "weekly") {
-    const days = block.recurrence?.days ?? [];
-    return days.some((d) => WEEKDAYS.includes(d));
-  }
-  return false;
+  if (freq === "daily") return new Set([0, 1, 2, 3, 4, 5, 6]);
+  if (freq === "weekly") return new Set(block.recurrence?.days ?? []);
+  const date = block.recurrence?.date;
+  const dm = date ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) : null;
+  if (dm) return new Set([new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3])).getDay()]);
+  return new Set();
 }
 
-export function typicalDayAvailability(
-  hours: DayHour[],
-  blocks: DayBlock[],
-): DayAvailability | null {
-  const weekday = hours.filter((h) => WEEKDAYS.includes(h.dayOfWeek));
-  const active = weekday.length ? weekday : hours;
+export function weekAvailability(hours: DayHour[], blocks: DayBlock[]): WeekAvailability | null {
+  const byDay = new Map<number, { start: number; end: number }>();
+  for (const h of hours) {
+    if (WEEKDAY_ORDER.includes(h.dayOfWeek)) byDay.set(h.dayOfWeek, { start: h.hourStart, end: h.hourEnd });
+  }
+  const active = WEEKDAY_ORDER.filter((d) => byDay.has(d));
   if (active.length === 0) return null;
 
-  const startHour = Math.min(...active.map((h) => h.hourStart));
-  const endHour = Math.max(...active.map((h) => h.hourEnd));
-  if (!(endHour > startHour)) return null;
+  const scaleStart = Math.min(...active.map((d) => byDay.get(d)!.start));
+  const scaleEnd = Math.max(...active.map((d) => byDay.get(d)!.end));
+  if (!(scaleEnd > scaleStart)) return null;
 
-  const winStart = startHour * 60;
-  const span = (endHour - startHour) * 60;
+  const scaleMin = scaleStart * 60;
+  const span = (scaleEnd - scaleStart) * 60;
 
-  const bands: AvailabilityBand[] = [];
-  for (const b of blocks) {
-    if (!recursOnWeekday(b)) continue;
-    const bs = parseHHMM(b.start);
-    const be = parseHHMM(b.end);
-    if (bs == null || be == null || be <= bs) continue;
-    const clampStart = Math.max(bs, winStart);
-    const clampEnd = Math.min(be, winStart + span);
-    if (clampEnd <= clampStart) continue; // block outside the window
-    bands.push({
-      startPct: ((clampStart - winStart) / span) * 100,
-      widthPct: ((clampEnd - clampStart) / span) * 100,
-      label: b.label?.trim() || "Blocked",
-    });
-  }
+  const days: WeekDayColumn[] = active.map((d) => {
+    const w = byDay.get(d)!;
+    const winStart = w.start * 60;
+    const winEnd = w.end * 60;
+    const bands: WeekBand[] = [];
+    for (const b of blocks) {
+      if (!blockWeekdays(b).has(d)) continue;
+      const bs = parseHHMM(b.start);
+      const be = parseHHMM(b.end);
+      if (bs == null || be == null || be <= bs) continue;
+      const cs = Math.max(bs, winStart);
+      const ce = Math.min(be, winEnd);
+      if (ce <= cs) continue; // block outside this day's window
+      bands.push({
+        topPct: ((cs - scaleMin) / span) * 100,
+        heightPct: ((ce - cs) / span) * 100,
+        label: b.label?.trim() || "Block",
+        hex: b.hex || DEFAULT_HEX,
+      });
+    }
+    return {
+      dayOfWeek: d,
+      label: DOW_LABEL[d],
+      openTopPct: ((winStart - scaleMin) / span) * 100,
+      openHeightPct: ((winEnd - winStart) / span) * 100,
+      bands,
+    };
+  });
 
-  return { startHour, endHour, bands };
+  return { scaleStart, scaleEnd, days };
 }
 
-// "8a" / "1p" / "12p" / "9p" — compact tick labels for the bar's time axis.
+// "8a" / "1p" / "12p" / "9p" — compact tick labels for the time axis.
 export function shortHour(hour24: number): string {
   const h = ((hour24 % 24) + 24) % 24;
   const suffix = h < 12 ? "a" : "p";

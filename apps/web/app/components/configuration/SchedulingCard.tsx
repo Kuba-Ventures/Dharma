@@ -9,7 +9,7 @@ import ConfirmModal from "../ui/ConfirmModal";
 import MeetingHoursGrid, {
   type MeetingHour,
 } from "../MeetingHoursGrid";
-import AvailabilityBar from "./AvailabilityBar";
+import WeekAvailability from "./WeekAvailability";
 
 const CAL_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -150,7 +150,7 @@ function summarizeHours(hours: MeetingHour[]): string | null {
         r.days.length === 1
           ? DAY_NAMES[r.days[0]]
           : `${DAY_NAMES[r.days[0]]}-${DAY_NAMES[r.days[r.days.length - 1]]}`;
-      return `${dayLabel} ${to12h(r.start)}–${to12h(r.end)}`;
+      return `${dayLabel} ${to12h(r.start)}-${to12h(r.end)}`;
     })
     .join(", ");
 }
@@ -679,7 +679,19 @@ export default function SchedulingCard({ initial }: Props) {
                 </div>
               </div>
               <MeetingHoursGrid initialHours={hours} onChange={persistHours} />
-              <AvailabilityBar hours={hours} blocks={prefs.blockedWindows} />
+              <WeekAvailability
+                hours={hours}
+                blocks={prefs.blockedWindows.map((b) => ({
+                  start: b.start,
+                  end: b.end,
+                  label: b.label,
+                  recurrence: b.recurrence,
+                  hex:
+                    GOOGLE_EVENT_COLORS.find(
+                      (c) => c.id === (b.colorId ?? DEFAULT_COLOR_ID),
+                    )?.hex ?? "#7986CB",
+                }))}
+              />
             </Card>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -814,7 +826,7 @@ export default function SchedulingCard({ initial }: Props) {
               block && rec
                 ? `This will create “${block.label?.trim() || "Dharma block"}” — ${fmtTime(
                     block.start,
-                  )}–${fmtTime(block.end)}, ${recurrenceSummary(rec)}${
+                  )}-${fmtTime(block.end)}, ${recurrenceSummary(rec)}${
                     rec.until ? `, until ${prettyDate(rec.until)}` : ""
                   }, in ${colorName(block.colorId)}. You can edit or remove it anytime.`
                 : undefined
@@ -907,7 +919,7 @@ function BlockRow({
                 {block.label?.trim() || "Untitled block"}
               </span>
               <span className="shrink-0 text-[11px] text-white/45">
-                {fmtTime(block.start)}–{fmtTime(block.end)}
+                {fmtTime(block.start)}-{fmtTime(block.end)}
               </span>
             </div>
             <div className="truncate text-[11px] text-white/40">
