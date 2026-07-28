@@ -6,28 +6,18 @@ import { makeAuthForUser } from "../../../lib/gmail";
 import ToneCard from "../../components/configuration/ToneCard";
 import LabelsCard from "../../components/configuration/LabelsCard";
 import SchedulingCard from "../../components/configuration/SchedulingCard";
+import SignalsSection from "../../components/configuration/SignalsSection";
+import ConfigTabs, { type ConfigSection } from "../../components/configuration/ConfigTabs";
 import GuidedTour, { type TourStep } from "../../components/GuidedTour";
 
 type Preset = "VC" | "PE" | "Legal" | "General" | "Personal" | "Custom";
 
 const CONFIG_TOUR: TourStep[] = [
   {
-    selector: '[data-tour="config-tone"]',
-    title: "Your writing tone",
+    selector: '[data-tour="config-tabs"]',
+    title: "Everything Dharma runs",
     description:
-      "Dharma drafts replies in your voice. Pick a preset or let it learn from your sent mail, and tweak the summary anytime.",
-  },
-  {
-    selector: '[data-tour="config-labels"]',
-    title: "Labels & tabs",
-    description:
-      "Choose a preset (VC, Personal, and so on) and Dharma auto-sorts new mail into these labels in your own Gmail.",
-  },
-  {
-    selector: '[data-tour="config-scheduling"]',
-    title: "Scheduling",
-    description:
-      "Turn back-and-forth scheduling threads into ready-to-send time proposals pulled from your calendar.",
+      "Tone, labels, scheduling, and signals live here. Switch between them with these tabs, and pause any one anytime.",
   },
 ];
 
@@ -47,6 +37,7 @@ export default async function ConfigurationPage() {
         inferredSignOff: true,
         schedulingEnabled: true,
         schedulingPreferences: true,
+        signalDetectionEnabled: true,
         timezone: true,
         homeCity: true,
       },
@@ -92,6 +83,61 @@ export default async function ConfigurationPage() {
     }
   })();
 
+  const sections: ConfigSection[] = [
+    {
+      key: "tone",
+      label: "Tone",
+      node: (
+        <ToneCard
+          initial={{
+            tone: user.tone,
+            toneProfile: user.toneProfile,
+            toneSummary: user.toneSummary,
+            toneExample: user.toneExample,
+            inferredSignOff: user.inferredSignOff,
+          }}
+        />
+      ),
+    },
+    {
+      key: "labels",
+      label: "Labels",
+      node: (
+        <LabelsCard
+          initial={{
+            preset: (labelPreset?.preset as Preset | undefined) ?? null,
+            enabled: labelPreset?.enabled ?? false,
+            customName: labelPreset?.customName ?? null,
+            customLabels: (labelPreset?.customLabels as unknown) ?? null,
+            provisioned: mappingCount,
+            uncategorizedEnabled: labelPreset?.uncategorizedEnabled ?? true,
+          }}
+        />
+      ),
+    },
+    {
+      key: "scheduling",
+      label: "Scheduling",
+      node: (
+        <SchedulingCard
+          initial={{
+            enabled: user.schedulingEnabled,
+            schedulingPreferences: user.schedulingPreferences,
+            timezone: user.timezone,
+            homeCity: user.homeCity,
+            hours,
+            averageMeetingsPerWeek,
+          }}
+        />
+      ),
+    },
+    {
+      key: "signals",
+      label: "Signals",
+      node: <SignalsSection enabled={user.signalDetectionEnabled} />,
+    },
+  ];
+
   return (
     <div className="max-w-3xl">
       <header className="mb-8">
@@ -99,54 +145,16 @@ export default async function ConfigurationPage() {
           Configuration
         </p>
         <h1 className="font-display text-3xl text-white">
-          Tone, labels, scheduling
+          Tone, labels, scheduling, signals
         </h1>
         <p className="mt-2 text-sm text-white/60">
-          The three features Dharma runs on your behalf. Pause any of them anytime.
+          Everything Dharma runs on your behalf. Pause any of it anytime.
         </p>
       </header>
 
       <GuidedTour id="config" steps={CONFIG_TOUR} />
 
-      <div className="space-y-5">
-        <div data-tour="config-tone">
-          <ToneCard
-            initial={{
-              tone: user.tone,
-              toneProfile: user.toneProfile,
-              toneSummary: user.toneSummary,
-              toneExample: user.toneExample,
-              inferredSignOff: user.inferredSignOff,
-            }}
-          />
-        </div>
-
-        <div data-tour="config-labels">
-          <LabelsCard
-            initial={{
-              preset: (labelPreset?.preset as Preset | undefined) ?? null,
-              enabled: labelPreset?.enabled ?? false,
-              customName: labelPreset?.customName ?? null,
-              customLabels: (labelPreset?.customLabels as unknown) ?? null,
-              provisioned: mappingCount,
-              uncategorizedEnabled: labelPreset?.uncategorizedEnabled ?? true,
-            }}
-          />
-        </div>
-
-        <div data-tour="config-scheduling">
-          <SchedulingCard
-            initial={{
-              enabled: user.schedulingEnabled,
-              schedulingPreferences: user.schedulingPreferences,
-              timezone: user.timezone,
-              homeCity: user.homeCity,
-              hours,
-              averageMeetingsPerWeek,
-            }}
-          />
-        </div>
-      </div>
+      <ConfigTabs sections={sections} />
     </div>
   );
 }

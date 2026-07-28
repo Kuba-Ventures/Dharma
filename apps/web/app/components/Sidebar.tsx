@@ -13,7 +13,6 @@ type Item = {
 
 type Props = {
   locked?: boolean;
-  signalCount?: number;
 };
 
 const NAV: Item[] = [
@@ -58,20 +57,6 @@ const NAV: Item[] = [
     ),
   },
   {
-    label: "Signals",
-    href: "/signals",
-    lockable: true,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-        <circle cx="7.5" cy="7.5" r="1.6" fill="currentColor" />
-        <path d="M4.5 4.5 C3.2 6 3.2 9 4.5 10.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.85" />
-        <path d="M10.5 4.5 C11.8 6 11.8 9 10.5 10.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.85" />
-        <path d="M2.5 2.5 C0.5 5 0.5 10 2.5 12.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.45" />
-        <path d="M12.5 2.5 C14.5 5 14.5 10 12.5 12.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.45" />
-      </svg>
-    ),
-  },
-  {
     label: "Profile & Settings",
     href: "/settings",
     icon: (
@@ -96,7 +81,7 @@ const LOCK_ICON = (
   </svg>
 );
 
-export default function Sidebar({ locked, signalCount }: Props) {
+export default function Sidebar({ locked }: Props) {
   const pathname = usePathname();
 
   return (
@@ -104,7 +89,6 @@ export default function Sidebar({ locked, signalCount }: Props) {
       {NAV.map((item) => {
         const itemLocked = !!(locked && item.lockable);
         const active = pathname === item.href || pathname.startsWith(item.href + "/");
-        const badge = item.href === "/signals" ? signalCount : undefined;
 
         if (itemLocked) {
           return (
@@ -133,11 +117,6 @@ export default function Sidebar({ locked, signalCount }: Props) {
           >
             <span className={active ? "text-brand-200" : "text-white/40"}>{item.icon}</span>
             <span className="flex-1">{item.label}</span>
-            {typeof badge === "number" && badge > 0 && (
-              <span className="rounded-full bg-brand-400 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                {badge}
-              </span>
-            )}
           </Link>
         );
       })}
