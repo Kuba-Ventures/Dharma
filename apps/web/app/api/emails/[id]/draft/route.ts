@@ -6,18 +6,8 @@ import { makeAuthForUser, createDraft } from "../../../../../lib/gmail";
 import { logUsage } from "../../../../../lib/usage";
 import { checkAiGuard } from "../../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../../lib/anthropicEndpoint";
+import { TONE_INSTRUCTIONS } from "../../../../../lib/toneInstructions";
 import { google } from "googleapis";
-
-const TONE_INSTRUCTIONS: Record<string, string> = {
-  "My Tone":
-    "Write in a natural, professional but personal tone: direct, warm, not overly formal. Mirror the style of someone who has worked in business for years and writes clearly without corporate jargon.",
-  Concise:
-    "Write the shortest reply that fully answers. Lead with the answer in the first sentence. No greeting, no pleasantries, no throat-clearing, no filler. Cut every word that isn't load-bearing. 1-3 sentences, ideally 1-2. Do not pad to sound polite.",
-  "Formal / Legal":
-    "Write in formal, precise language appropriate for legal or official correspondence. Use complete sentences, avoid contractions, and maintain a professional distance.",
-  "Casual / Friendly":
-    "Write in a warm, conversational tone. It's okay to be a little informal, use contractions, keep it light and approachable.",
-};
 
 // Same date pattern + context builder as thread-draft. Kept in sync manually
 // (small enough that extracting to a shared module would be over-engineering).
