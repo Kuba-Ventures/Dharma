@@ -115,6 +115,32 @@ describe("resolvePresetSpec — custom", () => {
     expect(spec!.labels[0].name).toBe("Deals");
   });
 
+  it("falls back to colorKey for displayHex when a custom label has none", () => {
+    // Older custom presets persisted colorKey only. The dashboard reads
+    // displayHex, so it must inherit the colorKey's color instead of gray.
+    const spec = resolvePresetSpec({
+      preset: "Custom",
+      customName: "",
+      customLabels: [{ shortName: "Orders", colorKey: "#16a765" }],
+      includeUncategorized: false,
+    });
+    expect(spec!.labels[0]).toMatchObject({
+      shortName: "Orders",
+      colorKey: "#16a765",
+      displayHex: "#16a765",
+    });
+  });
+
+  it("keeps an explicit displayHex when both are present", () => {
+    const spec = resolvePresetSpec({
+      preset: "Custom",
+      customName: "",
+      customLabels: [{ shortName: "Orders", colorKey: "green", displayHex: "#16a765" }],
+      includeUncategorized: false,
+    });
+    expect(spec!.labels[0].displayHex).toBe("#16a765");
+  });
+
   it("drops custom labels with an empty short name", () => {
     const spec = resolvePresetSpec({
       preset: "Custom",
