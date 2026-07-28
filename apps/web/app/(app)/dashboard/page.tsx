@@ -148,15 +148,13 @@ export default async function DashboardPage() {
   // list. Read across every calendar the user has visible in Google Calendar
   // (Work, Personal, …), not just primary — otherwise the card shows only
   // Dharma's own blocks (which live on primary) and misses real meetings on
-  // other calendars (issue #74). Wrapped in try/catch so a Calendar API blip
-  // doesn't fail the whole dashboard render — falls back to null and the tile
-  // shows a graceful "—".
-  // Meetings count for current calendar week (Sun-Sat, UTC). Wrapped in
-  // try/catch so a Calendar API blip doesn't fail the whole dashboard
-  // render — falls back to null and the tile shows a graceful message.
-  // `calendarError` distinguishes a transient blip (retry will fix it) from a
-  // dead OAuth grant (invalid_grant), which never self-resolves — the tile then
-  // shows an actionable reconnect prompt instead of "sync is catching up".
+  // other calendars (issue #74). Dharma's own mirrored blocks are excluded
+  // (issue #86). Wrapped in try/catch so a Calendar API blip doesn't fail the
+  // whole dashboard render — falls back to null and the tile shows a graceful
+  // message. `calendarError` distinguishes a transient blip (retry will fix it)
+  // from a dead OAuth grant (invalid_grant), which never self-resolves — the
+  // tile then shows an actionable reconnect prompt instead of "sync is catching
+  // up".
   type UpcomingMeeting = { id: string; summary: string; startISO: string };
   const { meetingsThisWeek, upcomingMeetings, calendarError } = await (async (): Promise<{
     meetingsThisWeek: number | null;
@@ -211,8 +209,10 @@ export default async function DashboardPage() {
         }),
       ]);
 
+      // A real meeting: not cancelled, timed (not all-day), and not one of
+      // Dharma's own mirrored blocks (issue #86).
       const isRealMeeting = (e: calendar_v3.Schema$Event) =>
-        e.status !== "cancelled" && !!e.start?.dateTime;
+        e.status !== "cancelled" && !!e.start?.dateTime && !isDharmaBlockEvent(e);
       // Stable identity for de-duping the same event across calendars.
       const keyOf = (e: calendar_v3.Schema$Event) =>
         e.id ?? `${e.start?.dateTime}-${e.summary}`;
@@ -244,14 +244,6 @@ export default async function DashboardPage() {
           upcomingSeen.add(k);
           return true;
         })
-      // Dharma blocks (focus/hold windows) are mirrored to the calendar as
-      // ordinary events, so exclude them — they are not meetings (issue #86).
-      const count = (weekRes.data.items ?? []).filter(
-        (e) => e.status !== "cancelled" && e.start?.dateTime && !isDharmaBlockEvent(e),
-      ).length;
-
-      const upcoming: UpcomingMeeting[] = (upcomingRes.data.items ?? [])
-        .filter((e) => e.status !== "cancelled" && e.start?.dateTime && !isDharmaBlockEvent(e))
         .slice(0, 10)
         .map((e) => ({
           id: keyOf(e),
