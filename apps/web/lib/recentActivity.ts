@@ -28,6 +28,34 @@ export type ActivityEvent =
       labelColor: string | null;
     };
 
+// Display row for the feed. Consecutive draft events collapse into a single
+// row carrying a count ("Drafted 6 replies"); signals and classifications stay
+// as individual rows since each carries distinct information.
+export type ActivityRow =
+  | { kind: "draft"; at: Date; count: number }
+  | Extract<ActivityEvent, { kind: "signal" }>
+  | Extract<ActivityEvent, { kind: "classified" }>;
+
+// Collapse runs of adjacent draft events into one counted row. Events arrive
+// newest-first, so the first draft in a run carries the most recent timestamp,
+// which the group keeps. Pure + order-preserving — safe to unit test.
+export function groupActivity(events: ActivityEvent[]): ActivityRow[] {
+  const rows: ActivityRow[] = [];
+  for (const e of events) {
+    if (e.kind === "draft") {
+      const last = rows[rows.length - 1];
+      if (last && last.kind === "draft") {
+        last.count += 1;
+        continue;
+      }
+      rows.push({ kind: "draft", at: e.at, count: 1 });
+    } else {
+      rows.push(e);
+    }
+  }
+  return rows;
+}
+
 export async function getRecentActivity(
   userId: string,
   limit = 20,
