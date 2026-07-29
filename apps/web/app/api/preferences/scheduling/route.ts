@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import { pruneExpiredBlocks, todayISOInZone } from "../../../../lib/expiredBlocks";
+import { pruneExpiredBlocks, nowISOInZone } from "../../../../lib/expiredBlocks";
 import { safeParsePrefs } from "../../../../lib/blockMirror";
 import { reconcileBlocks } from "../../../../lib/blockReconcile";
 
@@ -62,14 +62,14 @@ export async function POST(req: Request) {
     const oldBlocks = Array.isArray(oldPrefs.blockedWindows) ? oldPrefs.blockedWindows : [];
     const rawNewBlocks = Array.isArray(incoming.blockedWindows) ? incoming.blockedWindows : [];
 
-    // Auto-clear blocks whose event has fully passed: a one-off dated before
-    // today, or a recurring block whose `until` end date is now in the past.
-    // Dropping them here removes them from the persisted prefs, and — because
-    // the reconcile pass below deletes any old event that no longer maps to a
-    // surviving block — from the mirrored Google Calendar too. Judged in the
-    // user's own time zone so a block clears on the right calendar day.
-    const today = todayISOInZone(tz);
-    const newBlocks = pruneExpiredBlocks(rawNewBlocks, today).kept;
+    // Auto-clear blocks whose event has fully passed: a one-off once its end
+    // time is in the past, or a recurring block whose `until` end date has
+    // passed. Dropping them here removes them from the persisted prefs, and —
+    // because the reconcile pass below deletes any old event that no longer
+    // maps to a surviving block — from the mirrored Google Calendar too.
+    // Judged in the user's own time zone so a block clears at the right moment.
+    const now = nowISOInZone(tz);
+    const newBlocks = pruneExpiredBlocks(rawNewBlocks, now).kept;
     const prunedAny = newBlocks.length !== rawNewBlocks.length;
     incoming.blockedWindows = newBlocks;
 
