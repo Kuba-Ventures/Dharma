@@ -7,6 +7,8 @@ import { makeAuthForUser } from "../../../lib/gmail";
 import { listVisibleCalendarIds } from "../../../lib/googleCalendars";
 import { isInvalidGrant } from "../../../lib/googleErrors";
 import { isDharmaBlockEvent } from "../../../lib/dharmaBlock";
+import { mergeCalendarEvents } from "../../../lib/calendarFanout";
+import { eventDisplayTitle } from "../../../lib/eventTitle";
 import { getRecentActivity } from "../../../lib/recentActivity";
 import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets";
 import Greeting from "../../components/dashboard/Greeting";
@@ -184,12 +186,9 @@ export default async function DashboardPage() {
         const results = await Promise.allSettled(
           calendarIds.map((calendarId) => calendar.events.list({ ...params, calendarId })),
         );
-        const events: calendar_v3.Schema$Event[] = [];
-        for (const r of results) {
-          if (r.status === "fulfilled") events.push(...(r.value.data.items ?? []));
-          else console.error("[dashboard] events.list failed for a calendar:", r.reason);
-        }
-        return events;
+        // Tolerate a single unreadable calendar, but rethrow invalid_grant so a
+        // dead grant surfaces the reconnect prompt instead of a fake "0" (#91).
+        return mergeCalendarEvents(results);
       };
 
       const [weekEvents, upcomingEvents] = await Promise.all([
@@ -247,7 +246,7 @@ export default async function DashboardPage() {
         .slice(0, 10)
         .map((e) => ({
           id: keyOf(e),
-          summary: e.summary?.trim() || "(no title)",
+          summary: eventDisplayTitle(e),
           startISO: e.start!.dateTime!,
         }));
 
