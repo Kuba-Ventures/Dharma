@@ -10,7 +10,7 @@ import MeetingHoursGrid, {
   type MeetingHour,
 } from "../MeetingHoursGrid";
 import WeekAvailability from "./WeekAvailability";
-import { pruneExpiredBlocks, todayISOInZone } from "../../../lib/expiredBlocks";
+import { pruneExpiredBlocks, nowISOInZone } from "../../../lib/expiredBlocks";
 
 const CAL_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -346,14 +346,15 @@ const detectedTz =
 export default function SchedulingCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [confirmingOff, setConfirmingOff] = useState(false);
-  // Auto-clear blocks whose event has fully passed (a one-off in the past, or a
-  // recurring block whose repeats have run out) on load, so the card never
-  // shows a finished event. If any were dropped we persist the cleanup once on
-  // mount (see effect below), which also removes the mirrored calendar event.
+  // Auto-clear blocks whose event has fully passed (a one-off past its end
+  // time, or a recurring block whose repeats have run out) on load, so the
+  // card never shows a finished event. If any were dropped we persist the
+  // cleanup once on mount (see effect below), which also removes the mirrored
+  // calendar event.
   const [initialPrune] = useState(() => {
     const parsed = parsePrefs(initial.schedulingPreferences);
-    const today = todayISOInZone(initial.timezone ?? detectedTz);
-    const { kept, expired } = pruneExpiredBlocks(parsed.blockedWindows, today);
+    const now = nowISOInZone(initial.timezone ?? detectedTz);
+    const { kept, expired } = pruneExpiredBlocks(parsed.blockedWindows, now);
     const prefs: Prefs = expired.length ? { ...parsed, blockedWindows: kept } : parsed;
     return { prefs, hadExpired: expired.length > 0 };
   });

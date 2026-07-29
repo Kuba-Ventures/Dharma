@@ -13,7 +13,7 @@ import { google, type calendar_v3 } from "googleapis";
 import { prisma } from "./prisma";
 import { makeAuthForUser } from "./gmail";
 import { withCalendarTimeout } from "./calendarTimeout";
-import { pruneExpiredBlocks, todayISOInZone } from "./expiredBlocks";
+import { pruneExpiredBlocks, nowISOInZone } from "./expiredBlocks";
 import {
   buildEventBody,
   calendarErrorMessage,
@@ -198,7 +198,7 @@ export async function resyncUserCalendar(userId: string): Promise<ResyncResult> 
 
   // Same auto-clear rule as the save path: a fully-passed block is dropped
   // (and its mirrored event deleted by the reconcile's orphan pass).
-  const newBlocks = pruneExpiredBlocks(oldBlocks, todayISOInZone(tz)).kept;
+  const newBlocks = pruneExpiredBlocks(oldBlocks, nowISOInZone(tz)).kept;
   const prunedAny = newBlocks.length !== oldBlocks.length;
 
   const needsCalendar =
