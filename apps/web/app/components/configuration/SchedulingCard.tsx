@@ -10,7 +10,7 @@ import MeetingHoursGrid, {
   type MeetingHour,
 } from "../MeetingHoursGrid";
 import WeekAvailability from "./WeekAvailability";
-import { pruneExpiredBlocks, nowISOInZone } from "../../../lib/expiredBlocks";
+import { isBlockExpired, nowISOInZone } from "../../../lib/expiredBlocks";
 
 const CAL_ICON = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -339,26 +339,20 @@ const TZ_OPTIONS: TzOption[] = [
 ];
 
 // Detect timezone if user has no value set yet (best-effort). Hoisted so the
-// initial expired-block prune can judge "today" in the user's own zone.
+// expired-block check can judge "now" in the user's own zone.
 const detectedTz =
   typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
 
 export default function SchedulingCard({ initial }: Props) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [confirmingOff, setConfirmingOff] = useState(false);
-  // Auto-clear blocks whose event has fully passed (a one-off past its end
-  // time, or a recurring block whose repeats have run out) on load, so the
-  // card never shows a finished event. If any were dropped we persist the
-  // cleanup once on mount (see effect below), which also removes the mirrored
-  // calendar event.
-  const [initialPrune] = useState(() => {
-    const parsed = parsePrefs(initial.schedulingPreferences);
-    const now = nowISOInZone(initial.timezone ?? detectedTz);
-    const { kept, expired } = pruneExpiredBlocks(parsed.blockedWindows, now);
-    const prefs: Prefs = expired.length ? { ...parsed, blockedWindows: kept } : parsed;
-    return { prefs, hadExpired: expired.length > 0 };
-  });
-  const [prefs, setPrefs] = useState<Prefs>(initialPrune.prefs);
+  const [prefs, setPrefs] = useState<Prefs>(() => parsePrefs(initial.schedulingPreferences));
+  // "Now" in the user's zone, captured once on mount. Used to hide a
+  // fully-passed block (a one-off past its end time, or a recurring block
+  // whose repeats have run out) from the editable "No meetings between" list
+  // below — the block stays in the data (and so stays drawn in the "Your
+  // bookable week" grid), it just drops out of the actionable list.
+  const [nowISO] = useState(() => nowISOInZone(initial.timezone ?? detectedTz));
   const [hours, setHours] = useState<MeetingHour[]>(initial.hours);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -424,7 +418,7 @@ export default function SchedulingCard({ initial }: Props) {
   // Last prefs the server confirmed — the rollback target when an explicit
   // action (add/remove/Add-to-calendar) fails, so the optimistic state can't
   // get stuck (e.g. a block wedged on "Adding…").
-  const serverPrefsRef = useRef<Prefs>(initialPrune.prefs);
+  const serverPrefsRef = useRef<Prefs>(parsePrefs(initial.schedulingPreferences));
 
   const sendPrefs = useCallback(async (next: Prefs, immediate: boolean) => {
     const seq = ++saveSeqRef.current;
@@ -541,17 +535,6 @@ export default function SchedulingCard({ initial }: Props) {
     },
     [],
   );
-
-  // If load-time pruning dropped expired blocks, persist the cleaned set once so
-  // the DB and any mirrored Google Calendar events are removed too — the server
-  // reconcile deletes events for blocks that no longer exist. Runs a single
-  // time on mount; the pruned prefs are already what's rendered.
-  const cleanupSentRef = useRef(false);
-  useEffect(() => {
-    if (cleanupSentRef.current || !initialPrune.hadExpired) return;
-    cleanupSentRef.current = true;
-    void sendPrefs(initialPrune.prefs, true);
-  }, [initialPrune, sendPrefs]);
 
   async function persistHours(next: MeetingHour[]) {
     setHours(next);
@@ -800,34 +783,44 @@ export default function SchedulingCard({ initial }: Props) {
                   + Add block
                 </button>
               </div>
-              {prefs.blockedWindows.length === 0 ? (
-                <p className="text-[11px] text-white/40">
-                  Recurring blocks like lunch, the gym, or a standing meeting. Set how each one
-                  repeats, then <span className="text-white/60">Add to calendar</span> to create the
-                  event in your Google Calendar.
-                </p>
-              ) : (
-                <ul className="space-y-3">
-                  {prefs.blockedWindows.map((b, idx) => (
-                    <BlockRow
-                      key={idx}
-                      block={b}
-                      activeDays={activeDays}
-                      defaultExpanded={idx === expandNewIdx}
-                      onChange={(nb) => {
-                        const next = [...prefs.blockedWindows];
-                        next[idx] = nb;
-                        persistPrefs({ ...prefs, blockedWindows: next });
-                      }}
-                      onRemove={() => {
-                        const next = prefs.blockedWindows.filter((_, i) => i !== idx);
-                        persistPrefs({ ...prefs, blockedWindows: next }, { immediate: true });
-                      }}
-                      onRequestAdd={() => setConfirmAddIdx(idx)}
-                    />
-                  ))}
-                </ul>
-              )}
+              {(() => {
+                // A fully-passed block (a one-off past its end time, or a
+                // recurring block whose repeats have run out) drops out of this
+                // actionable list, but stays in `prefs.blockedWindows` — so it's
+                // still drawn in the "Your bookable week" grid above. Keep each
+                // block's original index so edit/remove patch the right entry.
+                const visible = prefs.blockedWindows
+                  .map((b, idx) => [b, idx] as const)
+                  .filter(([b]) => !isBlockExpired(b, nowISO));
+                return visible.length === 0 ? (
+                  <p className="text-[11px] text-white/40">
+                    Recurring blocks like lunch, the gym, or a standing meeting. Set how each one
+                    repeats, then <span className="text-white/60">Add to calendar</span> to create the
+                    event in your Google Calendar.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {visible.map(([b, idx]) => (
+                      <BlockRow
+                        key={idx}
+                        block={b}
+                        activeDays={activeDays}
+                        defaultExpanded={idx === expandNewIdx}
+                        onChange={(nb) => {
+                          const next = [...prefs.blockedWindows];
+                          next[idx] = nb;
+                          persistPrefs({ ...prefs, blockedWindows: next });
+                        }}
+                        onRemove={() => {
+                          const next = prefs.blockedWindows.filter((_, i) => i !== idx);
+                          persistPrefs({ ...prefs, blockedWindows: next }, { immediate: true });
+                        }}
+                        onRequestAdd={() => setConfirmAddIdx(idx)}
+                      />
+                    ))}
+                  </ul>
+                );
+              })()}
               {blockErrors.length > 0 && (
                 <div className="mt-3 space-y-1 rounded-card border border-red-500/30 bg-red-500/10 px-3 py-2">
                   {blockErrors.map((msg, i) => (
