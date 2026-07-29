@@ -13,7 +13,6 @@ import { google, type calendar_v3 } from "googleapis";
 import { prisma } from "./prisma";
 import { makeAuthForUser } from "./gmail";
 import { withCalendarTimeout } from "./calendarTimeout";
-import { pruneExpiredBlocks, nowISOInZone } from "./expiredBlocks";
 import {
   buildEventBody,
   calendarErrorMessage,
@@ -194,27 +193,15 @@ export async function resyncUserCalendar(userId: string): Promise<ResyncResult> 
   });
   const prefs = safeParsePrefs(dbUser?.schedulingPreferences);
   const tz = dbUser?.timezone ?? "America/New_York";
-  const oldBlocks = Array.isArray(prefs.blockedWindows) ? prefs.blockedWindows : [];
+  const blocks = Array.isArray(prefs.blockedWindows) ? prefs.blockedWindows : [];
 
-  // Same auto-clear rule as the save path: a fully-passed block is dropped
-  // (and its mirrored event deleted by the reconcile's orphan pass).
-  const newBlocks = pruneExpiredBlocks(oldBlocks, nowISOInZone(tz)).kept;
-  const prunedAny = newBlocks.length !== oldBlocks.length;
-
-  const needsCalendar =
-    newBlocks.some((b) => b.mirrorToCalendar || b.calendarEventId) ||
-    oldBlocks.some((b) => b.calendarEventId);
+  // Re-mirror the full stored set. Expired blocks are kept (they stay in the
+  // user's configured week / bookable-week grid and are only hidden from the
+  // Scheduling card's actionable list), so nothing is pruned here.
+  const needsCalendar = blocks.some((b) => b.mirrorToCalendar || b.calendarEventId);
 
   if (!needsCalendar) {
-    // No mirrored blocks — nothing to re-create. Persist a prune if one
-    // happened so the card reflects it, then we're done.
-    if (prunedAny) {
-      prefs.blockedWindows = newBlocks;
-      await prisma.user.update({
-        where: { id: userId },
-        data: { schedulingPreferences: JSON.stringify(prefs) },
-      });
-    }
+    // No mirrored blocks — nothing to re-create.
     return { reconciled: false, mirroredCount: 0, syncErrors: [] };
   }
 
@@ -228,7 +215,9 @@ export async function resyncUserCalendar(userId: string): Promise<ResyncResult> 
     [1, 2, 3, 4, 5].forEach((d) => activeDays.add(d));
   }
 
-  const result = await reconcileBlocks(userId, oldBlocks, newBlocks, tz, activeDays);
+  // oldBlocks == newBlocks: a resync re-affirms every stored block, recreating
+  // any whose calendar event drifted away.
+  const result = await reconcileBlocks(userId, blocks, blocks, tz, activeDays);
   prefs.blockedWindows = result.blocks;
   await prisma.user.update({
     where: { id: userId },

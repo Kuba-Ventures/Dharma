@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import { pruneExpiredBlocks, nowISOInZone } from "../../../../lib/expiredBlocks";
 import { safeParsePrefs } from "../../../../lib/blockMirror";
 import { reconcileBlocks } from "../../../../lib/blockReconcile";
 
@@ -60,23 +59,17 @@ export async function POST(req: Request) {
   if (typeof body.schedulingPreferences === "string" || tzChanged) {
     const incoming = prefsBody;
     const oldBlocks = Array.isArray(oldPrefs.blockedWindows) ? oldPrefs.blockedWindows : [];
-    const rawNewBlocks = Array.isArray(incoming.blockedWindows) ? incoming.blockedWindows : [];
+    const newBlocks = Array.isArray(incoming.blockedWindows) ? incoming.blockedWindows : [];
 
-    // Auto-clear blocks whose event has fully passed: a one-off once its end
-    // time is in the past, or a recurring block whose `until` end date has
-    // passed. Dropping them here removes them from the persisted prefs, and —
-    // because the reconcile pass below deletes any old event that no longer
-    // maps to a surviving block — from the mirrored Google Calendar too.
-    // Judged in the user's own time zone so a block clears at the right moment.
-    const now = nowISOInZone(tz);
-    const newBlocks = pruneExpiredBlocks(rawNewBlocks, now).kept;
-    const prunedAny = newBlocks.length !== rawNewBlocks.length;
-    incoming.blockedWindows = newBlocks;
+    // Expired blocks (a passed one-off, or a recurring block whose repeats have
+    // run out) are intentionally kept here: they still belong to the user's
+    // configured week and stay drawn in the "Your bookable week" grid. The
+    // Scheduling card just hides them from its actionable list. So we persist
+    // and mirror the full set — no auto-pruning on the server.
 
     // Only reconcile if any block needs mirroring or any old block had an
-    // event ID (so we can clean up — including deleting a just-expired block's
-    // mirrored event). Avoids a Calendar handshake on saves that don't touch
-    // blocks.
+    // event ID (so we can clean up). Avoids a Calendar handshake on saves that
+    // don't touch blocks.
     const needsCalendar =
       newBlocks.some((b) => b.mirrorToCalendar || b.calendarEventId) ||
       oldBlocks.some((b) => b.calendarEventId);
@@ -97,9 +90,8 @@ export async function POST(req: Request) {
     }
 
     // Persist even when only tzChanged so the event-id-bearing prefs come
-    // back patched, or when a tz-only save pruned an expired block. Avoid
-    // clobbering with empty data when nothing changed.
-    if (typeof body.schedulingPreferences === "string" || needsCalendar || prunedAny) {
+    // back patched. Avoid clobbering with empty data when nothing changed.
+    if (typeof body.schedulingPreferences === "string" || needsCalendar) {
       data.schedulingPreferences = JSON.stringify(incoming);
     }
   }
