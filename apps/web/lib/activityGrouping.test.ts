@@ -62,10 +62,57 @@ describe("groupActivity", () => {
     expect(rows[2]).toMatchObject({ kind: "draft", count: 1 });
   });
 
-  it("passes signals and classifications through untouched, preserving order", () => {
-    const c = classified("2026-07-28T08:00:00Z", "Product");
-    const rows = groupActivity([signal("2026-07-28T09:00:00Z"), c]);
+  it("passes a lone signal and classification through, preserving order", () => {
+    const rows = groupActivity([
+      signal("2026-07-28T09:00:00Z"),
+      classified("2026-07-28T08:00:00Z", "Product"),
+    ]);
     expect(rows).toHaveLength(2);
-    expect(rows[1]).toBe(c);
+    expect(rows.map((r) => r.kind)).toEqual(["signal", "classified"]);
+    expect(rows[1]).toMatchObject({ kind: "classified", labelName: "Product", count: 1 });
+  });
+
+  it("collapses a run of same-label classifications into one counted row", () => {
+    const rows = groupActivity([
+      classified("2026-07-28T10:00:00Z", "Product"),
+      classified("2026-07-28T09:30:00Z", "Product"),
+      classified("2026-07-28T09:00:00Z", "Product"),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "classified", labelName: "Product", count: 3 });
+  });
+
+  it("keeps the most recent timestamp for a classification group", () => {
+    const rows = groupActivity([
+      classified("2026-07-28T10:00:00Z", "Product"),
+      classified("2026-07-28T09:00:00Z", "Product"),
+    ]);
+    expect(rows[0].at.toISOString()).toBe("2026-07-28T10:00:00.000Z");
+  });
+
+  it("does not merge classifications with different labels", () => {
+    const rows = groupActivity([
+      classified("2026-07-28T10:00:00Z", "Product"),
+      classified("2026-07-28T09:30:00Z", "Team-Internal"),
+      classified("2026-07-28T09:00:00Z", "Product"),
+    ]);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => (r.kind === "classified" ? r.labelName : r.kind))).toEqual([
+      "Product",
+      "Team-Internal",
+      "Product",
+    ]);
+    expect(rows.every((r) => r.kind === "classified" && r.count === 1)).toBe(true);
+  });
+
+  it("does not merge same-label classifications separated by another event", () => {
+    const rows = groupActivity([
+      classified("2026-07-28T10:00:00Z", "Product"),
+      signal("2026-07-28T09:30:00Z"),
+      classified("2026-07-28T09:00:00Z", "Product"),
+    ]);
+    expect(rows.map((r) => r.kind)).toEqual(["classified", "signal", "classified"]);
+    expect(rows[0]).toMatchObject({ count: 1 });
+    expect(rows[2]).toMatchObject({ count: 1 });
   });
 });
