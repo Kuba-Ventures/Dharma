@@ -30,18 +30,6 @@ const NAV: Item[] = [
     ),
   },
   {
-    label: "Metrics",
-    href: "/metrics",
-    lockable: true,
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-        <rect x="1" y="7" width="3" height="7" rx="0.75" fill="currentColor" fillOpacity="0.85" />
-        <rect x="6" y="4" width="3" height="10" rx="0.75" fill="currentColor" fillOpacity="0.85" />
-        <rect x="11" y="1" width="3" height="13" rx="0.75" fill="currentColor" fillOpacity="0.85" />
-      </svg>
-    ),
-  },
-  {
     label: "Configuration",
     href: "/configuration",
     lockable: true,

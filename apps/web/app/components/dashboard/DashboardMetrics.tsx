@@ -27,6 +27,13 @@ function formatDuration(seconds: number): string {
   return `${hours}h ${mins}m`;
 }
 
+function formatUsd(n: number): string {
+  if (n === 0) return "$0";
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  if (n < 1) return `$${n.toFixed(3)}`;
+  return `$${n.toFixed(2)}`;
+}
+
 // Small "progress to next badge" line for a metric tile's sub slot.
 function NextBadgeSub({ group }: { group?: GroupProgress }) {
   if (!group || !group.next) return null;
@@ -42,6 +49,21 @@ function NextBadgeSub({ group }: { group?: GroupProgress }) {
   );
 }
 
+// Quieter cell for the secondary tier — cost/volume context that supports the
+// headline numbers without competing with them.
+function SecondaryCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-card border border-[color:var(--border-subtle)] bg-[color:var(--bg-card)]/60 px-4 py-3">
+      <p className="text-[10px] uppercase tracking-[0.08em] text-white/40">{label}</p>
+      <p className="mt-1 text-base font-medium tabular-nums text-white/75">{value}</p>
+    </div>
+  );
+}
+
+// Two-tier "how it's going" strip that opens the merged dashboard: three
+// headline metrics on top, three quieter cost/volume metrics below. Replaces
+// the old standalone Metrics page (reply-rate + time-saved + secondary grid all
+// fold into here plus the time-saved chart rendered alongside on the page).
 export default function DashboardMetrics() {
   const [data, setData] = useState<Metrics | null>(null);
   const [badges, setBadges] = useState<BadgeApi | null>(null);
@@ -65,10 +87,17 @@ export default function DashboardMetrics() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Skeleton className="h-20" />
-        <Skeleton className="h-20" />
-        <Skeleton className="h-20" />
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
       </div>
     );
   }
@@ -77,34 +106,44 @@ export default function DashboardMetrics() {
   const timeGroup = badges?.groups.find((g) => g.group === "time_saved");
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <MetricTile
-        dismissId="metric-drafts-week"
-        label="Drafts this week"
-        value={String(data?.draftsThisWeek ?? 0)}
-        sub={draftsGroup?.next ? <NextBadgeSub group={draftsGroup} /> : undefined}
-      />
-      {data?.replyRate7d == null ? (
+    <div className="space-y-3">
+      {/* Primary tier — the headline numbers */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {data?.replyRate7d == null ? (
+          <MetricTile
+            dismissId="metric-reply-rate"
+            label="Reply rate (7d)"
+            value="Not enough replies yet"
+            sub="Resumes once your replies land"
+            muted
+          />
+        ) : (
+          <MetricTile
+            dismissId="metric-reply-rate"
+            label="Reply rate (7d)"
+            value={`${Math.round(data.replyRate7d * 100)}%`}
+          />
+        )}
         <MetricTile
-          dismissId="metric-reply-rate"
-          label="Reply rate (7d)"
-          value="Not enough replies yet"
-          sub="Resumes once your replies land"
-          muted
+          dismissId="metric-time-saved"
+          label="Time saved (week)"
+          value={formatDuration(data?.timeSavedSecondsThisWeek ?? 0)}
+          sub={timeGroup?.next ? <NextBadgeSub group={timeGroup} /> : undefined}
         />
-      ) : (
         <MetricTile
-          dismissId="metric-reply-rate"
-          label="Reply rate (7d)"
-          value={`${Math.round(data.replyRate7d * 100)}%`}
+          dismissId="metric-drafts-week"
+          label="Drafts this week"
+          value={String(data?.draftsThisWeek ?? 0)}
+          sub={draftsGroup?.next ? <NextBadgeSub group={draftsGroup} /> : undefined}
         />
-      )}
-      <MetricTile
-        dismissId="metric-time-saved"
-        label="Time saved (week)"
-        value={formatDuration(data?.timeSavedSecondsThisWeek ?? 0)}
-        sub={timeGroup?.next ? <NextBadgeSub group={timeGroup} /> : undefined}
-      />
+      </div>
+
+      {/* Secondary tier — cost and volume context */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <SecondaryCell label="Emails tagged" value={String(data?.emailsTagged ?? 0)} />
+        <SecondaryCell label="Total spend (30d)" value={formatUsd(data?.totalSpend30d ?? 0)} />
+        <SecondaryCell label="Avg cost / draft" value={formatUsd(data?.avgCostPerDraft ?? 0)} />
+      </div>
     </div>
   );
 }
