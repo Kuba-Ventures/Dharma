@@ -14,8 +14,8 @@ import { resolvePresetSpec, HIGH_PRIORITY_NAME } from "../../../lib/labelPresets
 import Greeting from "../../components/dashboard/Greeting";
 import SyncInboxButton from "../../components/dashboard/SyncInboxButton";
 import ActivityFeed from "../../components/dashboard/ActivityFeed";
-import SignalsPeek from "../../components/dashboard/SignalsPeek";
 import DashboardMetrics from "../../components/dashboard/DashboardMetrics";
+import TimeSavedChart from "../../components/metrics/TimeSavedChart";
 import ConfigStatusCard from "../../components/dashboard/ConfigStatusCard";
 import NpsPrompt from "../../components/dashboard/NpsPrompt";
 import InstallNudge from "../../components/dashboard/InstallNudge";
@@ -316,6 +316,13 @@ export default async function DashboardPage() {
           never went through the onboarding install step). */}
       <InstallNudge installed={!!user.addonInstalledAt} />
 
+      {/* How it's going — the two-tier metrics strip that opens the merged
+          dashboard (the standalone Metrics tab folded into here). Metrics-first:
+          the headline numbers read before the config cards. */}
+      <section>
+        <DashboardMetrics />
+      </section>
+
       {/* Running for you */}
       <section data-tour="config">
         <div className="mb-3 flex items-baseline justify-between">
@@ -569,20 +576,10 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* This week */}
+      {/* Time saved — the 30-day trend chart carried over from the old Metrics
+          page. Sits below the config cards as the deeper "how it's going" read. */}
       <section>
-        <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-[11px] uppercase tracking-[0.08em] text-brand-200">
-            This week
-          </p>
-          <Link
-            href="/metrics"
-            className="text-[11px] text-white/50 hover:text-white/80"
-          >
-            Click to expand →
-          </Link>
-        </div>
-        <DashboardMetrics />
+        <TimeSavedChart days={30} />
       </section>
 
       {showNps && <NpsPrompt firstName={firstName} />}
@@ -594,10 +591,6 @@ export default async function DashboardPage() {
         </p>
         <ActivityFeed events={activity} />
       </section>
-
-      {/* Worth your attention. Signal producers aren't live yet, so this shows
-          the coming-soon state rather than seeded rows. */}
-      <SignalsPeek signals={[]} unreadCount={0} />
     </div>
   );
 }
