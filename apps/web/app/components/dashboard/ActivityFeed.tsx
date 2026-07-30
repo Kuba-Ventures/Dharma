@@ -89,12 +89,23 @@ export default function ActivityFeed({ events }: Props) {
       {rows.map((e, i) => (
         <li key={`${e.kind}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
           <span className={tintForKind(e.kind)}>{eventIcon(e.kind)}</span>
-          <span className="flex-1 truncate text-[13px] text-white/80">
-            {e.kind === "draft"
-              ? e.count === 1
-                ? "Drafted a reply"
-                : `Drafted ${e.count} replies`
-              : e.title}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            {e.kind === "classified" && e.count > 1 && (
+              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-1.5 text-[10px] tabular-nums text-white/50">
+                {e.count}
+              </span>
+            )}
+            <span className="truncate text-[13px] text-white/80">
+              {e.kind === "draft"
+                ? e.count === 1
+                  ? "Drafted a reply"
+                  : `Drafted ${e.count} replies`
+                : e.kind === "classified"
+                  ? e.count === 1
+                    ? "Classified a thread"
+                    : `Classified ${e.count} threads`
+                  : e.title}
+            </span>
           </span>
           {e.kind === "classified" && e.labelName && (
             <span
