@@ -27,13 +27,6 @@ function formatDuration(seconds: number): string {
   return `${hours}h ${mins}m`;
 }
 
-function formatUsd(n: number): string {
-  if (n === 0) return "$0";
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  if (n < 1) return `$${n.toFixed(3)}`;
-  return `$${n.toFixed(2)}`;
-}
-
 // Small "progress to next badge" line for a metric tile's sub slot.
 function NextBadgeSub({ group }: { group?: GroupProgress }) {
   if (!group || !group.next) return null;
@@ -95,8 +88,6 @@ export default function DashboardMetrics() {
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
         </div>
       </div>
     );
@@ -138,11 +129,9 @@ export default function DashboardMetrics() {
         />
       </div>
 
-      {/* Secondary tier — cost and volume context */}
+      {/* Secondary tier — volume context */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <SecondaryCell label="Emails tagged" value={String(data?.emailsTagged ?? 0)} />
-        <SecondaryCell label="Total spend (30d)" value={formatUsd(data?.totalSpend30d ?? 0)} />
-        <SecondaryCell label="Avg cost / draft" value={formatUsd(data?.avgCostPerDraft ?? 0)} />
       </div>
     </div>
   );
