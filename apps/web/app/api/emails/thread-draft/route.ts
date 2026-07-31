@@ -18,7 +18,8 @@ import { google } from "googleapis";
 const WRITING_RULES = `\
 - Never use em-dashes or en-dashes. Use a comma or period instead.
 - No generic openers like "Thanks for reaching out" or "Hope you're well".
-- No subject line.`;
+- No subject line.
+- Greet the recipient only by a name that actually appears in their email — the name they signed off with, or the name on the From line. If no name is clear, use a neutral greeting with no name. Never invent, guess, or substitute a different name.`;
 
 // Catches month names ("Sep 12", "September 12, 2026"), MM/DD or MM/DD/YYYY,
 // ISO YYYY-MM-DD, and relative phrases ("next Monday", "this week", "tomorrow").
@@ -300,7 +301,7 @@ ${toneBlock}
 Scheduling rules:
 ${WRITING_RULES}
 - Check whether any time proposed in the email conflicts with the busy times below.
-- If the proposed time IS blocked, say it does not work and propose 2-3 specific free times from the gaps in the calendar that fit the scheduling preferences. Only propose times that are still in the future relative to the current date and time given above; never propose a slot earlier today than right now.
+- If the proposed time IS blocked, FIRST clearly decline that exact time by name (e.g. "No, 4pm doesn't work for me"), then offer 2-3 specific alternative times (e.g. "2:30pm today" or "Monday at 10am" — real clock times, not vague ranges like "afternoon") from the free gaps that fit the scheduling preferences. Only propose times still in the future relative to the current date and time given above; never propose a slot earlier today than right now.
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
 - Never name or describe what event is blocking the time; just say the time does not work.
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
