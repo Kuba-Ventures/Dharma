@@ -40,21 +40,33 @@ function extractDates(text: string): string[] {
   return out;
 }
 
-function buildDateContext(emailBody: string): string {
-  const now = new Date();
-  const prettyToday = now.toLocaleString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "America/New_York",
-  });
-  const isoToday = now.toISOString().slice(0, 10);
+// `anchor` is the date relative words ("today", "tomorrow", a weekday) should
+// resolve against — the email's SENT date, so a reply written later still reads
+// "tomorrow" as the day after the email. `now` is the real current moment, used
+// only to forbid proposing times that have already passed. When they land on the
+// same calendar day (or anchor is omitted, e.g. polishing free-text notes) this
+// collapses to the original single "Today is …" line.
+function buildDateContext(emailBody: string, anchor: Date = new Date(), now: Date = anchor): string {
+  const fmt = (d: Date) =>
+    d.toLocaleString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "America/New_York",
+    });
+  const lines: string[] = [];
+  if (fmt(anchor) === fmt(now)) {
+    lines.push(`Today is ${fmt(now)} (America/New_York).`);
+  } else {
+    lines.push(`This email was sent on ${fmt(anchor)} (America/New_York); right now it is ${fmt(now)}.`);
+    lines.push(`Resolve relative dates like "today", "tomorrow", or a weekday RELATIVE TO WHEN THE EMAIL WAS SENT, not to the current date.`);
+    lines.push(`Never propose a time that is already in the past as of right now. If the time they asked about has already passed, say so and offer fresh options.`);
+  }
   const referenced = extractDates(emailBody);
-  const lines = [`Today is ${prettyToday} (${isoToday}, America/New_York).`];
   if (referenced.length > 0) {
     lines.push(`Dates mentioned in this email: ${referenced.join(", ")}.`);
-    lines.push("If any of those dates have already passed, never propose them. Always reason from today's date forward.");
+    lines.push("If any of those dates have already passed, never propose them. Always reason forward from the current date.");
   }
   return lines.join("\n");
 }
@@ -247,13 +259,20 @@ Polished email:`;
 
     const emailBody = extractBody(msg.payload) || msg.snippet || "";
 
+    // Anchor relative dates ("tomorrow", "Friday") to when the email was SENT,
+    // not to now: a reply written the next day must read "tomorrow" as the day
+    // after the email was sent. Keep the real `now` too, so we never propose a
+    // slot that has already passed. Fall back to now if internalDate is missing.
+    const now = new Date();
+    const sentMs = Number(msg.internalDate);
+    const emailSentAt = Number.isFinite(sentMs) && sentMs > 0 ? new Date(sentMs) : now;
+
     if (toneKey === "Scheduling") {
     if (dbUser?.schedulingEnabled === false) {
       return NextResponse.json({ error: "Scheduling is disabled. Enable it in your Dharma dashboard." }, { status: 403, headers: CORS });
     }
 
-    const now = new Date();
-    const { timeMin, timeMax } = getRelevantTimeWindow(emailBody, now);
+    const { timeMin, timeMax } = getRelevantTimeWindow(emailBody, emailSentAt);
 
     // Read every calendar the user has *visible*, not just `primary` — meetings
     // often live on a Work/secondary calendar, and a primary-only busy check
@@ -301,7 +320,7 @@ Polished email:`;
 
     prompt = `You are drafting a scheduling reply on behalf of ${fullName}. Your top priority is matching their writing style exactly.
 
-${buildDateContext(emailBody)}
+${buildDateContext(emailBody, emailSentAt, now)}
 
 ${toneBlock}
 
@@ -330,7 +349,7 @@ Reply draft:`;
       const toneInstruction = TONE_INSTRUCTIONS[toneKey] ?? TONE_INSTRUCTIONS.Concise;
       prompt = `${toneInstruction}
 
-${buildDateContext(emailBody)}
+${buildDateContext(emailBody, emailSentAt, now)}
 
 You are drafting a reply on behalf of ${fullName}. Read the email below and write an appropriate reply draft.
 
