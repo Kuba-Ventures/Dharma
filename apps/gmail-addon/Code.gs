@@ -610,59 +610,6 @@ function insertPolishedDraft(e) {
   return notificationResponse('No draft ID found in cache. meta=' + JSON.stringify(meta) + ' text_len=' + (polishedText ? polishedText.length : 0));
 }
 
-// ── Polish & insert (instant): polishes notes from the sidebar input, inserts live into compose ──
-function polishFromInput(e) {
-  try {
-    return polishFromInputInner(e);
-  } catch (globalErr) {
-    return notificationResponse('Caught: ' + globalErr.message);
-  }
-}
-
-function polishFromInputInner(e) {
-  var notes = '';
-  if (e && e.formInput && e.formInput.dharmaNotes) notes = e.formInput.dharmaNotes;
-  notes = (notes || '').trim();
-  if (!notes) {
-    return notificationResponse('Type or paste your notes first, then click Polish & insert.');
-  }
-
-  var accessToken = ScriptApp.getOAuthToken();
-
-  var response;
-  try {
-    response = UrlFetchApp.fetch(DHARMA_API + '/api/emails/thread-draft', {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
-      payload: JSON.stringify({ threadId: 'none', draftText: notes }),
-      muteHttpExceptions: true,
-    });
-  } catch (err) {
-    return notificationResponse('Network error: ' + err.message);
-  }
-
-  var data;
-  try {
-    data = JSON.parse(response.getContentText());
-  } catch (_) {
-    return notificationResponse('HTTP ' + response.getResponseCode() + ': server error');
-  }
-
-  if (!data.ok || !data.text) {
-    return notificationResponse(data.error || 'Polish failed.');
-  }
-
-  // Native compose action → inserts live into the open compose box (empty box = clean replace).
-  return CardService.newUpdateDraftActionResponseBuilder()
-    .setUpdateDraftBodyAction(
-      CardService.newUpdateDraftBodyAction()
-        .addUpdateContent(textToGmailHtml(data.text), CardService.ContentType.MUTABLE_HTML)
-        .setUpdateType(CardService.UpdateDraftBodyType.INSERT_AT_START)
-    )
-    .build();
-}
-
 function textToGmailHtml(text) {
   return text.split('\n').map(function(line) {
     var safe = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
