@@ -7,6 +7,7 @@ import { prisma } from "../../../../lib/prisma";
 import { markAddonInstalled } from "../../../../lib/addonInstall";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { listVisibleCalendarIds } from "../../../../lib/googleCalendars";
+import { getRelevantTimeWindow } from "../../../../lib/schedulingWindow";
 import { logUsage } from "../../../../lib/usage";
 import { checkAiGuard } from "../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../lib/anthropicEndpoint";
@@ -69,42 +70,6 @@ function buildDateContext(emailBody: string, anchor: Date = new Date(), now: Dat
     lines.push("If any of those dates have already passed, never propose them. Always reason forward from the current date.");
   }
   return lines.join("\n");
-}
-
-function getRelevantTimeWindow(emailText: string, now: Date): { timeMin: string; timeMax: string } {
-  const lower = emailText.toLowerCase();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const add = (d: Date, n: number) => new Date(d.getTime() + n * 86400000);
-
-  if (/\btoday\b/.test(lower))
-    return { timeMin: now.toISOString(), timeMax: add(today, 1).toISOString() };
-
-  if (/\btomorrow\b/.test(lower))
-    return { timeMin: add(today, 1).toISOString(), timeMax: add(today, 2).toISOString() };
-
-  if (/\bnext week\b/.test(lower)) {
-    const daysToMon = ((1 - today.getDay() + 7) % 7) || 7;
-    const mon = add(today, daysToMon);
-    return { timeMin: mon.toISOString(), timeMax: add(mon, 5).toISOString() };
-  }
-
-  if (/\bthis week\b/.test(lower)) {
-    const daysToFri = (5 - today.getDay() + 7) % 7;
-    return { timeMin: now.toISOString(), timeMax: add(today, daysToFri + 1).toISOString() };
-  }
-
-  const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-  for (let i = 0; i < days.length; i++) {
-    if (new RegExp(`\\b${days[i]}\\b`).test(lower)) {
-      const ahead = ((i - today.getDay() + 7) % 7) || 7;
-      const target = add(today, ahead);
-      return { timeMin: target.toISOString(), timeMax: add(target, 1).toISOString() };
-    }
-  }
-
-  // Default: next 3 days
-  return { timeMin: now.toISOString(), timeMax: add(today, 3).toISOString() };
 }
 
 const CORS = {
@@ -309,21 +274,6 @@ Polished email:`;
         return `• ${start.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: TZ })} - ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: TZ })} ET: busy`;
       })
       .join("\n") || "No events in this window";
-
-    // TEMP diagnostic — remove after root-causing the 4pm scheduling miss.
-    // Logs exactly what the busy-check saw so we can tell a data problem
-    // (wrong day/window, or the event's calendar not in the visible set) from
-    // a model-reasoning problem (busy list had it, draft confirmed anyway).
-    const _flat = eventsPerCalendar.flat();
-    console.log("[thread-draft][sched-debug] " + JSON.stringify({
-      sentAt: emailSentAt.toISOString(),
-      now: now.toISOString(),
-      window: { timeMin, timeMax },
-      calendars: calendarIds,
-      rawEventCount: _flat.length,
-      rawEvents: _flat.map((e) => ({ summary: e.summary, start: e.start?.dateTime ?? e.start?.date })),
-      busyList,
-    }));
 
     const toneBlock = effectiveTone
       ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
