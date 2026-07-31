@@ -6,6 +6,7 @@ import { verifyExtensionToken } from "../../../../lib/extension-token";
 import { prisma } from "../../../../lib/prisma";
 import { markAddonInstalled } from "../../../../lib/addonInstall";
 import { makeAuthForUser } from "../../../../lib/gmail";
+import { listVisibleCalendarIds } from "../../../../lib/googleCalendars";
 import { logUsage } from "../../../../lib/usage";
 import { checkAiGuard } from "../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../lib/anthropicEndpoint";
@@ -254,18 +255,35 @@ Polished email:`;
     const now = new Date();
     const { timeMin, timeMax } = getRelevantTimeWindow(emailBody, now);
 
-    const calendarRes = await google.calendar({ version: "v3", auth: oauthClient }).events.list({
-      calendarId: "primary",
-      timeMin,
-      timeMax,
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: "startTime",
-    });
+    // Read every calendar the user has *visible*, not just `primary` — meetings
+    // often live on a Work/secondary calendar, and a primary-only busy check
+    // silently confirms times that are actually booked (issue #74 parity).
+    const cal = google.calendar({ version: "v3", auth: oauthClient });
+    const calendarIds = await listVisibleCalendarIds(cal);
+    const eventsPerCalendar = await Promise.all(
+      calendarIds.map((calId) =>
+        cal.events
+          .list({
+            calendarId: calId,
+            timeMin,
+            timeMax,
+            maxResults: 10,
+            singleEvents: true,
+            orderBy: "startTime",
+          })
+          .then((r) => r.data.items ?? [])
+          .catch((err) => {
+            console.error(`[thread-draft] events.list failed for ${calId}:`, err?.message ?? err);
+            return [];
+          }),
+      ),
+    );
 
     const TZ = "America/New_York";
-    const busyList = (calendarRes.data.items ?? [])
+    const busyList = eventsPerCalendar
+      .flat()
       .filter((e) => e.status !== "cancelled" && e.start?.dateTime)
+      .sort((a, b) => new Date(a.start!.dateTime!).getTime() - new Date(b.start!.dateTime!).getTime())
       .map((e) => {
         const start = new Date(e.start!.dateTime!);
         const end = new Date(e.end!.dateTime!);
