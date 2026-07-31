@@ -310,6 +310,21 @@ Polished email:`;
       })
       .join("\n") || "No events in this window";
 
+    // TEMP diagnostic — remove after root-causing the 4pm scheduling miss.
+    // Logs exactly what the busy-check saw so we can tell a data problem
+    // (wrong day/window, or the event's calendar not in the visible set) from
+    // a model-reasoning problem (busy list had it, draft confirmed anyway).
+    const _flat = eventsPerCalendar.flat();
+    console.log("[thread-draft][sched-debug] " + JSON.stringify({
+      sentAt: emailSentAt.toISOString(),
+      now: now.toISOString(),
+      window: { timeMin, timeMax },
+      calendars: calendarIds,
+      rawEventCount: _flat.length,
+      rawEvents: _flat.map((e) => ({ summary: e.summary, start: e.start?.dateTime ?? e.start?.date })),
+      busyList,
+    }));
+
     const toneBlock = effectiveTone
       ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural tone.";
