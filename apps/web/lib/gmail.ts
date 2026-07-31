@@ -22,13 +22,28 @@ export async function makeAuthForUser(userId: string) {
   });
 
   auth.on("tokens", async (tokens) => {
-    await prisma.googleCredential.update({
-      where: { userId },
-      data: {
-        accessToken: tokens.access_token ?? cred.accessToken,
-        expiresAt: new Date(tokens.expiry_date ?? Date.now() + 3_600_000),
-      },
-    });
+    try {
+      await prisma.googleCredential.update({
+        where: { userId },
+        data: {
+          accessToken: tokens.access_token ?? cred.accessToken,
+          // Persist a rotated refresh token. Google rotates the refresh token
+          // on refresh when the OAuth client is in "Testing" publishing status:
+          // each refresh returns a fresh refresh_token and invalidates the
+          // previous one. Dropping it here left the stored token stale after the
+          // first refresh, so the *next* refresh (~1h later) failed with
+          // invalid_grant — breaking drafting and auto-labeling until the user
+          // re-logged in (issue #113). A plain access-token refresh omits
+          // refresh_token, so only overwrite when Google actually sends a new one.
+          ...(tokens.refresh_token && { refreshToken: tokens.refresh_token }),
+          expiresAt: new Date(tokens.expiry_date ?? Date.now() + 3_600_000),
+        },
+      });
+    } catch (err) {
+      // Never let a persistence failure surface as an unhandled rejection from
+      // the event emitter; the in-memory client still holds the fresh tokens.
+      console.error("[gmail] Failed to persist refreshed Google token:", err);
+    }
   });
 
   return { auth, cred };
