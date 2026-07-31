@@ -309,69 +309,6 @@ function buildMainCard(messageId) {
     .build();
 }
 
-// ── Compose-specific card: includes Polish Draft ──────────────────────────────
-function buildComposeToneCard(subject, threadId) {
-  var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
-
-  var replySection = CardService.newCardSection().setHeader('Quick reply');
-  for (var i = 0; i < tones.length; i++) {
-    replySection.addWidget(
-      CardService.newTextButton()
-        .setText(tones[i])
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_PRIMARY)
-        .setOnClickAction(
-          CardService.newAction()
-            .setFunctionName('generateFromCompose')
-            .setParameters({ subject: subject, tone: tones[i], threadId: threadId || '' })
-        )
-    );
-  }
-
-  // Instant path: paste notes here → polished text drops straight into the compose box (live, no reopening).
-  var instantSection = CardService.newCardSection().setHeader('Polish & insert (instant)')
-    .addWidget(CardService.newTextParagraph()
-      .setText('Type or paste your notes here. The polished version drops straight into the compose box. No need to open Drafts.'))
-    .addWidget(
-      CardService.newTextInput()
-        .setFieldName('dharmaNotes')
-        .setTitle('Your notes')
-        .setMultiline(true)
-    )
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Polish & insert')
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_PRIMARY)
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('polishFromInput')
-        )
-    );
-
-  // In-compose path (unchanged): reads your already-typed draft and replaces it — view it in Drafts.
-  var polishSection = CardService.newCardSection().setHeader('Have a draft?')
-    .addWidget(CardService.newTextParagraph()
-      .setText('Dharma will rewrite it in your voice without changing the meaning.'))
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Polish draft')
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_SECONDARY)
-        .setOnClickAction(
-          CardService.newAction()
-            .setFunctionName('polishDraft')
-            .setParameters({ subject: subject })
-        )
-    );
-
-  return CardService.newCardBuilder()
-    .setHeader(dharmaHeader('Dharma'))
-    .addSection(replySection)
-    .addSection(instantSection)
-    .addSection(polishSection)
-    .build();
-}
-
 function buildToneMenuCard(actionFunction, baseParams) {
   var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
 
@@ -1163,7 +1100,7 @@ function saveToneEdits(e) {
 // Reads the user-typed body of the open reply (quoted history stripped).
 // Returns '' when there's no confident match — which safely defaults to draft
 // mode, the non-destructive path.
-function composeBodyText(accessToken, messageId) {
+function composeBodyText(accessToken, messageId, threadId) {
   try {
     var listRes = UrlFetchApp.fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=20',
@@ -1172,9 +1109,13 @@ function composeBodyText(accessToken, messageId) {
     if (listRes.getResponseCode() !== 200) return '';
     var drafts = (JSON.parse(listRes.getContentText()).drafts) || [];
 
+    // Match the draft by message id, then fall back to thread id — the open
+    // reply's draft belongs to this thread even when the compose event's
+    // message id has already rotated (why detection sometimes read "empty").
     var draftId = '';
     for (var i = 0; i < drafts.length; i++) {
-      if (drafts[i].message && drafts[i].message.id === messageId) { draftId = drafts[i].id; break; }
+      var dm = drafts[i].message;
+      if (dm && (dm.id === messageId || (threadId && dm.threadId === threadId))) { draftId = drafts[i].id; break; }
     }
     if (!draftId) return '';
 
@@ -1199,7 +1140,7 @@ function composeBodyText(accessToken, messageId) {
 function buildComposeCard(subject, threadId, messageId, forcedMode) {
   var bodyText = '';
   try {
-    bodyText = composeBodyText(ScriptApp.getOAuthToken(), messageId);
+    bodyText = composeBodyText(ScriptApp.getOAuthToken(), messageId, threadId);
   } catch (_) {}
   var mode = forcedMode || (bodyText && bodyText.trim() ? 'rewrite' : 'draft');
 
