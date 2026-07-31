@@ -43,12 +43,11 @@ function extractDates(text: string): string[] {
 
 // `anchor` is the date relative words ("today", "tomorrow", a weekday) should
 // resolve against — the email's SENT date, so a reply written later still reads
-// "tomorrow" as the day after the email. `now` is the real current moment, used
-// only to forbid proposing times that have already passed. When they land on the
-// same calendar day (or anchor is omitted, e.g. polishing free-text notes) this
-// collapses to the original single "Today is …" line.
+// "tomorrow" as the day after the email. `now` is the real current moment. The
+// model is always grounded in the current date AND time so it never proposes a
+// slot that has already passed today (e.g. offering 10:30am when it's 11:35am).
 function buildDateContext(emailBody: string, anchor: Date = new Date(), now: Date = anchor): string {
-  const fmt = (d: Date) =>
+  const fmtDate = (d: Date) =>
     d.toLocaleString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -56,18 +55,27 @@ function buildDateContext(emailBody: string, anchor: Date = new Date(), now: Dat
       day: "numeric",
       timeZone: "America/New_York",
     });
+  const fmtDateTime = (d: Date) =>
+    d.toLocaleString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/New_York",
+    });
   const lines: string[] = [];
-  if (fmt(anchor) === fmt(now)) {
-    lines.push(`Today is ${fmt(now)} (America/New_York).`);
-  } else {
-    lines.push(`This email was sent on ${fmt(anchor)} (America/New_York); right now it is ${fmt(now)}.`);
-    lines.push(`Resolve relative dates like "today", "tomorrow", or a weekday RELATIVE TO WHEN THE EMAIL WAS SENT, not to the current date.`);
-    lines.push(`Never propose a time that is already in the past as of right now. If the time they asked about has already passed, say so and offer fresh options.`);
+  // Ground the model in the real current moment (date AND time). The time is
+  // essential: without it the model knows the day but not that, say, 10:30am
+  // has already passed, so it proposes slots in the past.
+  lines.push(`The current date and time is ${fmtDateTime(now)} (America/New_York). Never suggest a date or time earlier than this — only propose slots in the future.`);
+  if (fmtDate(anchor) !== fmtDate(now)) {
+    lines.push(`This email was sent on ${fmtDate(anchor)}. Resolve relative dates like "today", "tomorrow", or a weekday RELATIVE TO WHEN THE EMAIL WAS SENT, not to the current date. If a time they asked about has already passed, say so and offer fresh options.`);
   }
   const referenced = extractDates(emailBody);
   if (referenced.length > 0) {
     lines.push(`Dates mentioned in this email: ${referenced.join(", ")}.`);
-    lines.push("If any of those dates have already passed, never propose them. Always reason forward from the current date.");
+    lines.push("If any of those dates have already passed, never propose them. Always reason forward from the current date and time.");
   }
   return lines.join("\n");
 }
@@ -292,7 +300,7 @@ ${toneBlock}
 Scheduling rules:
 ${WRITING_RULES}
 - Check whether any time proposed in the email conflicts with the busy times below.
-- If the proposed time IS blocked, say it does not work and propose 2-3 specific free times from the gaps in the calendar that fit the scheduling preferences.
+- If the proposed time IS blocked, say it does not work and propose 2-3 specific free times from the gaps in the calendar that fit the scheduling preferences. Only propose times that are still in the future relative to the current date and time given above; never propose a slot earlier today than right now.
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
 - Never name or describe what event is blocking the time; just say the time does not work.
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
