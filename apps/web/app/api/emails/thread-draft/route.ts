@@ -8,6 +8,7 @@ import { markAddonInstalled } from "../../../../lib/addonInstall";
 import { makeAuthForUser } from "../../../../lib/gmail";
 import { listVisibleCalendarIds } from "../../../../lib/googleCalendars";
 import { getRelevantTimeWindow } from "../../../../lib/schedulingWindow";
+import { resolveRecipientName } from "../../../../lib/recipientName";
 import { logUsage } from "../../../../lib/usage";
 import { checkAiGuard } from "../../../../lib/aiGuard";
 import { ANTHROPIC_URL, anthropicHeaders } from "../../../../lib/anthropicEndpoint";
@@ -241,6 +242,19 @@ Polished email:`;
     const sentMs = Number(msg.internalDate);
     const emailSentAt = Number.isFinite(sentMs) && sentMs > 0 ? new Date(sentMs) : now;
 
+    // Address the reply to a real name — the sender's sign-off or From name —
+    // filled in by us, not guessed by the model. The saved greeting is a
+    // template like "Hey {{name}},"; leaving the model to fill {{name}} produced
+    // hallucinated openers ("Hey Brady,"). If no name is found, greet neutrally.
+    const recipientName = resolveRecipientName(from, emailBody);
+    const introForm = dbUser?.inferredIntro?.trim() || "";
+    const resolvedGreeting = recipientName
+      ? introForm.replace(/\{\{?\s*name\s*\}?\}/gi, recipientName) || `Hi ${recipientName},`
+      : "";
+    const threadIntroHint = recipientName
+      ? `\nOpen with this exact greeting: "${resolvedGreeting}". Address the recipient only as "${recipientName}" — never any other name, and never leave a literal "{{name}}" placeholder.`
+      : `\nIf a greeting fits, address the sender by the name they signed off with or the From line; never invent a name.`;
+
     if (toneKey === "Scheduling") {
     if (dbUser?.schedulingEnabled === false) {
       return NextResponse.json({ error: "Scheduling is disabled. Enable it in your Dharma dashboard." }, { status: 403, headers: CORS });
@@ -284,6 +298,19 @@ Polished email:`;
       })
       .join("\n") || "No events in this window";
 
+    // TEMP diagnostic — verify scheduling inputs; remove once dialed in.
+    console.log("[thread-draft][sched-debug] " + JSON.stringify({
+      msgCount: messages.length,
+      from,
+      recipientName,
+      sentAt: emailSentAt.toISOString(),
+      now: now.toISOString(),
+      window: { timeMin, timeMax },
+      calendars: calendarIds,
+      busyList,
+      emailSnippet: emailBody.slice(0, 200),
+    }));
+
     const toneBlock = effectiveTone
       ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural tone.";
@@ -303,9 +330,10 @@ ${WRITING_RULES}
 - Check whether any time proposed in the email conflicts with the busy times below.
 - If the proposed time IS blocked, FIRST clearly decline that exact time by name (e.g. "No, 4pm doesn't work for me"), then offer 2-3 specific alternative times (e.g. "2:30pm today" or "Monday at 10am" — real clock times, not vague ranges like "afternoon") from the free gaps that fit the scheduling preferences. Only propose times still in the future relative to the current date and time given above; never propose a slot earlier today than right now.
 - If the proposed time IS free and fits the scheduling preferences, confirm it.
+- Only propose times on weekdays (Monday to Friday) between 9am and 5pm Eastern, unless the sender explicitly asked about a weekend or a time outside those hours. Never propose a weekend or evening slot by default.
 - Never name or describe what event is blocking the time; just say the time does not work.
 - Always end with a casual question asking if the proposed times work (e.g. "Would any of these work?", "Do any of these fit your schedule?", "Are you free at any of these?"). Never end with a statement.
-- Do not include any sign-off name at the end.${introHint}
+- Do not include any sign-off name at the end.${threadIntroHint}
 - Keep it to 2-3 sentences.
 - Format: if there is an opening line, leave one blank line before the message body, and one blank line before the closing question.
 - Do not include a subject line.${prefsLine}
@@ -329,7 +357,7 @@ You are drafting a reply on behalf of ${fullName}. Read the email below and writ
 
 Rules:
 ${WRITING_RULES}
-- ${signOffBlock}${introHint}
+- ${signOffBlock}${threadIntroHint}
 - If there is an opening line, leave one blank line before the body, and one blank line before the closing.
 
 Email from: ${from}
@@ -359,6 +387,9 @@ Reply draft:`;
   const replyBody = (claudeData.content[0]?.text?.trim() ?? "")
     .replace(/\s*[\u2014\u2013]\s*/g, ", ")
     .replace(/ {2,}/g, " ");
+
+  // TEMP diagnostic \u2014 see the scheduling draft the model produced; remove once dialed in.
+  if (toneKey === "Scheduling") console.log("[thread-draft][sched-out] " + JSON.stringify({ text: replyBody }));
 
   if (claudeData.usage) {
     await logUsage({
