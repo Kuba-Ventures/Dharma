@@ -298,19 +298,6 @@ Polished email:`;
       })
       .join("\n") || "No events in this window";
 
-    // TEMP diagnostic — verify scheduling inputs; remove once dialed in.
-    console.log("[thread-draft][sched-debug] " + JSON.stringify({
-      msgCount: messages.length,
-      from,
-      recipientName,
-      sentAt: emailSentAt.toISOString(),
-      now: now.toISOString(),
-      window: { timeMin, timeMax },
-      calendars: calendarIds,
-      busyList,
-      emailSnippet: emailBody.slice(0, 200),
-    }));
-
     const toneBlock = effectiveTone
       ? `Writing style to match exactly: ${effectiveTone}${dbUser?.toneExample ? `\n\nExample of how this person writes:\n${dbUser.toneExample.slice(0, 300)}` : ""}`
       : "Write in a direct, natural tone.";
@@ -387,9 +374,6 @@ Reply draft:`;
   const replyBody = (claudeData.content[0]?.text?.trim() ?? "")
     .replace(/\s*[\u2014\u2013]\s*/g, ", ")
     .replace(/ {2,}/g, " ");
-
-  // TEMP diagnostic \u2014 see the scheduling draft the model produced; remove once dialed in.
-  if (toneKey === "Scheduling") console.log("[thread-draft][sched-out] " + JSON.stringify({ text: replyBody }));
 
   if (claudeData.usage) {
     await logUsage({
