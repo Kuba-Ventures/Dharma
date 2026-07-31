@@ -250,20 +250,21 @@ function rsvpReschedule(e) {
 
 function onComposeOpen(e) {
   var subject = (e.draftMetadata && e.draftMetadata.subject) ? e.draftMetadata.subject : '';
+  var messageId = (e.gmail && e.gmail.messageId) ? e.gmail.messageId : '';
   var threadId = '';
 
   // With draftAccess METADATA, e.gmail.messageId is the draft's message ID.
   // Use it to get the thread ID directly instead of guessing from subject.
-  if (e.gmail && e.gmail.messageId) {
+  if (messageId) {
     try {
-      var draft = Gmail.Users.Messages.get('me', e.gmail.messageId, { format: 'minimal' });
+      var draft = Gmail.Users.Messages.get('me', messageId, { format: 'minimal' });
       if (draft && draft.threadId) threadId = draft.threadId;
     } catch (err) {
       Logger.log('Could not resolve threadId from draft: ' + err.message);
     }
   }
 
-  return buildComposeToneCard(subject, threadId);
+  return buildComposeCard(subject, threadId);
 }
 
 function buildWelcomeCard() {
@@ -305,69 +306,6 @@ function buildMainCard(messageId) {
     .setHeader(dharmaHeader('Dharma'))
     .addSection(buildToneStatusSection())
     .addSection(section)
-    .build();
-}
-
-// ── Compose-specific card: includes Polish Draft ──────────────────────────────
-function buildComposeToneCard(subject, threadId) {
-  var tones = ['My Tone', 'Concise', 'Formal / Legal', 'Scheduling'];
-
-  var replySection = CardService.newCardSection().setHeader('Quick reply');
-  for (var i = 0; i < tones.length; i++) {
-    replySection.addWidget(
-      CardService.newTextButton()
-        .setText(tones[i])
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_PRIMARY)
-        .setOnClickAction(
-          CardService.newAction()
-            .setFunctionName('generateFromCompose')
-            .setParameters({ subject: subject, tone: tones[i], threadId: threadId || '' })
-        )
-    );
-  }
-
-  // Instant path: paste notes here → polished text drops straight into the compose box (live, no reopening).
-  var instantSection = CardService.newCardSection().setHeader('Polish & insert (instant)')
-    .addWidget(CardService.newTextParagraph()
-      .setText('Type or paste your notes here. The polished version drops straight into the compose box. No need to open Drafts.'))
-    .addWidget(
-      CardService.newTextInput()
-        .setFieldName('dharmaNotes')
-        .setTitle('Your notes')
-        .setMultiline(true)
-    )
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Polish & insert')
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_PRIMARY)
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('polishFromInput')
-        )
-    );
-
-  // In-compose path (unchanged): reads your already-typed draft and replaces it — view it in Drafts.
-  var polishSection = CardService.newCardSection().setHeader('Have a draft?')
-    .addWidget(CardService.newTextParagraph()
-      .setText('Dharma will rewrite it in your voice without changing the meaning.'))
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Polish draft')
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor(BRAND_SECONDARY)
-        .setOnClickAction(
-          CardService.newAction()
-            .setFunctionName('polishDraft')
-            .setParameters({ subject: subject })
-        )
-    );
-
-  return CardService.newCardBuilder()
-    .setHeader(dharmaHeader('Dharma'))
-    .addSection(replySection)
-    .addSection(instantSection)
-    .addSection(polishSection)
     .build();
 }
 
@@ -670,59 +608,6 @@ function insertPolishedDraft(e) {
 
   // Diagnostic: show why we couldn't replace
   return notificationResponse('No draft ID found in cache. meta=' + JSON.stringify(meta) + ' text_len=' + (polishedText ? polishedText.length : 0));
-}
-
-// ── Polish & insert (instant): polishes notes from the sidebar input, inserts live into compose ──
-function polishFromInput(e) {
-  try {
-    return polishFromInputInner(e);
-  } catch (globalErr) {
-    return notificationResponse('Caught: ' + globalErr.message);
-  }
-}
-
-function polishFromInputInner(e) {
-  var notes = '';
-  if (e && e.formInput && e.formInput.dharmaNotes) notes = e.formInput.dharmaNotes;
-  notes = (notes || '').trim();
-  if (!notes) {
-    return notificationResponse('Type or paste your notes first, then click Polish & insert.');
-  }
-
-  var accessToken = ScriptApp.getOAuthToken();
-
-  var response;
-  try {
-    response = UrlFetchApp.fetch(DHARMA_API + '/api/emails/thread-draft', {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': 'GoogleBearer ' + accessToken },
-      payload: JSON.stringify({ threadId: 'none', draftText: notes }),
-      muteHttpExceptions: true,
-    });
-  } catch (err) {
-    return notificationResponse('Network error: ' + err.message);
-  }
-
-  var data;
-  try {
-    data = JSON.parse(response.getContentText());
-  } catch (_) {
-    return notificationResponse('HTTP ' + response.getResponseCode() + ': server error');
-  }
-
-  if (!data.ok || !data.text) {
-    return notificationResponse(data.error || 'Polish failed.');
-  }
-
-  // Native compose action → inserts live into the open compose box (empty box = clean replace).
-  return CardService.newUpdateDraftActionResponseBuilder()
-    .setUpdateDraftBodyAction(
-      CardService.newUpdateDraftBodyAction()
-        .addUpdateContent(textToGmailHtml(data.text), CardService.ContentType.MUTABLE_HTML)
-        .setUpdateType(CardService.UpdateDraftBodyType.INSERT_AT_START)
-    )
-    .build();
 }
 
 function textToGmailHtml(text) {
@@ -1151,4 +1036,62 @@ function saveToneEdits(e) {
   } catch (err) {
     return notificationResponse('Save failed: ' + err.message);
   }
+}
+
+// ── Compose flow: show both paths ─────────────────────────────────────────────
+// The card can't reliably detect whether the box already has text — Gmail
+// autosaves the draft on a delay, and the card is a one-time snapshot that
+// can't react to text typed after it opens. So rather than guess a mode, we
+// always offer both: draft a fresh reply from the email, or rewrite what's
+// already in the box (the latter reuses the polishDraft -> insertPolishedDraft
+// replace path, verified to update the open box live).
+function buildComposeCard(subject, threadId) {
+  return CardService.newCardBuilder()
+    .setHeader(dharmaHeader('Dharma'))
+    .addSection(buildToneStatusSection())
+    .addSection(buildDraftSection(subject, threadId))
+    .addSection(buildRewriteSection(subject))
+    .build();
+}
+
+function buildDraftSection(subject, threadId) {
+  var section = CardService.newCardSection().setHeader('Draft a reply');
+  section.addWidget(CardService.newTextParagraph()
+    .setText('Dharma reads this email and drafts a reply in your voice, straight into the box.'));
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Draft reply')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor(BRAND_PRIMARY)
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('generateFromCompose')
+      .setParameters({ subject: subject || '', tone: 'My Tone', threadId: threadId || '' })));
+
+  var alt = ['Concise', 'Formal / Legal', 'Scheduling'];
+  var chips = CardService.newButtonSet();
+  for (var i = 0; i < alt.length; i++) {
+    chips.addButton(CardService.newTextButton()
+      .setText(alt[i])
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(CardService.newAction()
+        .setFunctionName('generateFromCompose')
+        .setParameters({ subject: subject || '', tone: alt[i], threadId: threadId || '' })));
+  }
+  section.addWidget(chips);
+  return section;
+}
+
+function buildRewriteSection(subject) {
+  var section = CardService.newCardSection().setHeader('Rewrite what you typed');
+  section.addWidget(CardService.newTextParagraph()
+    .setText('Already typed something in the box? Dharma rewrites it in your voice and replaces it. You approve a preview first, nothing changes without your OK.'));
+
+  section.addWidget(CardService.newTextButton()
+    .setText('Rewrite in my voice')
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    .setBackgroundColor(BRAND_SECONDARY)
+    .setOnClickAction(CardService.newAction()
+      .setFunctionName('polishDraft')
+      .setParameters({ subject: subject || '' })));
+  return section;
 }
