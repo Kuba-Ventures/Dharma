@@ -264,7 +264,7 @@ function onComposeOpen(e) {
     }
   }
 
-  return buildComposeCard(subject, threadId, messageId);
+  return buildComposeCard(subject, threadId);
 }
 
 function buildWelcomeCard() {
@@ -1091,77 +1091,26 @@ function saveToneEdits(e) {
   }
 }
 
-// ── New adaptive compose flow ─────────────────────────────────────────────────
-// One card that follows the box: empty reply → "Draft reply" from the thread
-// (live insert into the empty box = clean); already-typed → "Rewrite in my
-// voice", which reuses the existing polishDraft → insertPolishedDraft replace
-// path. No new replace logic; the risky half is code you already ship.
-
-// Reads the user-typed body of the open reply (quoted history stripped).
-// Returns '' when there's no confident match — which safely defaults to draft
-// mode, the non-destructive path.
-function composeBodyText(accessToken, messageId, threadId) {
-  try {
-    var listRes = UrlFetchApp.fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=20',
-      { headers: { 'Authorization': 'Bearer ' + accessToken }, muteHttpExceptions: true }
-    );
-    if (listRes.getResponseCode() !== 200) return '';
-    var drafts = (JSON.parse(listRes.getContentText()).drafts) || [];
-
-    // Match the draft by message id, then fall back to thread id — the open
-    // reply's draft belongs to this thread even when the compose event's
-    // message id has already rotated (why detection sometimes read "empty").
-    var draftId = '';
-    for (var i = 0; i < drafts.length; i++) {
-      var dm = drafts[i].message;
-      if (dm && (dm.id === messageId || (threadId && dm.threadId === threadId))) { draftId = drafts[i].id; break; }
-    }
-    if (!draftId) return '';
-
-    var getRes = UrlFetchApp.fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + encodeURIComponent(draftId) + '?format=full',
-      { headers: { 'Authorization': 'Bearer ' + accessToken }, muteHttpExceptions: true }
-    );
-    if (getRes.getResponseCode() !== 200) return '';
-    var draftData = JSON.parse(getRes.getContentText());
-    var body = extractPlainTextFromPayload(draftData.message && draftData.message.payload);
-    if (body) {
-      var q = body.search(/\nOn .+wrote:/);
-      if (q > 0) body = body.slice(0, q).trim();
-    }
-    return body || '';
-  } catch (err) {
-    Logger.log('composeBodyText failed: ' + err.message);
-    return '';
-  }
+// ── Compose flow: show both paths ─────────────────────────────────────────────
+// The card can't reliably detect whether the box already has text — Gmail
+// autosaves the draft on a delay, and the card is a one-time snapshot that
+// can't react to text typed after it opens. So rather than guess a mode, we
+// always offer both: draft a fresh reply from the email, or rewrite what's
+// already in the box (the latter reuses the polishDraft -> insertPolishedDraft
+// replace path, verified to update the open box live).
+function buildComposeCard(subject, threadId) {
+  return CardService.newCardBuilder()
+    .setHeader(dharmaHeader('Dharma'))
+    .addSection(buildToneStatusSection())
+    .addSection(buildDraftSection(subject, threadId))
+    .addSection(buildRewriteSection(subject))
+    .build();
 }
 
-function buildComposeCard(subject, threadId, messageId, forcedMode) {
-  var bodyText = '';
-  try {
-    bodyText = composeBodyText(ScriptApp.getOAuthToken(), messageId, threadId);
-  } catch (_) {}
-  var mode = forcedMode || (bodyText && bodyText.trim() ? 'rewrite' : 'draft');
-
-  var builder = CardService.newCardBuilder().setHeader(dharmaHeader('Dharma'));
-  builder.addSection(buildToneStatusSection());
-
-  if (mode === 'rewrite') {
-    var snippet = bodyText
-      ? (bodyText.length > 140 ? bodyText.slice(0, 140) + '…' : bodyText)
-      : '';
-    builder.addSection(buildRewriteSection(subject, threadId, messageId, snippet));
-  } else {
-    builder.addSection(buildDraftSection(subject, threadId, messageId));
-  }
-  return builder.build();
-}
-
-function buildDraftSection(subject, threadId, messageId) {
+function buildDraftSection(subject, threadId) {
   var section = CardService.newCardSection().setHeader('Draft a reply');
   section.addWidget(CardService.newTextParagraph()
-    .setText('Empty reply. Dharma will read this email and draft a reply in your voice, straight into the box.'));
+    .setText('Dharma reads this email and drafts a reply in your voice, straight into the box.'));
 
   section.addWidget(CardService.newTextButton()
     .setText('Draft reply')
@@ -1182,56 +1131,20 @@ function buildDraftSection(subject, threadId, messageId) {
         .setParameters({ subject: subject || '', tone: alt[i], threadId: threadId || '' })));
   }
   section.addWidget(chips);
-
-  section.addWidget(CardService.newTextButton()
-    .setText('Already typed something? Rewrite it')
-    .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
-    .setOnClickAction(CardService.newAction()
-      .setFunctionName('composeSwitchRewrite')
-      .setParameters({ subject: subject || '', threadId: threadId || '', messageId: messageId || '' })));
   return section;
 }
 
-function buildRewriteSection(subject, threadId, messageId, snippet) {
-  var section = CardService.newCardSection().setHeader('Rewrite in your voice');
-  if (snippet) {
-    section.addWidget(CardService.newDecoratedText()
-      .setTopLabel('Detected in your reply')
-      .setText(snippet)
-      .setWrapText(true));
-  }
+function buildRewriteSection(subject) {
+  var section = CardService.newCardSection().setHeader('Rewrite what you typed');
   section.addWidget(CardService.newTextParagraph()
-    .setText('Dharma rewrites what is in the box in your voice and replaces it. You approve a preview first, nothing changes without your OK.'));
+    .setText('Already typed something in the box? Dharma rewrites it in your voice and replaces it. You approve a preview first, nothing changes without your OK.'));
 
   section.addWidget(CardService.newTextButton()
     .setText('Rewrite in my voice')
     .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-    .setBackgroundColor(BRAND_PRIMARY)
+    .setBackgroundColor(BRAND_SECONDARY)
     .setOnClickAction(CardService.newAction()
       .setFunctionName('polishDraft')
       .setParameters({ subject: subject || '' })));
-
-  section.addWidget(CardService.newTextButton()
-    .setText('Draft fresh from the email instead')
-    .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
-    .setOnClickAction(CardService.newAction()
-      .setFunctionName('composeSwitchDraft')
-      .setParameters({ subject: subject || '', threadId: threadId || '', messageId: messageId || '' })));
   return section;
-}
-
-function composeSwitchRewrite(e) {
-  var p = e.parameters || {};
-  return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation()
-      .updateCard(buildComposeCard(p.subject, p.threadId, p.messageId, 'rewrite')))
-    .build();
-}
-
-function composeSwitchDraft(e) {
-  var p = e.parameters || {};
-  return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation()
-      .updateCard(buildComposeCard(p.subject, p.threadId, p.messageId, 'draft')))
-    .build();
 }
