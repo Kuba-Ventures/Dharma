@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { OAuth2Client } from "google-auth-library";
 import { prisma } from "../../../../lib/prisma";
 import { getNewMessageIds, getMessage, applyGmailLabels, HistoryExpiredError } from "../../../../lib/gmail";
+import { resolveLearnedLabels } from "../../../../lib/smartLabels";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
@@ -163,7 +164,16 @@ async function processPush(ctx: PushContext): Promise<void> {
           aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
         }
 
-        const gmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
+        // Smart Labeling (#120): stack labels learned from how the user has
+        // labeled this sender before, alongside rule/AI matches.
+        const learned = await resolveLearnedLabels(ctx.userId, msg.from);
+        const learnedIds = learned
+          .map((l) => l.gmailLabelId)
+          .filter((id): id is string => !!id);
+
+        const gmailIds = Array.from(
+          new Set([...[...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!), ...learnedIds])
+        );
         if (gmailIds.length > 0) {
           await applyGmailLabels(ctx.userId, messageId, gmailIds);
           console.log(`[gmail/webhook] Labeled message ${messageId}:`, gmailIds);
