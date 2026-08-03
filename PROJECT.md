@@ -115,7 +115,7 @@ This week's work fixed why a freshly-onboarded user saw "You're all set, we sort
 | Gmail | `googleapis` v173 (Gmail API v1) | `gmail.modify` scope; read/label/draft/history/watch |
 | Calendar | Google Calendar + Microsoft Graph + Apple CalDAV (`tsdav` 2.0) | Free/busy + Meet links |
 | Hosting | Vercel (`kuba-ventures` team) | `vercel.json` runs `prisma generate && next build`; 3 UTC crons |
-| OG / share cards | Vercel Edge runtime + `@vercel/og` | `app/api/share/milestone/[id]` |
+| Badges / share cards | Static SVG assets in `public/badges`; earned badges served as JSON | `app/api/badges/[userId]` |
 | Gmail add-on | Apps Script via `clasp` (live deployment v22) | `apps/gmail-addon/Code.gs` |
 | Tests | Vitest + Testing Library + happy-dom | 8 suites |
 
