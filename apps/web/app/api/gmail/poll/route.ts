@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { getNewMessageIds, getMessage, applyGmailLabels } from "../../../../lib/gmail";
+import { getNewMessageIds, getMessage, applyGmailLabels, getProfileHistoryId } from "../../../../lib/gmail";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
@@ -43,7 +43,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
     const { setupGmailWatch } = await import("../../../../lib/gmail");
     await Promise.allSettled(
       unseeded.map((c) =>
-        setupGmailWatch(c.userId, c.accessToken, c.refreshToken).catch((err) =>
+        setupGmailWatch(c.userId).catch((err) =>
           console.error(`[poll] Failed to seed historyId for ${c.email}:`, err)
         )
       )
@@ -63,24 +63,15 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
     try {
       const messageIds = await getNewMessageIds(
-        googleCred.accessToken,
-        googleCred.refreshToken,
+        googleCred.userId,
         googleCred.gmailHistoryId!
       );
 
-      // Advance historyId so a re-invoke doesn't reprocess the same messages
-      const { google } = await import("googleapis");
-      const auth = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID!,
-        process.env.GOOGLE_CLIENT_SECRET!
-      );
-      auth.setCredentials({
-        access_token: googleCred.accessToken,
-        refresh_token: googleCred.refreshToken,
-      });
-      const gmail = google.gmail({ version: "v1", auth });
-      const profile = await gmail.users.getProfile({ userId: "me" });
-      const latestHistoryId = String(profile.data.historyId ?? googleCred.gmailHistoryId);
+      // Advance historyId so a re-invoke doesn't reprocess the same messages.
+      // getProfileHistoryId routes through makeAuthForUser so a rotated refresh
+      // token is persisted rather than dropped (#113).
+      const latestHistoryId =
+        (await getProfileHistoryId(googleCred.userId)) ?? googleCred.gmailHistoryId!;
 
       await prisma.googleCredential.update({
         where: { email },
@@ -91,12 +82,7 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
       for (const messageId of messageIds) {
         try {
-          const msg = await getMessage(
-            googleCred.accessToken,
-            googleCred.refreshToken,
-            messageId,
-            email
-          );
+          const msg = await getMessage(googleCred.userId, messageId, email);
 
           if (!msg) continue;
 

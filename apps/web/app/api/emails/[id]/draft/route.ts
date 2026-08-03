@@ -164,7 +164,7 @@ Reply draft:`;
   }
 
   // Save as Gmail draft
-  await createDraft(googleCred.accessToken, googleCred.refreshToken, {
+  await createDraft(userId, {
     from: googleCred.email,
     to: from,
     subject,
