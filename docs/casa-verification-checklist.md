@@ -48,13 +48,13 @@ Every restricted/sensitive scope below must be justified in the consent screen a
 | `calendar.readonly` | Sensitive | `apps/web/lib/auth.ts` | ✅ YES | events.list in dashboard/configuration/schedule |
 | `calendar.events` | Sensitive | `apps/web/lib/auth.ts` | ✅ YES | events.insert/patch/delete in `api/preferences/scheduling` + `api/calendar/rsvp` |
 | `gmail.readonly` | Restricted | `apps/gmail-addon/appsscript.json` | ✅ YES | Reads drafts via REST (Code.gs:470-493) + `GmailApp.search` (Code.gs:739) |
-| `gmail.compose` | Restricted | `apps/gmail-addon/appsscript.json` | ⚠️ **DROP CANDIDATE** | Add-on writes drafts ONLY via `UpdateDraftBodyAction` (needs `gmail.addons.current.action.compose`, already granted). No drafts.create/.send/createDraft found. Removing this cuts one restricted scope from the add-on's CASA footprint. Requires re-consent + a test that compose-insert still works. |
+| `gmail.compose` | Restricted | `apps/gmail-addon/appsscript.json` | ✅ **YES — REQUIRED** | **Correction (2026-08-03): the earlier "drop candidate" assessment was wrong.** The add-on creates and updates drafts programmatically: `Gmail.Users.Drafts.create` in `Code.gs:788` (`saveDraft`) and `Code.gs:818` (`saveRescheduleDraft`), plus a draft-replace `PUT .../drafts/{id}` in `Code.gs:587` (`insertPolishedDraft`). `gmail.addons.current.action.compose` covers ONLY the compose-time `UpdateDraftBodyAction`, not these REST/advanced-service calls. Dropping `gmail.compose` would break Save-as-draft, Save-reschedule-draft, and Draft-replace. Keep the scope; justify it in the demo video. |
 | `gmail.addons.*` | Restricted | `apps/gmail-addon/appsscript.json` | ✅ YES | Add-on runtime (execute, current.action.compose, current.message.metadata) |
 | `script.external_request` | Sensitive | `apps/gmail-addon/appsscript.json` | ✅ YES | UrlFetchApp → DHARMA_API |
 | `spreadsheets` | Sensitive | `apps/web/lib/adminSheet.ts` | ✅ N/A to consent | **Confirmed:** service-account JWT (`adminSheet.ts:14`), NOT on the user OAuth consent screen. No user-facing justification needed. |
 
 - [ ] **Confirm whether the web app and the Gmail add-on share one OAuth client / GCP project or are separate.** Each restricted-scope client must be covered. **Owner:** Abhinav (holds GCP project — confirm)
-- [ ] **ACTION (Finley):** Remove `gmail.compose` from `apps/gmail-addon/appsscript.json`, re-deploy the add-on (create-version + deploy -i per the pinned-deployment rule), and verify polish/generate still inserts into compose. One fewer restricted scope = cheaper/faster CASA.
+- [x] ~~**ACTION (Finley):** Remove `gmail.compose` from the add-on.~~ **CANCELLED (2026-08-03):** verified the add-on requires `gmail.compose` for `Gmail.Users.Drafts.create` (`Code.gs:788`, `:818`) and the draft-replace PUT (`Code.gs:587`). Removing it breaks drafting. There is no free restricted scope to shed on the add-on — both `gmail.readonly` and `gmail.compose` are in active use.
 
 ---
 
@@ -111,7 +111,7 @@ These block the security assessment and are the most common rejection reasons. K
 ### Internal security pre-work (cheaper to fix before the assessor scans)
 - [x] Secrets only in Vercel env vars, none in git / `NEXT_PUBLIC_*` — **verified 2026-07-05:** no keys/PEMs/tokens in tracked files, no `.env` tracked, no secret-shaped `NEXT_PUBLIC_*`.
 - [ ] HTTPS / TLS enforced everywhere — **Owner:** Finley (Vercel enforces by default; confirm no plaintext callbacks)
-- [~] Dependency vulnerabilities triaged (`npm audit`) — **2026-07-05:** 7 vulns (6 moderate, 1 high), ALL transitive `uuid` via `gaxios → googleapis-common → googleapis`. Clean fix needs `googleapis` major bump (breaking) + regression test. **Owner:** Finley — do before the assessor's DAST scan.
+- [~] Dependency vulnerabilities triaged (`npm audit`) — **2026-07-05:** 7 vulns via transitive `uuid` (`gaxios → googleapis-common → googleapis`); called for a breaking `googleapis` major bump. **Update (2026-08-03):** that chain is RESOLVED — `googleapis` is now `^173.0.0` (`packages/providers-google/package.json`) and no `googleapis`/`uuid`/`gaxios` advisories remain. Current `npm audit` findings are different packages: `postcss` (transitive via `next` — non-breaking `npm audit fix`) and `sharp` via `@vercel/og` (breaking — needs `@vercel/og` upgrade + regression test). Re-triage against a clean full install before the assessor's DAST scan. **Owner:** Finley.
 - [ ] Auth/session handling reviewed (`apps/web/lib/auth.ts`, `middleware.ts`) — **Owner:** ___
 - [x] Data-deletion-on-request flow implemented & documented — **2026-07-05:** self-serve delete at Settings → Advanced (`/api/user/delete-account` → `lib/accountDeletion.ts`): stops Gmail watch, revokes Google grant, removes allowlist row, cascade-deletes all user data. Documented in `docs/data-deletion.md`. **Owner:** Finley
 - [ ] Access logging / least-privilege on data stores — **Owner:** ___
