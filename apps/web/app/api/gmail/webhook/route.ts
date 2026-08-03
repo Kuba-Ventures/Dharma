@@ -104,8 +104,6 @@ export async function POST(req: NextRequest) {
     processPush({
       userId: googleCred.userId,
       email: emailAddress,
-      accessToken: googleCred.accessToken,
-      refreshToken: googleCred.refreshToken,
       startHistoryId,
     }).catch((err) => console.error("[gmail/webhook] processPush failed:", err))
   );
@@ -116,15 +114,13 @@ export async function POST(req: NextRequest) {
 interface PushContext {
   userId: string;
   email: string;
-  accessToken: string;
-  refreshToken: string;
   startHistoryId: string;
 }
 
 async function processPush(ctx: PushContext): Promise<void> {
   let messageIds: string[];
   try {
-    messageIds = await getNewMessageIds(ctx.accessToken, ctx.refreshToken, ctx.startHistoryId);
+    messageIds = await getNewMessageIds(ctx.userId, ctx.startHistoryId);
   } catch (err) {
     if (err instanceof HistoryExpiredError) {
       console.warn(
@@ -144,7 +140,7 @@ async function processPush(ctx: PushContext): Promise<void> {
 
   for (const messageId of messageIds) {
     try {
-      const msg = await getMessage(ctx.accessToken, ctx.refreshToken, messageId, ctx.email);
+      const msg = await getMessage(ctx.userId, messageId, ctx.email);
       if (!msg) continue; // sent by the user themselves
 
       // Apply matching Gmail labels (rules first, then AI for labels without rules)

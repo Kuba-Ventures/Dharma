@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../lib/auth";
-import { makeAuthForUser, setupGmailWatch } from "../../../../../lib/gmail";
+import { setupGmailWatch } from "../../../../../lib/gmail";
 import { prisma } from "../../../../../lib/prisma";
 import { resyncUserCalendar } from "../../../../../lib/blockReconcile";
 
@@ -23,8 +23,7 @@ export async function POST() {
   }
 
   try {
-    const { cred: freshCred } = await makeAuthForUser(userId);
-    await setupGmailWatch(userId, freshCred.accessToken, freshCred.refreshToken);
+    await setupGmailWatch(userId);
   } catch (err) {
     console.error("[calendar/google/sync] Gmail watch failed:", err);
     const code = (err as { code?: number })?.code;

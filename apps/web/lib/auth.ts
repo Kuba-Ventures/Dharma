@@ -161,13 +161,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
           console.error("[auth] Failed to upsert GoogleCredential:", err);
         }
 
-        const token = account.access_token;
-        const refresh = account.refresh_token ?? "";
         const uid = user.id;
         try {
           waitUntil(
             import("./gmail")
-              .then(({ setupGmailWatch }) => setupGmailWatch(uid, token, refresh))
+              .then(({ setupGmailWatch }) => setupGmailWatch(uid))
               .catch((err) => console.error("[auth] Gmail watch setup failed:", err))
           );
         } catch (err) {

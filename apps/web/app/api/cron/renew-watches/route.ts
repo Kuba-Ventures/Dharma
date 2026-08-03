@@ -21,8 +21,6 @@ export async function GET(req: Request) {
     select: {
       userId: true,
       email: true,
-      accessToken: true,
-      refreshToken: true,
       gmailHistoryId: true,
     },
   });
@@ -33,10 +31,10 @@ export async function GET(req: Request) {
       // First-time setup also needs gmailHistoryId seeded; renewal must not
       // overwrite an existing historyId (would drop in-flight messages).
       if (cred.gmailHistoryId) {
-        await renewGmailWatch(cred.userId, cred.accessToken, cred.refreshToken);
+        await renewGmailWatch(cred.userId);
         results.push({ email: cred.email, status: "renewed" });
       } else {
-        await setupGmailWatch(cred.userId, cred.accessToken, cred.refreshToken);
+        await setupGmailWatch(cred.userId);
         results.push({ email: cred.email, status: "seeded" });
       }
     } catch (err) {

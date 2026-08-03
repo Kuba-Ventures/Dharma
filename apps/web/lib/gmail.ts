@@ -51,13 +51,11 @@ export async function makeAuthForUser(userId: string) {
 
 // Seeds gmailHistoryId from the current Gmail profile so the poller knows
 // where to start. If Pub/Sub is configured, also registers a push watch.
-export async function setupGmailWatch(
-  userId: string,
-  accessToken: string,
-  refreshToken: string
-): Promise<void> {
-  const auth = makeOAuth2Client();
-  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+export async function setupGmailWatch(userId: string): Promise<void> {
+  // Auth via makeAuthForUser so a rotated refresh token is persisted. Passing
+  // raw tokens here (as this used to) dropped the rotation Google issues on
+  // refresh, leaving the stored token stale — see makeAuthForUser and #113.
+  const { auth } = await makeAuthForUser(userId);
 
   const gmail = google.gmail({ version: "v1", auth });
 
@@ -89,16 +87,14 @@ export async function setupGmailWatch(
 // Renews an existing Gmail Pub/Sub watch without touching gmailHistoryId.
 // Use from the daily cron — overwriting historyId on renewal would drop any
 // in-flight messages between the last webhook push and this call.
-export async function renewGmailWatch(
-  userId: string,
-  accessToken: string,
-  refreshToken: string
-): Promise<{ expiry: Date }> {
+export async function renewGmailWatch(userId: string): Promise<{ expiry: Date }> {
   const topic = process.env.GOOGLE_PUBSUB_TOPIC;
   if (!topic) throw new Error("GOOGLE_PUBSUB_TOPIC not set");
 
-  const auth = makeOAuth2Client();
-  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  // Auth via makeAuthForUser so the refresh triggered by users.watch (the
+  // stored access token is usually >1h old by the daily renewal) persists any
+  // rotated refresh token instead of dropping it — see #113.
+  const { auth } = await makeAuthForUser(userId);
   const gmail = google.gmail({ version: "v1", auth });
 
   const res = await gmail.users.watch({
@@ -150,12 +146,15 @@ export class HistoryExpiredError extends Error {
 }
 
 export async function getNewMessageIds(
-  accessToken: string,
-  refreshToken: string,
+  userId: string,
   startHistoryId: string
 ): Promise<string[]> {
-  const auth = makeOAuth2Client();
-  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  // This runs first on every push/poll cycle, so it is the call most likely to
+  // trigger the ~hourly token refresh. It MUST go through makeAuthForUser so
+  // the rotated refresh token is persisted; using raw tokens here dropped the
+  // rotation and stranded the account on a stale token (#113 — the reason
+  // labeling would "stop" a few hours after each login).
+  const { auth } = await makeAuthForUser(userId);
 
   const gmail = google.gmail({ version: "v1", auth });
   try {
@@ -183,6 +182,16 @@ export async function getNewMessageIds(
   }
 }
 
+// Returns the account's current Gmail historyId. The poll cron uses this to
+// advance its stored cursor after a sweep. Routed through makeAuthForUser so
+// the getProfile call persists any rotated refresh token (#113).
+export async function getProfileHistoryId(userId: string): Promise<string | null> {
+  const { auth } = await makeAuthForUser(userId);
+  const gmail = google.gmail({ version: "v1", auth });
+  const profile = await gmail.users.getProfile({ userId: "me" });
+  return profile.data.historyId != null ? String(profile.data.historyId) : null;
+}
+
 export interface ParsedMessage {
   id: string;
   threadId: string;
@@ -194,13 +203,11 @@ export interface ParsedMessage {
 }
 
 export async function getMessage(
-  accessToken: string,
-  refreshToken: string,
+  userId: string,
   messageId: string,
   userEmail: string
 ): Promise<ParsedMessage | null> {
-  const auth = makeOAuth2Client();
-  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  const { auth } = await makeAuthForUser(userId);
 
   const gmail = google.gmail({ version: "v1", auth });
   const res = await gmail.users.messages.get({
@@ -453,8 +460,7 @@ export async function applyGmailLabels(
 }
 
 export async function createDraft(
-  accessToken: string,
-  refreshToken: string,
+  userId: string,
   opts: {
     from: string;
     to: string;
@@ -465,8 +471,7 @@ export async function createDraft(
     references: string;
   }
 ): Promise<void> {
-  const auth = makeOAuth2Client();
-  auth.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  const { auth } = await makeAuthForUser(userId);
 
   const gmail = google.gmail({ version: "v1", auth });
 
