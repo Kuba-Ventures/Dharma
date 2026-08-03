@@ -64,6 +64,7 @@ model User {
   labelPreset              LabelPreset?
   labelMappings            LabelMapping[]
   classifiedThreads        ClassifiedThread[]
+  learnedLabels            LearnedLabel[]
   usageEvents              UsageEvent[]
 
   meetingHours             MeetingHour[]
@@ -214,6 +215,33 @@ model ClassifiedThread {
 
   @@unique([userId, threadId])
   @@index([userId, labelName])
+}
+
+// ── Smart Labeling: learned sender→label associations (issue #120) ──────────
+// When the user manually applies a label to an email, Dharma remembers the
+// sender→label association and re-applies it to future mail from that sender.
+// Two granularities per association:
+//   - matchType "address": exact sender (e.g. "jim@yahoo.com") — applied to
+//     the next matching message immediately (sampleCount starts at 1).
+//   - matchType "domain":  whole domain (senderKey "@vercel.com") — applied
+//     only once sampleCount crosses the promotion threshold, so a single stray
+//     label doesn't tag an entire domain.
+// gmailLabelId is captured at learn time (the label the user actually added),
+// so applying a learned label needs no name→id re-resolution.
+model LearnedLabel {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  senderKey    String   // lowercased address ("jim@yahoo.com") or "@domain"
+  matchType    String   // "address" | "domain"
+  labelName    String   // Gmail label display name (for dedup/UI)
+  gmailLabelId String?  // Gmail label resource ID applied for this association
+  sampleCount  Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, senderKey, labelName])
+  @@index([userId, senderKey])
 }
 
 // ── Cost / usage tracking ──────────────────────────────────────────────────

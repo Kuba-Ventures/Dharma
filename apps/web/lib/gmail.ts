@@ -192,6 +192,62 @@ export async function getProfileHistoryId(userId: string): Promise<string | null
   return profile.data.historyId != null ? String(profile.data.historyId) : null;
 }
 
+export interface LabelChangeEvent {
+  messageId: string;
+  threadId?: string;
+  addedLabelIds: string[];
+  removedLabelIds: string[];
+}
+
+// Reads labelAdded/labelRemoved history since startHistoryId — how Smart
+// Labeling (issue #120) observes the user manually labeling mail. Deliberately
+// a SEPARATE history.list from getNewMessageIds (which reads messageAdded on
+// INBOX): keeping them independent means this cannot regress the labeling hot
+// path, at the cost of one extra read per poll cycle. Never throws — a lapsed
+// history buffer (404) or any error yields [] so learning failures never break
+// labeling.
+export async function getLabelChangeEvents(
+  userId: string,
+  startHistoryId: string
+): Promise<LabelChangeEvent[]> {
+  try {
+    const { auth } = await makeAuthForUser(userId);
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.history.list({
+      userId: "me",
+      startHistoryId,
+      historyTypes: ["labelAdded", "labelRemoved"],
+    });
+    const events: LabelChangeEvent[] = [];
+    for (const rec of res.data.history ?? []) {
+      for (const added of rec.labelsAdded ?? []) {
+        if (added.message?.id) {
+          events.push({
+            messageId: added.message.id,
+            threadId: added.message.threadId ?? undefined,
+            addedLabelIds: added.labelIds ?? [],
+            removedLabelIds: [],
+          });
+        }
+      }
+      for (const removed of rec.labelsRemoved ?? []) {
+        if (removed.message?.id) {
+          events.push({
+            messageId: removed.message.id,
+            threadId: removed.message.threadId ?? undefined,
+            addedLabelIds: [],
+            removedLabelIds: removed.labelIds ?? [],
+          });
+        }
+      }
+    }
+    return events;
+  } catch (err) {
+    console.warn("[gmail] getLabelChangeEvents failed (skipping learn this cycle):", (err as Error).message);
+    return [];
+  }
+}
+
 export interface ParsedMessage {
   id: string;
   threadId: string;

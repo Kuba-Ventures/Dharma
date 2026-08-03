@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { getNewMessageIds, getMessage, applyGmailLabels, getProfileHistoryId } from "../../../../lib/gmail";
+import { getNewMessageIds, getMessage, applyGmailLabels, getProfileHistoryId, getLabelChangeEvents, listGmailLabels } from "../../../../lib/gmail";
+import { resolveLearnedLabels, learnLabel, unlearnLabel, isUserLabelId } from "../../../../lib/smartLabels";
 import { classifyEmailLabels, classifyForPreset } from "../../../../lib/classify";
 import { HIGH_PRIORITY_NAME, UNCATEGORIZED_NAME, isPresetKey, isBuiltInPresetKey, resolvePresetSpec } from "../../../../lib/labelPresets";
 import { detectAndPersistSignal } from "../../../../lib/signalDetector";
@@ -67,6 +68,11 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
         googleCred.gmailHistoryId!
       );
 
+      // Smart Labeling (#120): learn from labels the user applied by hand since
+      // the last sweep. Read from the CURRENT cursor before we advance it.
+      // Best-effort — wrapped so a failure never blocks labeling.
+      await learnFromLabelChanges(googleCred.userId, googleCred.gmailHistoryId!, email);
+
       // Advance historyId so a re-invoke doesn't reprocess the same messages.
       // getProfileHistoryId routes through makeAuthForUser so a rotated refresh
       // token is persisted rather than dropped (#113).
@@ -86,8 +92,11 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
 
           if (!msg) continue;
 
-          // ── Label classification (rule-based + AI) ─────────────────────────
+          // ── Label classification (rule-based + AI + learned) ───────────────
           try {
+            const matchIds: string[] = [];
+            const matchNames: string[] = [];
+
             const labels = await prisma.label.findMany({
               where: { userId: googleCred.userId, enabled: true, gmailLabelId: { not: null } },
               include: { rules: true },
@@ -123,12 +132,28 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
                 aiMatches = labelsWithoutRules.filter((l) => aiNames.includes(l.name));
               }
 
-              const gmailIds = [...ruleMatches, ...aiMatches].map((l) => l.gmailLabelId!);
-              if (gmailIds.length > 0) {
-                await applyGmailLabels(googleCred.userId, messageId, gmailIds);
-                labeled++;
-                console.log(`[poll] Labels applied to ${messageId}: ${[...ruleMatches, ...aiMatches].map((l) => l.name).join(", ")}`);
+              for (const l of [...ruleMatches, ...aiMatches]) {
+                matchIds.push(l.gmailLabelId!);
+                matchNames.push(l.name);
               }
+            }
+
+            // Smart Labeling (#120): stack labels learned from how the user has
+            // labeled this sender before. Applies even when the user has no
+            // rule/AI Label rows configured.
+            const learned = await resolveLearnedLabels(googleCred.userId, msg.from);
+            for (const l of learned) {
+              if (l.gmailLabelId) {
+                matchIds.push(l.gmailLabelId);
+                matchNames.push(l.labelName);
+              }
+            }
+
+            const gmailIds = Array.from(new Set(matchIds));
+            if (gmailIds.length > 0) {
+              await applyGmailLabels(googleCred.userId, messageId, gmailIds);
+              labeled++;
+              console.log(`[poll] Labels applied to ${messageId}: ${matchNames.join(", ")}`);
             }
           } catch (err) {
             console.error(`[poll] Label classification failed for ${messageId}:`, err);
@@ -247,6 +272,54 @@ async function runPoll(req: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json({ polled: creds.length, results });
+}
+
+// Smart Labeling (#120): learn sender→label associations from labels the user
+// added by hand (and unlearn ones they removed) since `startHistoryId`. Only
+// user-created Gmail labels count (never INBOX/STARRED/CATEGORY_*). To avoid a
+// feedback loop, we skip re-learning any label Dharma already auto-applies for
+// that sender — which includes the labels Dharma itself just applied — so its
+// own applications never inflate the counters. Fully best-effort: any failure
+// is logged and swallowed so learning never blocks the label sweep.
+async function learnFromLabelChanges(
+  userId: string,
+  startHistoryId: string,
+  email: string
+): Promise<void> {
+  try {
+    const changes = await getLabelChangeEvents(userId, startHistoryId);
+    if (changes.length === 0) return;
+
+    const idToName = new Map((await listGmailLabels(userId)).map((l) => [l.id, l.name]));
+
+    for (const ev of changes) {
+      const added = ev.addedLabelIds.filter(isUserLabelId);
+      const removed = ev.removedLabelIds.filter(isUserLabelId);
+      if (added.length === 0 && removed.length === 0) continue;
+
+      const msg = await getMessage(userId, ev.messageId, email);
+      if (!msg) continue; // self-sent or unreadable
+
+      const alreadyKnown = new Set(
+        (await resolveLearnedLabels(userId, msg.from)).map((l) => l.labelName)
+      );
+
+      for (const id of added) {
+        const name = idToName.get(id);
+        if (!name || alreadyKnown.has(name)) continue;
+        await learnLabel({ userId, from: msg.from, labelName: name, gmailLabelId: id });
+        console.log(`[poll] Learned ${email}: ${msg.from} → "${name}"`);
+      }
+      for (const id of removed) {
+        const name = idToName.get(id);
+        if (!name) continue;
+        await unlearnLabel({ userId, from: msg.from, labelName: name });
+        console.log(`[poll] Unlearned ${email}: ${msg.from} → "${name}"`);
+      }
+    }
+  } catch (err) {
+    console.error(`[poll] Smart-label learning failed for ${email}:`, err);
+  }
 }
 
 // Wrap the handler so a total poll failure (e.g. DB unreachable) pages ops
