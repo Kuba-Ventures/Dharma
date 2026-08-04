@@ -168,3 +168,34 @@ describe("unlearnLabel", () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 });
+
+// Regression: Smart Labeling must never break core labeling. Before this, a DB
+// error in resolveLearnedLabels (most importantly the LearnedLabel table not
+// yet migrated after #121 shipped) threw out of the shared apply block and
+// skipped the message's rule/AI labels entirely — labeling silently stopped.
+describe("fault isolation — DB errors never throw", () => {
+  const dbError = () => Promise.reject(new Error('relation "LearnedLabel" does not exist'));
+
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("resolveLearnedLabels degrades to [] when the query fails", async () => {
+    findManyMock.mockImplementation(dbError);
+    await expect(resolveLearnedLabels("u1", "jim@yahoo.com")).resolves.toEqual([]);
+  });
+
+  it("learnLabel swallows a DB error instead of throwing", async () => {
+    upsertMock.mockImplementation(dbError);
+    await expect(
+      learnLabel({ userId: "u1", from: "jim@yahoo.com", labelName: "Family" })
+    ).resolves.toBeUndefined();
+  });
+
+  it("unlearnLabel swallows a DB error instead of throwing", async () => {
+    deleteManyMock.mockImplementation(dbError);
+    await expect(
+      unlearnLabel({ userId: "u1", from: "jim@yahoo.com", labelName: "Family" })
+    ).resolves.toBeUndefined();
+  });
+});
