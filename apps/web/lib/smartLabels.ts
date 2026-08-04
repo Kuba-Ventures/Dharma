@@ -1,5 +1,14 @@
 import { prisma } from "./prisma";
 
+// Smart Labeling is a best-effort enrichment layer on top of rule/AI/preset
+// labeling — it must never be able to abort core tagging. If any of its DB
+// calls fail (e.g. the LearnedLabel table is missing because a schema change
+// wasn't pushed to the database), we log and degrade to "no learned labels"
+// rather than throwing, so the caller still applies the labels it computed.
+function logSmartLabelFailure(op: string, err: unknown): void {
+  console.warn(`[smartLabels] ${op} failed (degrading to no-op):`, err);
+}
+
 // Smart Labeling (issue #120): learn how the user labels mail and re-apply it.
 //
 // When the user manually applies a label to an email, we remember the
@@ -67,23 +76,27 @@ export async function learnLabel(params: {
   ];
   if (domain) keys.push({ senderKey: domainKey(domain), matchType: "domain" });
 
-  for (const { senderKey, matchType } of keys) {
-    await prisma.learnedLabel.upsert({
-      where: { userId_senderKey_labelName: { userId, senderKey, labelName } },
-      create: {
-        userId,
-        senderKey,
-        matchType,
-        labelName,
-        gmailLabelId: gmailLabelId ?? null,
-        sampleCount: 1,
-      },
-      update: {
-        sampleCount: { increment: 1 },
-        // Refresh the stored Gmail label id if we now have one.
-        ...(gmailLabelId ? { gmailLabelId } : {}),
-      },
-    });
+  try {
+    for (const { senderKey, matchType } of keys) {
+      await prisma.learnedLabel.upsert({
+        where: { userId_senderKey_labelName: { userId, senderKey, labelName } },
+        create: {
+          userId,
+          senderKey,
+          matchType,
+          labelName,
+          gmailLabelId: gmailLabelId ?? null,
+          sampleCount: 1,
+        },
+        update: {
+          sampleCount: { increment: 1 },
+          // Refresh the stored Gmail label id if we now have one.
+          ...(gmailLabelId ? { gmailLabelId } : {}),
+        },
+      });
+    }
+  } catch (err) {
+    logSmartLabelFailure("learnLabel", err);
   }
 }
 
@@ -105,21 +118,27 @@ export async function resolveLearnedLabels(
   const senderKeys = [address];
   if (domain) senderKeys.push(domainKey(domain));
 
-  const rows = await prisma.learnedLabel.findMany({
-    where: { userId, senderKey: { in: senderKeys } },
-  });
+  try {
+    const rows = await prisma.learnedLabel.findMany({
+      where: { userId, senderKey: { in: senderKeys } },
+    });
 
-  // Address matches first so they win the gmailLabelId on dedup.
-  rows.sort((a, b) => (a.matchType === "address" ? -1 : 1) - (b.matchType === "address" ? -1 : 1));
+    // Address matches first so they win the gmailLabelId on dedup.
+    rows.sort((a, b) => (a.matchType === "address" ? -1 : 1) - (b.matchType === "address" ? -1 : 1));
 
-  const byName = new Map<string, ResolvedLabel>();
-  for (const r of rows) {
-    if (r.matchType === "domain" && r.sampleCount < DOMAIN_PROMOTION_THRESHOLD) continue;
-    if (!byName.has(r.labelName)) {
-      byName.set(r.labelName, { labelName: r.labelName, gmailLabelId: r.gmailLabelId });
+    const byName = new Map<string, ResolvedLabel>();
+    for (const r of rows) {
+      if (r.matchType === "domain" && r.sampleCount < DOMAIN_PROMOTION_THRESHOLD) continue;
+      if (!byName.has(r.labelName)) {
+        byName.set(r.labelName, { labelName: r.labelName, gmailLabelId: r.gmailLabelId });
+      }
     }
+    return [...byName.values()];
+  } catch (err) {
+    // Degrade to no learned labels so rule/AI/preset labeling still applies.
+    logSmartLabelFailure("resolveLearnedLabels", err);
+    return [];
   }
-  return [...byName.values()];
 }
 
 // The user removed `labelName` from mail from `from`: forget the association so
@@ -135,25 +154,29 @@ export async function unlearnLabel(params: {
   const { address, domain } = parseSender(from);
   if (!address) return;
 
-  await prisma.learnedLabel.deleteMany({
-    where: { userId, senderKey: address, labelName },
-  });
-
-  if (domain) {
-    const key = domainKey(domain);
-    const row = await prisma.learnedLabel.findUnique({
-      where: { userId_senderKey_labelName: { userId, senderKey: key, labelName } },
+  try {
+    await prisma.learnedLabel.deleteMany({
+      where: { userId, senderKey: address, labelName },
     });
-    if (row) {
-      if (row.sampleCount <= 1) {
-        await prisma.learnedLabel.delete({ where: { id: row.id } });
-      } else {
-        await prisma.learnedLabel.update({
-          where: { id: row.id },
-          data: { sampleCount: { decrement: 1 } },
-        });
+
+    if (domain) {
+      const key = domainKey(domain);
+      const row = await prisma.learnedLabel.findUnique({
+        where: { userId_senderKey_labelName: { userId, senderKey: key, labelName } },
+      });
+      if (row) {
+        if (row.sampleCount <= 1) {
+          await prisma.learnedLabel.delete({ where: { id: row.id } });
+        } else {
+          await prisma.learnedLabel.update({
+            where: { id: row.id },
+            data: { sampleCount: { decrement: 1 } },
+          });
+        }
       }
     }
+  } catch (err) {
+    logSmartLabelFailure("unlearnLabel", err);
   }
 }
 

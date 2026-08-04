@@ -168,3 +168,42 @@ describe("unlearnLabel", () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 });
+
+// Smart Labeling is best-effort: a DB failure (e.g. the LearnedLabel table not
+// existing because a schema change wasn't pushed to the database) must NEVER
+// propagate, or it would abort the caller's rule/AI/preset labeling. Regression
+// guard for the webhook tagging outage where a missing table threw before
+// applyGmailLabels() ran, discarding every already-computed label.
+describe("best-effort degradation on DB failure", () => {
+  const tableMissing = () => {
+    const err = new Error("The table `public.LearnedLabel` does not exist");
+    (err as unknown as { code: string }).code = "P2021";
+    return err;
+  };
+
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("resolveLearnedLabels returns [] instead of throwing", async () => {
+    findManyMock.mockRejectedValue(tableMissing());
+    await expect(resolveLearnedLabels("u1", "jim@yahoo.com")).resolves.toEqual([]);
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it("learnLabel swallows the error and does not throw", async () => {
+    upsertMock.mockRejectedValue(tableMissing());
+    await expect(
+      learnLabel({ userId: "u1", from: "jim@yahoo.com", labelName: "Family", gmailLabelId: "Label_9" })
+    ).resolves.toBeUndefined();
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it("unlearnLabel swallows the error and does not throw", async () => {
+    deleteManyMock.mockRejectedValue(tableMissing());
+    await expect(
+      unlearnLabel({ userId: "u1", from: "jim@yahoo.com", labelName: "Family" })
+    ).resolves.toBeUndefined();
+    expect(console.warn).toHaveBeenCalled();
+  });
+});
