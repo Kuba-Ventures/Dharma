@@ -67,23 +67,29 @@ export async function learnLabel(params: {
   ];
   if (domain) keys.push({ senderKey: domainKey(domain), matchType: "domain" });
 
-  for (const { senderKey, matchType } of keys) {
-    await prisma.learnedLabel.upsert({
-      where: { userId_senderKey_labelName: { userId, senderKey, labelName } },
-      create: {
-        userId,
-        senderKey,
-        matchType,
-        labelName,
-        gmailLabelId: gmailLabelId ?? null,
-        sampleCount: 1,
-      },
-      update: {
-        sampleCount: { increment: 1 },
-        // Refresh the stored Gmail label id if we now have one.
-        ...(gmailLabelId ? { gmailLabelId } : {}),
-      },
-    });
+  try {
+    for (const { senderKey, matchType } of keys) {
+      await prisma.learnedLabel.upsert({
+        where: { userId_senderKey_labelName: { userId, senderKey, labelName } },
+        create: {
+          userId,
+          senderKey,
+          matchType,
+          labelName,
+          gmailLabelId: gmailLabelId ?? null,
+          sampleCount: 1,
+        },
+        update: {
+          sampleCount: { increment: 1 },
+          // Refresh the stored Gmail label id if we now have one.
+          ...(gmailLabelId ? { gmailLabelId } : {}),
+        },
+      });
+    }
+  } catch (err) {
+    // Best-effort: never let a DB error (e.g. the LearnedLabel table not yet
+    // migrated) surface to the caller and disrupt the label sweep.
+    console.warn("[smartLabels] learnLabel skipped:", (err as Error).message);
   }
 }
 
@@ -105,9 +111,20 @@ export async function resolveLearnedLabels(
   const senderKeys = [address];
   if (domain) senderKeys.push(domainKey(domain));
 
-  const rows = await prisma.learnedLabel.findMany({
-    where: { userId, senderKey: { in: senderKeys } },
-  });
+  let rows: Array<{ labelName: string; gmailLabelId: string | null; matchType: string; sampleCount: number }>;
+  try {
+    rows = await prisma.learnedLabel.findMany({
+      where: { userId, senderKey: { in: senderKeys } },
+    });
+  } catch (err) {
+    // CRITICAL: this runs inside the label-application path. Smart Labeling is
+    // a best-effort enhancement, so a DB error here (most importantly the
+    // LearnedLabel table not yet being migrated via `prisma db push`) must
+    // NEVER throw — otherwise it would abort the whole block and skip the
+    // message's rule/AI labels too. Degrade to "no learned labels".
+    console.warn("[smartLabels] resolveLearnedLabels degraded to none:", (err as Error).message);
+    return [];
+  }
 
   // Address matches first so they win the gmailLabelId on dedup.
   rows.sort((a, b) => (a.matchType === "address" ? -1 : 1) - (b.matchType === "address" ? -1 : 1));
@@ -135,25 +152,30 @@ export async function unlearnLabel(params: {
   const { address, domain } = parseSender(from);
   if (!address) return;
 
-  await prisma.learnedLabel.deleteMany({
-    where: { userId, senderKey: address, labelName },
-  });
-
-  if (domain) {
-    const key = domainKey(domain);
-    const row = await prisma.learnedLabel.findUnique({
-      where: { userId_senderKey_labelName: { userId, senderKey: key, labelName } },
+  try {
+    await prisma.learnedLabel.deleteMany({
+      where: { userId, senderKey: address, labelName },
     });
-    if (row) {
-      if (row.sampleCount <= 1) {
-        await prisma.learnedLabel.delete({ where: { id: row.id } });
-      } else {
-        await prisma.learnedLabel.update({
-          where: { id: row.id },
-          data: { sampleCount: { decrement: 1 } },
-        });
+
+    if (domain) {
+      const key = domainKey(domain);
+      const row = await prisma.learnedLabel.findUnique({
+        where: { userId_senderKey_labelName: { userId, senderKey: key, labelName } },
+      });
+      if (row) {
+        if (row.sampleCount <= 1) {
+          await prisma.learnedLabel.delete({ where: { id: row.id } });
+        } else {
+          await prisma.learnedLabel.update({
+            where: { id: row.id },
+            data: { sampleCount: { decrement: 1 } },
+          });
+        }
       }
     }
+  } catch (err) {
+    // Best-effort — see learnLabel/resolveLearnedLabels.
+    console.warn("[smartLabels] unlearnLabel skipped:", (err as Error).message);
   }
 }
 
