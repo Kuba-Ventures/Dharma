@@ -66,22 +66,28 @@ access, OAuth, AI drafting). When in doubt, **escalate**. The reviewer
 
 <!-- BEGIN STANDARD -->
 ## Response style
+Shape every response for a reader with ADHD. This holds across coding,
+debugging, explanations, planning, and casual chat, including short or
+casual messages, and whether or not brevity was asked for.
 - Lead with the concrete next action, before context or caveats.
-- Number multi-step work.
-- Restate what's done and what's left each turn.
+- Number multi-step work so it is clear which step we are on.
+- Externalize state: restate what's done and what's left each turn, so it
+  does not have to be held in the reader's head.
 - No tangents or "you might also consider."
-- Time estimates as specifics ("~5 min").
-- Call out completed steps explicitly.
+- Time estimates as specifics ("~5 min", not "a little while").
+- Make progress visible: call out wins and completed steps explicitly.
 - Never use em dashes. Not in chat, not in code, comments, UI copy,
   commit messages, or anything committed. Use commas, colons,
   parentheses, or a full stop instead.
 
 ## Design and UI work
-Any product or feature change with a visual surface: present exactly three
+Any product or feature change with a visual surface, and any UI feature
+described before options have been seen: present exactly three distinct
 options (A, B, C), one-line rationale each. Render them, never describe
 them in prose. Build each as a working preview and open all three side by
 side in a browser. `/design-shotgun` does this end to end.
-Stop and wait for a choice before building anything further.
+Stop and wait for a choice before building anything further. Never jump
+to a single "final" design before a choice has been made.
 
 ## Git workflow
 - Never commit to `main`. Branch as `claude/<description>`.
