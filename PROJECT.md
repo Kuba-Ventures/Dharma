@@ -1,21 +1,21 @@
 # Dharma
 *AI-drafted Gmail replies and scheduling, wrapped in a labeled inbox.*
 
-*Last updated: 2026-10-02 by kuba-vault*
+*Last updated: 2026-10-02 17:16 ET by kuba-vault*
 
 ---
 
 ## TL;DR
 
-Dharma is a Next.js web app plus a Gmail add-on that watches a user's Gmail, classifies threads into preset labels (VC / PE / Legal / General / Personal / Custom), and drafts replies in the user's tone, including calendar-aware scheduling replies over Google, Microsoft, and Apple free/busy. The product works end to end for the invite-only cohort. Since mid-July the work has been a **simplification plus reliability pass, not new surface area**. Gamification came out end to end (milestones, the tier ladder, the badge case, share cards); the IA collapsed from five tabs to three (Dashboard, Configuration, Profile & Settings) with Metrics folded into the Dashboard and Signals into Configuration. Two production bugs that silently killed auto-labeling a few hours after login were root-caused and fixed: Google rotates the refresh token, and the old code kept the original, so every Gmail call now routes through one `makeAuthForUser` helper that persists the rotation (#115/#117). Scheduling replies got a correctness run of eight PRs (#104 to #111): read all visible calendars, resolve relative dates against the email's sent date, bucket the busy window in Eastern, never propose a past time, deterministic addressee. The newest feature is **Smart Labeling** (#121/#123): Dharma learns sender to label associations from the user's own labeling and re-applies them, with domain-level learning gated behind a promotion threshold. **Onboarding v2** (connect, quiz, personalize, land in a labeled inbox) shipped back on 2026-07-08/09 behind a default-off `ONBOARDING_V2` flag, with each user pinned to v1 or v2 at entry. The public launch is still **blocked externally** on Google restricted-scope verification plus a CASA Tier 2 assessment, waiting on budget, assessor, and legal decisions from Abhinav Godavarthi. A staged `ROADMAP.md` (#128, 2026-10-02) now lays out the path from here to public launch.
+Dharma is a Next.js web app plus a Gmail add-on that watches a user's Gmail, sorts threads into preset labels (VC / PE / Legal / General / Personal / Custom), and drafts replies in the user's tone, including calendar-aware scheduling replies over Google, Microsoft, and Apple free/busy. It is live at `www.dharmaautomations.com` for an invite-only cohort; `/api/health` returned ok on 2026-10-02. No product code has merged since 2026-08-04: the last stretch was a simplification and reliability pass (gamification removed, three tabs, refresh-token rotation fixed in #115/#117, a scheduling correctness run in #104 to #111, Smart Labeling in #121/#123). Public launch is still **blocked externally** on Google restricted-scope verification plus CASA Tier 2, waiting on Abhinav Godavarthi's budget, assessor, and legal decisions. New this run: `npm audit` now reports 6 **production** findings, including 3 critical advisories against `next` 16.2.12, so the "6 left, all dev-only" state from #119 no longer holds and needs fixing before the CASA DAST scan.
 
 ---
 
 ## What it is
 
-**The problem:** Busy operators (founders, VCs, PE associates, lawyers) spend hours triaging inbox and writing routine replies — especially scheduling back-and-forth.
+**The problem:** Busy operators (founders, VCs, PE associates, lawyers) spend hours triaging inbox and writing routine replies, especially scheduling back-and-forth.
 **The solution:** Dharma classifies each new thread into a small set of meaningful Gmail labels, drafts reply text in the user's tone, and (for scheduling threads) pulls multi-calendar availability and writes a ready-to-send reply with concrete time slots.
-**The user:** Solo operators and small teams in finance/legal whose inbox is their job — VC/PE first, Legal next.
+**The user:** Solo operators and small teams in finance/legal whose inbox is their job: VC/PE first, Legal next.
 **The value:** Reclaim ~30-60 min/day of triage and routine writing; never miss a scheduling thread because the calendar work is already done.
 
 ---
@@ -28,13 +28,13 @@ Dharma is a Next.js web app plus a Gmail add-on that watches a user's Gmail, cla
 - **Cadence:** daily commits via a supervised PR factory; async decision doc (`docs/abhinav-questions.md`) is the client channel
 - **Next milestone (external):** Abhinav approves the CASA budget and picks an assessor so the Google verification clock can start (~1-2 months, external)
 - **Next milestone (engineering):** soak `ONBOARDING_V2`, flip it on for new entrants, then delete the v1 step routes
-- **Flags:** on-track (engineering) / blocked (public launch, waiting on Abhinav + Google)
+- **Flags:** on-track (engineering) / blocked (public launch, waiting on Abhinav + Google). New engineering item: production npm audit findings, including a critical `next` advisory.
 
 ---
 
 ## Where we are right now
 
-**October 2 update.** No product code has merged since 2026-08-30. Today `ROADMAP.md` landed (#128). It stages the work: Stages 0 and 1 (core product, then simplify and stabilize) are done; Stage 2 (Google restricted-scope verification plus CASA Tier 2) is the critical path and still waits on Abhinav's budget, assessor, and legal decisions; Stages 3 to 5 cover launch readiness, Stripe billing, and later Signals and Smart Labeling UI work. Dharma stays live for the invite-only cohort until verification clears. Writing the roadmap surfaced four housekeeping items: issue #99 (drop `gmail.compose`) is superseded by #118, which found the scope is required; issue #122 (harden the learned-label lookup) looks fixed by #123; both are still open. Nobody has confirmed that `prisma db push` ran in production for the `LearnedLabel` table, or that the Google consent screen is in production mode.
+**October 2 update.** Docs and housekeeping only; no product code has merged since #123 on 2026-08-04. Today: `ROADMAP.md` landed (#128), PROJECT.md recorded it (#129), and `CLAUDE.md` gained the owner's "Initiative and previews" preferences, placed under the merge policy so the policy still wins on conflicts (#130). Issues #99 (drop `gmail.compose`, superseded by #118) and #122 (harden the learned-label lookup, fixed by #123) were both closed today. Live checks on 2026-10-02: the site and `/privacy` return 200, the apex 308-redirects to www, `/api/health` reports database and admin sheet ok, and the Limited Use section with the Anthropic disclosure is already live on production `/privacy`. That means the open question is no longer whether to deploy it, only whether Abhinav has signed off on wording that is already public. A fresh `npm audit` shows the dependency picture has slipped since #119: 14 findings in total, 6 of them in production dependencies (1 critical, 3 high, 2 moderate). The critical one is `next` 16.2.12, with three RCE advisories (npm audit lists versions up to 16.3.5 as affected). Next concrete steps: bump `next` and the other production dependencies with fixes, then get Abhinav's CASA budget and assessor decision. Still unconfirmed: `prisma db push` for `LearnedLabel` in production, and the consent screen's production mode.
 
 Three threads ran through August, all merged to `main` and live in prod.
 
@@ -114,7 +114,7 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 | Layer | Technology | Notes |
 |---|---|---|
 | Monorepo | npm workspaces | `apps/*` + `packages/*`, Node >=20 |
-| Frontend | Next.js 16.2.12 (App Router) + React 18.3 + Tailwind 3.4 | `apps/web`; patched to 16.2.12 in #119 for the Next DoS advisories |
+| Frontend | Next.js 16.2.12 (App Router) + React 18.3 + Tailwind 3.4 | `apps/web`; patched to 16.2.12 in #119. As of 2026-10-02 `npm audit` flags 16.2.12 with 3 critical RCE advisories (affected range runs to 16.3.5) |
 | Onboarding tour | driver.js 1.4 | `app/components/dashboard/ProductTour.tsx` |
 | Auth | NextAuth v5 beta (`^5.0.0-beta.25`, locked at beta.32) + wrapped Prisma adapter | `lib/adapter.ts`; rotated refresh tokens persisted (#115/#117) |
 | Database | PostgreSQL (Neon) via Prisma 5.22 client | `schema.prisma` at repo root; no versioned migrations (`db push`) |
@@ -138,7 +138,7 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 | Vercel (hosting + functions + cron) | Hosts the app, API routes, and the three crons (share-card OG retired with milestones, #52/#119) | unknown (Hobby/Pro) | live (`www.dharmaautomations.com`, `kuba-ventures` team) |
 | Neon (Postgres) | Primary database | unknown | live |
 | Anthropic API (direct, optionally via AI Gateway) | Haiku 4.5 (classify/polish/signal) + Sonnet (reply/scheduling/tone) | usage-based; tracked in `UsageEvent`; capped by `aiLimits` per-user tier | live |
-| Google OAuth | User login | free | live (consent-screen production status: confirm — see risks) |
+| Google OAuth | User login | free | live (consent-screen production status unconfirmed, see risks) |
 | Gmail API | Read inbox, apply labels, create drafts, register Watch | free (quota-limited) | live |
 | Google Calendar API | Free/busy, create/update/delete events with Meet | free (quota-limited) | live |
 | Google Cloud Pub/Sub | Real-time Gmail push (push → `/api/gmail/webhook`, OIDC-verified) | usage-based, unknown | live (`/api/gmail/poll` cron is the fallback) |
@@ -157,6 +157,7 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 
 ## Decisions log
 
+- **2026-10-02 - Owner initiative preferences live in CLAUDE.md, below the merge policy** - Agents do routine, reversible steps themselves (dashboards, CLIs, MCPs) and stop for money, messages sent as the owner, secrets, DNS, and deletions. The section states that the repo's merge policy takes precedence on conflict, so it cannot loosen the escalate-to-human rules. (PR #130)
 - **2026-08-08/09 - CLAUDE.md carries a shared standard block** - Response style, the three-option rule for any visual change, git workflow, and a hard no-em-dash rule live between `<!-- BEGIN STANDARD -->` markers so the block can be synced across repos without hand-merging. (PRs #124/#125)
 - **2026-08-03 - Smart Labeling learns from the user, with domain matches gated** - A manual label is a training signal: `LearnedLabel` stores sender to label associations and the webhook plus poll paths re-apply them. Exact-address matches apply from the first sighting; domain matches wait for `DOMAIN_PROMOTION_THRESHOLD` (2) so one stray label cannot tag a whole domain. Rejected: learning at domain granularity immediately (too easy to poison from one mislabel). (PR #121, issue #120)
 - **2026-08-04 - Smart Labeling failures degrade, they do not break labeling** - Every Smart Labeling DB call is wrapped so a schema or connection error falls back to normal classification instead of taking down the core path a paying user depends on. (PR #123)
@@ -221,12 +222,12 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 - [ ] **BLOCKER (external), CASA Tier 2 budget + assessor** - Abhinav approves the ~$500-$3,000+/yr budget, confirms who pays, and signs an assessor SOW (from the App Defense Alliance list). Finley sources 2-3 quotes. Google's restricted-scope verification clock cannot start until this is done. (Abhinav)
 - [ ] **Confirm the Google OAuth consent screen is "In production" (not Testing)** - Testing mode expires all refresh tokens every 7 days, which would re-break labeling weekly on top of the rotation bug just fixed. (Abhinav)
 - [ ] **Confirm `prisma db push` ran in production for `LearnedLabel`** - Smart Labeling (#121/#123) needs the table. Because #123 swallows DB errors, a missing table would not break labeling; Smart Labeling would just never learn, silently. (Finley)
-- [ ] **Close issues #99 and #122** - #99 (drop `gmail.compose`) is superseded by #118, which found the scope is required and still in `apps/gmail-addon/appsscript.json`. #122 (harden the learned-label lookup) looks fixed by #123: `resolveLearnedLabels` now degrades to no labels on error. Both are still open. (Finley)
-- [ ] **Abhinav's legal sign-off on the Limited-Use privacy copy (#16)** - the draft is written; it cannot be un-drafted and deployed without sign-off. (Abhinav)
+- [ ] **Fix the production npm audit findings before the CASA DAST scan** - as of 2026-10-02: 6 production findings (`next` critical; `brace-expansion`, `nanoid`, `sharp` high; `qs`, `baseline-browser-mapping` moderate), 14 in total. All report a fix available. A `next` bump touches `package.json` / `package-lock.json`, so it escalates under the merge policy. (Finley)
+- [ ] **Abhinav's legal sign-off on the Limited-Use privacy copy (#16)** - the copy, including the Anthropic disclosure, is already live on production `/privacy` (checked 2026-10-02). Sign-off is still not recorded anywhere in the repo. (Abhinav)
 - [ ] **Approve/edit the free-vs-paid feature split + price points** - unblocks the Stripe build (#7). (Abhinav)
 - [ ] **Record the demo video** - script is done (`docs/demo-video-script.md`); covers every scope plus the client-ID-in-URL requirement, needed for Google verification. (Finley/Abhinav)
 - [ ] **Soak `ONBOARDING_V2`, flip it on, then delete the v1 step routes** - v1 and v2 both live in the tree today; the flag only decides what new entrants get pinned to. (Finley)
-- [ ] **Re-triage the remaining npm audit findings before the CASA DAST scan** - 6 left after #119, all dev-only test tooling; confirm the scan agrees. (Finley)
+- [ ] **Confirm the residual npm audit findings with the assessor's DAST scan (#100)** - after the production fixes above, re-run the audit and confirm the scan agrees. (Finley)
 - [ ] Build Stripe billing on the `planForUser()` seam once pricing is approved (#7). (Finley)
 - [ ] Set `OPS_ALERT_WEBHOOK_URL` in prod so watch-renewal and poll-failure alerts page out instead of only landing in logs. (Finley)
 - [ ] Turn on `FACTORY_AUTOMERGE` after a supervised soak of the PR factory. (Finley)
@@ -239,6 +240,9 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 - [ ] Multi-account switching (deferred; Chrome profiles cover the gap). (Finley)
 
 ### Recently closed
+- [x] Issues #99 (superseded by #118) and #122 (fixed by #123) closed (2026-10-02)
+- [x] `CLAUDE.md` gained owner initiative and preview preferences, subordinate to the merge policy (2026-10-02, #130)
+- [x] `ROADMAP.md` added (2026-10-02, #128)
 - [x] CLAUDE.md shared standard block + no-em-dash rule (2026-08-08/09, #124/#125)
 - [x] Smart Labeling: learn and re-apply sender to label associations, with failures isolated from core labeling (2026-08-03/04, #121/#123)
 - [x] CASA pre-work: corrected add-on scope audit (`gmail.compose` is required), npm audit 14 vulns to 6 (2026-08-03, #118/#119)
@@ -255,7 +259,7 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 - [x] Onboarding v2 (connect, quiz, personalize, land-in-inbox) behind a pinned flow flag, plus `role` / `addonInstalledAt` / `onboardingFlow` schema fields (2026-07-08/09, #30 to #38, #40)
 - [x] Back-scan labeling pipeline: force onboarding scan (#42), record `ClassifiedThread` only when a label lands (#43), backfill ~75 threads (#44) (2026-07-13)
 - [x] Security response headers + report-only CSP (2026-07-05, PR #24)
-- [x] Limited-Use privacy section + accurate scope disclosures (2026-07-05, PR #16, code merged; deploy still gated on legal sign-off)
+- [x] Limited-Use privacy section + accurate scope disclosures (2026-07-06, PR #16; live on production `/privacy` as of the 2026-10-02 check; legal sign-off still not recorded)
 - [x] Health check + poll-failure alert + self-serve deletion in support (2026-07-05, PR #21)
 - [x] Self-serve signup behind `SELF_SERVE_SIGNUP` flag, default off (2026-07-05, PR #17)
 - [x] AI cost/abuse guardrails on all AI paths (2026-07-05, PR #15)
@@ -273,7 +277,8 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 - **Refresh-token rotation is fixed by convention, not by the type system** - the bug came back once because a route built its own Gmail client. Any new Gmail call path that bypasses `makeAuthForUser` reintroduces it; `gmail.hotPathAuth.test.ts` is the guard.
 - **Smart Labeling can be confidently wrong** - a domain association promoted at two sightings will label every future thread from that domain, and there is no user-facing way to review or forget a learned association yet. #123 isolates DB failures, not bad learning.
 - **`LearnedLabel` may not exist in production** - schema changes ship via `db push`, and no one has confirmed it ran for this table. #123 hides the failure, so the only symptom would be Smart Labeling never applying a learned label.
-- **Stale open issues mislead the CASA prep** - #99 still reads as a pending scope drop, which #118 reversed. Close it so nobody re-opens the scope question with the assessor.
+- **Production dependencies carry known critical advisories** - `next` 16.2.12 has three RCE advisories per `npm audit` (2026-10-02), plus high findings in `brace-expansion`, `nanoid`, and `sharp`. Exposure on Vercel has not been assessed. A CASA DAST scan run today would likely flag these.
+- **Privacy copy is public without a recorded legal sign-off** - the Limited Use section is live on production `/privacy`, while the repo still lists Abhinav's sign-off as pending.
 - **Two onboarding flows live in the tree** - v1 and v2 both ship; correctness depends on the `onboardingFlow` pin being read in both layouts. Delete v1 once `ONBOARDING_V2` is soaked.
 - **CSP is report-only, not enforcing** - it surfaces violations but blocks nothing; real XSS protection waits on tightening.
 - **AI guardrails depend on `UsageEvent` writes plus the `AI_*` envs being set in prod** - any AI path that forgets `logUsage` is invisible to the caps. Confirm the guardrail envs before flipping `SELF_SERVE_SIGNUP`.
@@ -309,6 +314,7 @@ Alongside those: the product got noticeably smaller. Milestones, the tier progre
 
 ## Changelog
 
+- **2026-10-02 (PM):** Recorded #130 (`CLAUDE.md` initiative and preview preferences) and the closure of issues #99 and #122. Live checks: site, `/privacy`, and `/api/health` all ok; Limited Use copy is already live on production. Fresh `npm audit`: 6 production findings including 3 critical `next` advisories, so the #119 "dev-only" state no longer holds; added an open loop and a risk. ROADMAP.md backfilled with sourced dates on every item, stage date ranges, and a Timeline.
 - **2026-10-02:** `ROADMAP.md` added (#128): Stages 0 and 1 done, Stage 2 (Google verification plus CASA Tier 2) on the critical path and blocked on Abhinav, Stages 3 to 5 for launch readiness, billing, and later UI work. Recorded open items: close #99 (superseded by #118) and #122 (fixed by #123); confirm `prisma db push` ran for `LearnedLabel` in prod; confirm the consent screen is in production mode.
 - **2026-08-30:** Full-repo refresh of this doc after seven weeks of unrecorded work (PRs #46 to #125, plus onboarding v2 in #30 to #40, which the 2026-07-13 pass missed). Three August threads: (1) auto-labeling was dying a few hours after login because Google rotates the refresh token and the code kept the original, fixed by persisting the rotation (#115) and routing every Gmail call through one `makeAuthForUser` helper (#117), with `gmail.tokenRefresh` / `gmail.hotPathAuth` tests as the guard; (2) a scheduling correctness run (#104 to #111): all visible calendars, relative dates resolved against the email's sent date, Eastern day bucketing, never propose a past time, explicit named decline, deterministic addressee; (3) Smart Labeling (#121, issue #120), a new `LearnedLabel` model that learns sender to label associations, exact-address from the first sighting and domain only past a promotion threshold of 2, with every DB call wrapped so a failure cannot break core labeling (#123). Product got smaller: gamification removed end to end (#52 to #55), Profile merged into "Profile & Settings" (#56), Metrics merged into the Dashboard (#101 to #103), Signals folded into a unified Configuration panel with segmented tabs (#57 to #72). Scheduling blocks now self-expire, stay in the bookable-week grid, and resync for real (#89 to #97); dead calendar grants surface a reconnect prompt instead of a fake "0 meetings" (#91/#95). Add-on gained an adaptive show-both compose card (#116). CASA pre-work: the add-on's `gmail.compose` is required, not droppable (#118), and npm audit went 14 to 6, all remaining dev-only (#119). Em dashes are stripped from every drafted reply (#61) and the no-em-dash rule joined a shared `CLAUDE.md` standard block (#124/#125). Doc corrections: IA is 3 tabs not 5, `User.role` / `onboardingFlow` / `addonInstalledAt` now exist, `MilestoneDef` / `UserMilestone` and the `share/milestone` Edge OG route are gone, test suites 8 to 36, `scripts/poller.mjs` no longer exists.
 - **2026-07-13:** Back-scan / labeling pipeline fixes, three PRs merged to `main` and live in prod. #42 — onboarding's "sort my inbox" now sends `force: true` so it labels the inbox instead of skipping already-`ClassifiedThread` rows (`PersonalizeForm.tsx`; test asserts `{ onboarding: true, force: true }`). #43 — root cause: new pure gate `lib/classifiedThreadGate.ts` (`shouldRecordClassifiedThread`, unit-tested) makes the webhook + poll paths record a `ClassifiedThread` only when a Gmail label actually landed, no longer stranding threads "classified but unlabeled" during a provisioning race. #44 — `scanCore` backfills ~75 inbox threads (`BACKSCAN_BACKFILL_TARGET`) via a synchronous first 25 + `after()` tail, now for both Sync inbox and onboarding; fixed a pagination skip bug (listed 2x messages but consumed only 25). All three returned ESCALATE from factory-review (touch `onboarding/**` + `api/**`) and were human-merged. #44 verified live on the `mrfinleyunderwood@gmail.com` test account (`scanned=8 tagged=8 skipped=0`; 8-thread inbox, so multi-page path not exercised on real data). Back-scan env knobs: `BACKSCAN_CONCURRENCY` (25, from #41), `BACKSCAN_MAX_THREADS` (25), `BACKSCAN_BACKFILL_TARGET` (75).
