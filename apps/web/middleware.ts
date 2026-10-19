@@ -1,12 +1,39 @@
 import NextAuth from "next-auth";
 import { authConfig } from "./lib/auth.config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { adminSessionCookieName, readAdminSessionToken } from "./lib/admin/adminSession";
 
 const { auth } = NextAuth(authConfig);
+
+// The admin console has its own sign-in (email allowlist + master password,
+// see lib/admin/adminSession.ts) and never uses the product's NextAuth session.
+async function handleAdminRequest(req: NextRequest): Promise<NextResponse> {
+  const { pathname, search } = req.nextUrl;
+  if (pathname === "/admin/login" || pathname === "/api/admin/login" || pathname === "/api/admin/logout") {
+    return NextResponse.next();
+  }
+  const adminSession = await readAdminSessionToken(req.cookies.get(adminSessionCookieName)?.value);
+  if (adminSession) {
+    const response = NextResponse.next();
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+  if (pathname.startsWith("/api/admin/")) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const loginUrl = new URL("/admin/login", req.url);
+  loginUrl.searchParams.set("next", pathname + search);
+  return NextResponse.redirect(loginUrl);
+}
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
+
+  if (pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/")) {
+    return handleAdminRequest(req);
+  }
 
   // Add-on endpoints below carry their own `Authorization: GoogleBearer <token>`
   // and verify the user inside the route handler. They must bypass middleware,
