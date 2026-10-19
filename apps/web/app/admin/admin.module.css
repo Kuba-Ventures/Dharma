@@ -1,0 +1,743 @@
+.consoleShell {
+  --admin-background: #0f0f10;
+  --admin-surface: #141416;
+  --admin-border: #232326;
+  --admin-text: #f4f4f2;
+  --admin-muted: #8d8d93;
+  --admin-faint: #5c5c62;
+  --admin-brand: #7f77dd;
+  --admin-brand-soft: rgba(127, 119, 221, 0.16);
+  --admin-gold: #d4a017;
+  --admin-good: #34d399;
+  --admin-bad: #f87171;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  background: var(--admin-background);
+  color: var(--admin-text);
+  font-size: 14px;
+}
+
+.sidebar {
+  border-right: 1px solid var(--admin-border);
+  padding: 24px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 8px 28px;
+}
+
+.brandMark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: block;
+}
+
+.brandEyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--admin-muted);
+}
+
+.brandName {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.navigationSectionLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--admin-faint);
+  margin: 18px 10px 8px;
+}
+
+.navigationLink {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: #c9c9cc;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.navigationLink:hover {
+  background: #141416;
+  color: #fff;
+}
+
+.navigationLinkActive {
+  background: var(--admin-brand-soft);
+  color: #fff;
+}
+
+.sidebarFooter {
+  margin-top: auto;
+  padding: 12px 8px 0;
+  border-top: 1px solid var(--admin-border);
+  color: var(--admin-muted);
+  font-size: 12px;
+  word-break: break-all;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebarFooterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ghostButton {
+  background: none;
+  border: 1px solid #2c2c30;
+  color: var(--admin-text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ghostButton:hover {
+  background: #17171a;
+}
+
+.content {
+  padding: 30px 32px 48px;
+  min-width: 0;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.pageSubtitle {
+  color: var(--admin-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.syncBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: #d8d8db;
+}
+
+.syncDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--admin-good);
+}
+
+.rangeSelector {
+  display: flex;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.rangeOption {
+  padding: 6px 14px;
+  border-radius: 7px;
+  color: var(--admin-muted);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.rangeOption:hover {
+  color: #fff;
+}
+
+.rangeOptionActive {
+  background: #1d1d20;
+  color: #fff;
+  font-weight: 600;
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tileGridSix {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.tile {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  min-width: 0;
+}
+
+.tileLabel {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+}
+
+.tileValue {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tileNote {
+  color: var(--admin-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.panelRow {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panel {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.panelRow .panel {
+  margin-bottom: 0;
+}
+
+.panelTitle {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #c9c9cc;
+  font-weight: 600;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.panelFootnote {
+  color: var(--admin-muted);
+  font-size: 12px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.chartLegend {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #d8d8db;
+  margin-bottom: 8px;
+}
+
+.legendSwatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.lineItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 0;
+  border-top: 1px solid #1b1b1e;
+  font-variant-numeric: tabular-nums;
+}
+
+.lineItem:first-of-type {
+  border-top: 0;
+}
+
+.lineItemTotal {
+  font-weight: 700;
+  border-top: 1px solid #2c2c30;
+}
+
+.funnelStep {
+  display: grid;
+  grid-template-columns: 120px 1fr 50px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.funnelBarTrack {
+  height: 26px;
+}
+
+.funnelBar {
+  height: 100%;
+  background: var(--admin-brand);
+  border-radius: 3px;
+  min-width: 4px;
+}
+
+.funnelValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.funnelShare {
+  grid-column: 2 / 4;
+  color: var(--admin-muted);
+  font-size: 12px;
+  margin-top: -6px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.tableScroller {
+  overflow-x: auto;
+}
+
+.table th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--admin-muted);
+  font-weight: 600;
+  padding: 0 10px 10px 0;
+  border-bottom: 1px solid #1b1b1e;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 13px 10px 13px 0;
+  border-bottom: 1px solid #1b1b1e;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table .numericCell {
+  text-align: right;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #2c2c30;
+  color: #d8d8db;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--admin-faint);
+}
+
+.statusDotGood {
+  background: var(--admin-good);
+}
+
+.statusDotBad {
+  background: var(--admin-bad);
+}
+
+.changeGood {
+  color: var(--admin-good);
+}
+
+.changeBad {
+  color: var(--admin-bad);
+}
+
+.changeNeutral {
+  color: var(--admin-muted);
+}
+
+.notice {
+  border: 1px solid #4a3f12;
+  background: #1a1606;
+  color: #f3dc7a;
+  border-radius: 10px;
+  padding: 11px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.emptyState {
+  padding: 22px 0;
+  color: var(--admin-muted);
+  text-align: center;
+}
+
+.externalLink {
+  color: #7cc7ff;
+  text-decoration: none;
+}
+
+.externalLink:hover {
+  text-decoration: underline;
+}
+
+.inlineForm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.skeletonBlock {
+  background: linear-gradient(90deg, #0f0f11 0%, #18181b 50%, #0f0f11 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.2s ease-in-out infinite;
+  border-radius: 12px;
+  border: 1px solid var(--admin-border);
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.loginPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #0f0f10;
+  padding: 16px;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 360px;
+  background: #0b0b0c;
+  border: 1px solid #232326;
+  color: #f4f4f2;
+  border-radius: 16px;
+  padding: 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.loginLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #8d8d93;
+}
+
+.loginInput {
+  background: #0f0f10;
+  border: 1px solid #2c2c30;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: #f4f4f2;
+}
+
+.loginInput:focus {
+  outline: 2px solid #7f77dd;
+  outline-offset: -1px;
+}
+
+.loginButton {
+  margin-top: 4px;
+  background: #7f77dd;
+  color: #ffffff;
+  border: 0;
+  border-radius: 9px;
+  padding: 11px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.loginButton:hover {
+  background: #8f88e6;
+}
+
+.loginButton:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.loginError {
+  background: #2a0f0f;
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .tileGridSix {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .panelRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .consoleShell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .brand {
+    margin: 0 10px 0 0;
+  }
+
+  .navigationSectionLabel {
+    display: none;
+  }
+
+  .sidebarFooter {
+    display: none;
+  }
+
+  .content {
+    padding: 20px 16px 36px;
+  }
+
+  .tileGrid,
+  .tileGridSix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pageTitle {
+    font-size: 24px;
+  }
+}
+
+.accountGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.accountLink {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #1b1b1e;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.accountLink:hover {
+  background: #141416;
+  border-color: #2c2c30;
+}
+
+.accountLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #fff;
+  object-fit: contain;
+}
+
+.accountText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.accountName {
+  font-size: 15px;
+}
+
+.accountMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.accountOpen {
+  color: #7cc7ff;
+  font-size: 13px;
+}
+
+.accountLink:hover .accountOpen {
+  text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  .accountGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statusDotGoogle {
+  background: var(--admin-brand);
+}
+
+.statusDotMeta {
+  background: var(--admin-gold);
+}
+
+.panelTitleWithAside {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.panelTitleAside {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.wideLeftPanelRow {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.barListItem {
+  display: grid;
+  grid-template-columns: 1fr 40px;
+  gap: 10px;
+  align-items: end;
+  padding: 7px 0;
+}
+
+.barListLabel {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.barListTrack {
+  height: 8px;
+  border-radius: 3px;
+  background: #1a1a1d;
+  overflow: hidden;
+}
+
+.barListFill {
+  height: 100%;
+  background: var(--admin-brand);
+}
+
+.truncatedCell {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c9c9cc;
+}
+
+.waitlistRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid #1b1b1e;
+  word-break: break-all;
+}
+
+.waitlistRow:first-of-type {
+  border-top: 0;
+}
+
+@media (max-width: 1100px) {
+  .wideLeftPanelRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compactTable {
+  min-width: 380px;
+}
