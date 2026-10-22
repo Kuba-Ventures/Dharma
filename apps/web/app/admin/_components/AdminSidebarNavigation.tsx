@@ -20,9 +20,15 @@ const adminNavigationSections = [
       { href: "/admin/feedback", label: "Feedback" },
     ],
   },
+  {
+    sectionLabel: "SYSTEM",
+    items: [{ href: "/admin/health", label: "Health" }],
+  },
 ];
 
-export default function AdminSidebarNavigation() {
+const healthPageHref = "/admin/health";
+
+export default function AdminSidebarNavigation({ servicesCurrentlyDownCount }: { servicesCurrentlyDownCount: number }) {
   const currentPathname = usePathname() ?? "";
   return (
     <nav>
@@ -43,6 +49,11 @@ export default function AdminSidebarNavigation() {
                 aria-current={isCurrentPage ? "page" : undefined}
               >
                 {navigationItem.label}
+                {navigationItem.href === healthPageHref && servicesCurrentlyDownCount > 0 ? (
+                  <span className={adminStyles.navigationBadge} aria-label={`${servicesCurrentlyDownCount} down`}>
+                    {servicesCurrentlyDownCount}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
