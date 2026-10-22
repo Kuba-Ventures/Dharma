@@ -155,9 +155,10 @@ export default async function AdminHealthPage() {
           ))
         )}
         <div className={adminStyles.panelFootnote}>
-          An email goes out the moment a service goes down and again when it recovers. Running out of credit or a
-          rejected key alerts on the first failed check; outages wait for a second check so a blip doesn&apos;t page
-          anyone.
+          At most one email a day goes out. It lists everything that is down and anything that recovered since
+          the last email, and an outage that lasts into the next day is mentioned again then. Running out of
+          credit or a rejected key counts on the first failed check; outages need a second check so a blip
+          doesn&apos;t count.
         </div>
       </div>
     </>

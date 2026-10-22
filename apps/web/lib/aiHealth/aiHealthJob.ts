@@ -1,11 +1,19 @@
 import { prisma } from "../prisma";
 import { sendOpsAlert } from "../opsAlert";
 import {
-  buildAiServiceAlertEmail,
-  decideAiServiceAlert,
+  anAlertEmailWentOutSince,
+  buildAiHealthDailyEmail,
   downSinceForIncident,
+  isOutageWorthReporting,
+  isRecoveryAwaitingReport,
+  pacificDayKey,
   parseAiHealthAlertRecipients,
+  reportedIncidentTimes,
+  startOfPacificDay,
+  type AiHealthDailyEmailInput,
   type AiServiceAlertKind,
+  type ServiceOutageForEmail,
+  type ServiceRecoveryForEmail,
   type StoredAiServiceCheck,
 } from "./aiHealthAlerts";
 import {
@@ -78,6 +86,7 @@ async function sendAlertEmailThroughResend(
         html: alertEmail.html,
         text: alertEmail.text,
       }),
+      cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
     if (!resendResponse.ok) {
@@ -92,24 +101,11 @@ async function sendAlertEmailThroughResend(
   }
 }
 
-async function sendAiServiceAlert(
-  alertKind: AiServiceAlertKind,
-  checkResult: AiServiceCheckResult,
-  downSinceIso: string,
-  nowIso: string,
-): Promise<boolean> {
-  const alertEmail = buildAiServiceAlertEmail({
-    alertKind,
-    service: checkResult.service,
-    failureKind: checkResult.failureKind,
-    failureDetail: checkResult.failureDetail,
-    downSinceIso,
-    nowIso,
-    healthPageUrl,
-  });
+async function sendAiHealthDailyAlert(emailInput: AiHealthDailyEmailInput, now: Date): Promise<boolean> {
+  const alertEmail = buildAiHealthDailyEmail(emailInput);
   const emailWasSent = await sendAlertEmailThroughResend(
     alertEmail,
-    `ai-health-${checkResult.service}-${alertKind}-${downSinceIso}`,
+    `ai-health-${pacificDayKey(now)}`,
     parseAiHealthAlertRecipients(process.env.AI_HEALTH_ALERT_TO),
   );
   await sendOpsAlert(`${alertEmail.subject}. ${healthPageUrl}`);
@@ -124,39 +120,71 @@ export type AiServiceCheckOutcome = {
   alertSent: AiServiceAlertKind | null;
 };
 
-async function recordCheckAndAlertIfNeeded(checkResult: AiServiceCheckResult, now: Date): Promise<AiServiceCheckOutcome> {
+export type AiHealthRunOutcome = {
+  checks: AiServiceCheckOutcome[];
+  alert: "sent" | "not_needed" | "already_sent_today" | "send_failed";
+};
+
+export async function runAiHealthCheck(now = new Date()): Promise<AiHealthRunOutcome> {
   const nowIso = now.toISOString();
-  const earlierChecksNewestFirst = await readEarlierChecksNewestFirst(checkResult.service);
-  const alertKindToSend = decideAiServiceAlert(checkResult, earlierChecksNewestFirst);
-  const downSinceIso = downSinceForIncident(earlierChecksNewestFirst, nowIso);
+  const checkResults = await checkAllAiServices();
+  const earlierChecksByService = await Promise.all(
+    checkResults.map((checkResult) => readEarlierChecksNewestFirst(checkResult.service)),
+  );
 
-  const alertWasSent =
-    alertKindToSend !== null && (await sendAiServiceAlert(alertKindToSend, checkResult, downSinceIso, nowIso));
-  const alertSent = alertWasSent ? alertKindToSend : null;
-
-  await prisma.aiServiceCheck.create({
-    data: {
-      service: checkResult.service,
-      checkedAt: now,
-      status: checkResult.status,
-      failureKind: checkResult.failureKind,
-      failureDetail: checkResult.failureDetail,
-      latencyMs: checkResult.latencyMilliseconds,
-      alertSent,
-    },
+  const outages: ServiceOutageForEmail[] = [];
+  const recoveries: ServiceRecoveryForEmail[] = [];
+  const alertKindByService = new Map<AiServiceName, AiServiceAlertKind>();
+  checkResults.forEach((checkResult, checkIndex) => {
+    const earlierChecksNewestFirst = earlierChecksByService[checkIndex];
+    if (isOutageWorthReporting(checkResult, earlierChecksNewestFirst)) {
+      outages.push({
+        service: checkResult.service,
+        failureKind: checkResult.failureKind,
+        failureDetail: checkResult.failureDetail,
+        downSinceIso: downSinceForIncident(earlierChecksNewestFirst, nowIso),
+      });
+      alertKindByService.set(checkResult.service, "down");
+    } else if (isRecoveryAwaitingReport(checkResult, earlierChecksNewestFirst)) {
+      recoveries.push({ service: checkResult.service, ...reportedIncidentTimes(earlierChecksNewestFirst, nowIso) });
+      alertKindByService.set(checkResult.service, "recovered");
+    }
   });
 
-  return {
+  const alertAlreadySentToday = anAlertEmailWentOutSince(
+    earlierChecksByService.flat(),
+    startOfPacificDay(now).toISOString(),
+  );
+  let alertOutcome: AiHealthRunOutcome["alert"] = "not_needed";
+  if (outages.length > 0 || recoveries.length > 0) {
+    if (alertAlreadySentToday) {
+      alertOutcome = "already_sent_today";
+    } else {
+      const alertWasSent = await sendAiHealthDailyAlert({ outages, recoveries, healthPageUrl }, now);
+      alertOutcome = alertWasSent ? "sent" : "send_failed";
+    }
+  }
+
+  const checkRowsToInsert = checkResults.map((checkResult) => ({
     service: checkResult.service,
+    checkedAt: now,
     status: checkResult.status,
     failureKind: checkResult.failureKind,
-    alertSent,
-  };
-}
+    failureDetail: checkResult.failureDetail,
+    latencyMs: checkResult.latencyMilliseconds,
+    alertSent: alertOutcome === "sent" ? alertKindByService.get(checkResult.service) ?? null : null,
+  }));
+  await prisma.aiServiceCheck.createMany({ data: checkRowsToInsert });
 
-export async function runAiHealthCheck(now = new Date()): Promise<AiServiceCheckOutcome[]> {
-  const checkResults = await checkAllAiServices();
-  return Promise.all(checkResults.map((checkResult) => recordCheckAndAlertIfNeeded(checkResult, now)));
+  return {
+    checks: checkRowsToInsert.map((checkRow) => ({
+      service: checkRow.service,
+      status: checkRow.status,
+      failureKind: checkRow.failureKind,
+      alertSent: checkRow.alertSent,
+    })),
+    alert: alertOutcome,
+  };
 }
 
 export async function readRecentChecksForAllServices(

@@ -78,6 +78,7 @@ export async function checkClaude(): Promise<AiServiceCheckResult> {
         max_tokens: 1,
         messages: [{ role: "user", content: "ok" }],
       }),
+      cache: "no-store",
       signal: AbortSignal.timeout(checkTimeoutMilliseconds),
     });
     const latencyMilliseconds = Date.now() - checkStartedAt;
