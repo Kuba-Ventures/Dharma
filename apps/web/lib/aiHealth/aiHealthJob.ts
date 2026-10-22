@@ -1,16 +1,15 @@
 import { prisma } from "../prisma";
 import { sendOpsAlert } from "../opsAlert";
 import {
-  anAlertEmailWentOutSince,
-  buildAiHealthDailyEmail,
+  aDownEmailWentOutForThisServiceSince,
+  buildAiHealthAlertEmail,
   downSinceForIncident,
   isOutageWorthReporting,
   isRecoveryAwaitingReport,
-  pacificDayKey,
   parseAiHealthAlertRecipients,
   reportedIncidentTimes,
   startOfPacificDay,
-  type AiHealthDailyEmailInput,
+  type AiHealthAlertEmailInput,
   type AiServiceAlertKind,
   type ServiceOutageForEmail,
   type ServiceRecoveryForEmail,
@@ -101,11 +100,11 @@ async function sendAlertEmailThroughResend(
   }
 }
 
-async function sendAiHealthDailyAlert(emailInput: AiHealthDailyEmailInput, now: Date): Promise<boolean> {
-  const alertEmail = buildAiHealthDailyEmail(emailInput);
+async function sendAiHealthAlert(emailInput: AiHealthAlertEmailInput, now: Date): Promise<boolean> {
+  const alertEmail = buildAiHealthAlertEmail(emailInput);
   const emailWasSent = await sendAlertEmailThroughResend(
     alertEmail,
-    `ai-health-${pacificDayKey(now)}`,
+    `ai-health-${now.toISOString()}`,
     parseAiHealthAlertRecipients(process.env.AI_HEALTH_ALERT_TO),
   );
   await sendOpsAlert(`${alertEmail.subject}. ${healthPageUrl}`);
@@ -122,7 +121,7 @@ export type AiServiceCheckOutcome = {
 
 export type AiHealthRunOutcome = {
   checks: AiServiceCheckOutcome[];
-  alert: "sent" | "not_needed" | "already_sent_today" | "send_failed";
+  alert: "sent" | "not_needed" | "send_failed";
 };
 
 export async function runAiHealthCheck(now = new Date()): Promise<AiHealthRunOutcome> {
@@ -132,12 +131,16 @@ export async function runAiHealthCheck(now = new Date()): Promise<AiHealthRunOut
     checkResults.map((checkResult) => readEarlierChecksNewestFirst(checkResult.service)),
   );
 
+  const startOfTodayIso = startOfPacificDay(now).toISOString();
   const outages: ServiceOutageForEmail[] = [];
   const recoveries: ServiceRecoveryForEmail[] = [];
   const alertKindByService = new Map<AiServiceName, AiServiceAlertKind>();
   checkResults.forEach((checkResult, checkIndex) => {
     const earlierChecksNewestFirst = earlierChecksByService[checkIndex];
-    if (isOutageWorthReporting(checkResult, earlierChecksNewestFirst)) {
+    const outageIsNewAndNotAlreadyEmailedToday =
+      isOutageWorthReporting(checkResult, earlierChecksNewestFirst) &&
+      !aDownEmailWentOutForThisServiceSince(earlierChecksNewestFirst, startOfTodayIso);
+    if (outageIsNewAndNotAlreadyEmailedToday) {
       outages.push({
         service: checkResult.service,
         failureKind: checkResult.failureKind,
@@ -151,18 +154,10 @@ export async function runAiHealthCheck(now = new Date()): Promise<AiHealthRunOut
     }
   });
 
-  const alertAlreadySentToday = anAlertEmailWentOutSince(
-    earlierChecksByService.flat(),
-    startOfPacificDay(now).toISOString(),
-  );
   let alertOutcome: AiHealthRunOutcome["alert"] = "not_needed";
   if (outages.length > 0 || recoveries.length > 0) {
-    if (alertAlreadySentToday) {
-      alertOutcome = "already_sent_today";
-    } else {
-      const alertWasSent = await sendAiHealthDailyAlert({ outages, recoveries, healthPageUrl }, now);
-      alertOutcome = alertWasSent ? "sent" : "send_failed";
-    }
+    const alertWasSent = await sendAiHealthAlert({ outages, recoveries, healthPageUrl }, now);
+    alertOutcome = alertWasSent ? "sent" : "send_failed";
   }
 
   const checkRowsToInsert = checkResults.map((checkResult) => ({

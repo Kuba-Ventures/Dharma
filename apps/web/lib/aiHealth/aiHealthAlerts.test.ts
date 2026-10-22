@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  anAlertEmailWentOutSince,
-  buildAiHealthDailyEmail,
+  aDownEmailWentOutForThisServiceSince,
+  buildAiHealthAlertEmail,
   describeDowntime,
   downSinceForIncident,
   isOutageWorthReporting,
@@ -41,9 +41,19 @@ describe("isOutageWorthReporting", () => {
     ).toBe(true);
   });
 
-  it("keeps reporting an outage that was already emailed, so the next day mentions it again", () => {
+  it("never reports an outage again once its down email went out, so there are no reminders", () => {
     expect(
       isOutageWorthReporting({ status: "down", failureKind: "out_of_credits" }, [
+        storedCheck({ status: "down", failureKind: "out_of_credits" }),
+        storedCheck({ status: "down", failureKind: "out_of_credits", alertSent: "down" }),
+      ]),
+    ).toBe(false);
+  });
+
+  it("reports a new outage after a fixed one", () => {
+    expect(
+      isOutageWorthReporting({ status: "down", failureKind: "key_rejected" }, [
+        storedCheck({ alertSent: "recovered" }),
         storedCheck({ status: "down", failureKind: "out_of_credits", alertSent: "down" }),
       ]),
     ).toBe(true);
@@ -94,22 +104,33 @@ describe("reportedIncidentTimes", () => {
   });
 });
 
-describe("once a Pacific day", () => {
+describe("Pacific day", () => {
   it("starts the day at Pacific midnight", () => {
     expect(startOfPacificDay(new Date("2026-10-22T05:00:00.000Z")).toISOString()).toBe("2026-10-21T07:00:00.000Z");
     expect(startOfPacificDay(new Date("2026-12-01T12:00:00.000Z")).toISOString()).toBe("2026-12-01T08:00:00.000Z");
     expect(pacificDayKey(new Date("2026-10-22T05:00:00.000Z"))).toBe("2026-10-21");
   });
 
-  it("knows whether an email already went out today", () => {
+  it("knows whether a down email already went out for the service today", () => {
     const todayStartIso = "2026-10-21T07:00:00.000Z";
     expect(
-      anAlertEmailWentOutSince([storedCheck({ checkedAt: "2026-10-21T15:00:00.000Z", alertSent: "down" })], todayStartIso),
+      aDownEmailWentOutForThisServiceSince(
+        [storedCheck({ checkedAt: "2026-10-21T15:00:00.000Z", alertSent: "down" })],
+        todayStartIso,
+      ),
     ).toBe(true);
     expect(
-      anAlertEmailWentOutSince([storedCheck({ checkedAt: "2026-10-21T06:50:00.000Z", alertSent: "down" })], todayStartIso),
+      aDownEmailWentOutForThisServiceSince(
+        [storedCheck({ checkedAt: "2026-10-21T06:50:00.000Z", alertSent: "down" })],
+        todayStartIso,
+      ),
     ).toBe(false);
-    expect(anAlertEmailWentOutSince([storedCheck({ checkedAt: "2026-10-21T15:00:00.000Z" })], todayStartIso)).toBe(false);
+    expect(
+      aDownEmailWentOutForThisServiceSince(
+        [storedCheck({ checkedAt: "2026-10-21T15:00:00.000Z", alertSent: "recovered" })],
+        todayStartIso,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -159,11 +180,11 @@ describe("describeDowntime", () => {
   });
 });
 
-describe("buildAiHealthDailyEmail", () => {
+describe("buildAiHealthAlertEmail", () => {
   const healthPageUrl = "https://www.dharmaautomations.com/admin/health";
 
   it("says what breaks, who fixes it, and links to the Health page", () => {
-    const alertEmail = buildAiHealthDailyEmail({
+    const alertEmail = buildAiHealthAlertEmail({
       outages: [
         {
           service: "claude",
@@ -178,13 +199,13 @@ describe("buildAiHealthDailyEmail", () => {
     expect(alertEmail.subject).toBe("Dharma is down: Claude says the credit balance is too low");
     expect(alertEmail.text).toContain("cannot draft replies");
     expect(alertEmail.text).toContain("Console > Billing");
-    expect(alertEmail.text).toContain("at most one of these emails a day");
+    expect(alertEmail.text).toContain("when something goes down and another when it is fixed");
     expect(alertEmail.text).toContain(healthPageUrl);
     expect(alertEmail.html).toContain(`href="${healthPageUrl}"`);
   });
 
   it("reports how long a recovered incident lasted", () => {
-    const alertEmail = buildAiHealthDailyEmail({
+    const alertEmail = buildAiHealthAlertEmail({
       outages: [],
       recoveries: [
         { service: "claude", downSinceIso: "2026-10-21T20:00:00.000Z", recoveredAtIso: "2026-10-21T23:00:00.000Z" },
@@ -196,7 +217,7 @@ describe("buildAiHealthDailyEmail", () => {
   });
 
   it("escapes provider text in the HTML and never contains an em dash", () => {
-    const alertEmail = buildAiHealthDailyEmail({
+    const alertEmail = buildAiHealthAlertEmail({
       outages: [
         { service: "claude", failureKind: "unexpected_response", failureDetail: "<b>oops</b>", downSinceIso: "2026-10-21T20:00:00.000Z" },
       ],
