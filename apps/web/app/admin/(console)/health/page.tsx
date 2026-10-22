@@ -155,8 +155,8 @@ export default async function AdminHealthPage() {
           ))
         )}
         <div className={adminStyles.panelFootnote}>
-          At most one email a day goes out. It lists everything that is down and anything that recovered since
-          the last email, and an outage that lasts into the next day is mentioned again then. Running out of
+          An email goes out when a service goes down and another when it is fixed, never while it stays down or
+          while everything works. A service that keeps flipping gets at most one down email a day. Running out of
           credit or a rejected key counts on the first failed check; outages need a second check so a blip
           doesn&apos;t count.
         </div>

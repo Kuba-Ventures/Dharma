@@ -91,6 +91,10 @@ export function isOutageWorthReporting(
   earlierChecksNewestFirst: StoredAiServiceCheck[],
 ): boolean {
   if (newCheck.status !== "down") return false;
+  const outageWasAlreadyReported = checksInTheCurrentIncident(earlierChecksNewestFirst).some(
+    (check) => check.alertSent === "down",
+  );
+  if (outageWasAlreadyReported) return false;
   const failureNeverFixesItself =
     newCheck.failureKind !== null && failureKindsThatNeverFixThemselves.includes(newCheck.failureKind);
   const previousCheckWasAlsoDown = earlierChecksNewestFirst[0]?.status === "down";
@@ -135,13 +139,13 @@ export function reportedIncidentTimes(
   };
 }
 
-export function anAlertEmailWentOutSince(
-  recentChecksAcrossAllServices: Pick<StoredAiServiceCheck, "checkedAt" | "alertSent">[],
+export function aDownEmailWentOutForThisServiceSince(
+  earlierChecksNewestFirst: Pick<StoredAiServiceCheck, "checkedAt" | "alertSent">[],
   sinceInstantIso: string,
 ): boolean {
   const sinceMilliseconds = Date.parse(sinceInstantIso);
-  return recentChecksAcrossAllServices.some(
-    (check) => check.alertSent !== null && Date.parse(check.checkedAt) >= sinceMilliseconds,
+  return earlierChecksNewestFirst.some(
+    (check) => check.alertSent === "down" && Date.parse(check.checkedAt) >= sinceMilliseconds,
   );
 }
 
@@ -192,7 +196,7 @@ export type ServiceRecoveryForEmail = {
   recoveredAtIso: string;
 };
 
-export type AiHealthDailyEmailInput = {
+export type AiHealthAlertEmailInput = {
   outages: ServiceOutageForEmail[];
   recoveries: ServiceRecoveryForEmail[];
   healthPageUrl: string;
@@ -200,7 +204,7 @@ export type AiHealthDailyEmailInput = {
 
 export type AiServiceAlertEmail = { subject: string; text: string; html: string };
 
-export function dailyEmailSubject(emailInput: Pick<AiHealthDailyEmailInput, "outages" | "recoveries">): string {
+export function alertEmailSubject(emailInput: Pick<AiHealthAlertEmailInput, "outages" | "recoveries">): string {
   if (emailInput.outages.length === 1) {
     const outage = emailInput.outages[0];
     return `Dharma is down: ${aiServiceDisplayNames[outage.service]} says ${aiServiceFailureSummaries[outage.failureKind ?? "unexpected_response"]}`;
@@ -229,15 +233,15 @@ function recoveryParagraph(recovery: ServiceRecoveryForEmail): string {
   return `${aiServiceDisplayNames[recovery.service]} is working again since ${formatPacificTime(recovery.recoveredAtIso)} PT, after being down for ${describeDowntime(recovery.downSinceIso, recovery.recoveredAtIso)}.`;
 }
 
-export const dailyEmailLimitNotice =
-  "You get at most one of these emails a day. If it is still broken tomorrow you will hear again, and the Health page always shows the live status.";
+export const alertEmailRuleNotice =
+  "You only get an email when something goes down and another when it is fixed. Nothing is sent while it stays down or while everything is working; the Health page always shows the live status.";
 
-export function buildAiHealthDailyEmail(emailInput: AiHealthDailyEmailInput): AiServiceAlertEmail {
-  const subject = dailyEmailSubject(emailInput);
+export function buildAiHealthAlertEmail(emailInput: AiHealthAlertEmailInput): AiServiceAlertEmail {
+  const subject = alertEmailSubject(emailInput);
   const paragraphs = [
     ...emailInput.outages.flatMap(outageParagraphs),
     ...emailInput.recoveries.map(recoveryParagraph),
-    dailyEmailLimitNotice,
+    alertEmailRuleNotice,
   ];
   const text = [...paragraphs, `Health page: ${emailInput.healthPageUrl}`].join("\n\n");
   const accentColor = emailInput.outages.length > 0 ? "#dc2626" : "#16a34a";
