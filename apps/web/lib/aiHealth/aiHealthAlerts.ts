@@ -1,4 +1,4 @@
-import { adminTimeZone } from "../admin/adminRange";
+import { adminTimeZone, dayKeyInTimeZone, startOfDayInstant } from "../admin/adminRange";
 import type {
   AiServiceCheckResult,
   AiServiceFailureKind,
@@ -86,24 +86,71 @@ function checksInTheCurrentIncident(earlierChecksNewestFirst: StoredAiServiceChe
     : earlierChecksNewestFirst.slice(0, indexOfMostRecentWorkingCheck);
 }
 
-export function decideAiServiceAlert(
+export function isOutageWorthReporting(
   newCheck: Pick<AiServiceCheckResult, "status" | "failureKind">,
   earlierChecksNewestFirst: StoredAiServiceCheck[],
-): AiServiceAlertKind | null {
-  const currentIncidentChecks = checksInTheCurrentIncident(earlierChecksNewestFirst);
-  const downAlertAlreadySentForThisIncident = currentIncidentChecks.some((check) => check.alertSent === "down");
-
-  if (newCheck.status === "working") {
-    return downAlertAlreadySentForThisIncident ? "recovered" : null;
-  }
-  if (newCheck.status !== "down" || downAlertAlreadySentForThisIncident) {
-    return null;
-  }
-
+): boolean {
+  if (newCheck.status !== "down") return false;
   const failureNeverFixesItself =
     newCheck.failureKind !== null && failureKindsThatNeverFixThemselves.includes(newCheck.failureKind);
   const previousCheckWasAlsoDown = earlierChecksNewestFirst[0]?.status === "down";
-  return failureNeverFixesItself || previousCheckWasAlsoDown ? "down" : null;
+  return failureNeverFixesItself || previousCheckWasAlsoDown;
+}
+
+function indexOfMostRecentlyReportedCheck(earlierChecksNewestFirst: StoredAiServiceCheck[]): number {
+  return earlierChecksNewestFirst.findIndex((check) => check.alertSent !== null);
+}
+
+export function isRecoveryAwaitingReport(
+  newCheck: Pick<AiServiceCheckResult, "status">,
+  earlierChecksNewestFirst: StoredAiServiceCheck[],
+): boolean {
+  if (newCheck.status !== "working") return false;
+  const reportedCheckIndex = indexOfMostRecentlyReportedCheck(earlierChecksNewestFirst);
+  return reportedCheckIndex !== -1 && earlierChecksNewestFirst[reportedCheckIndex].alertSent === "down";
+}
+
+export function reportedIncidentTimes(
+  earlierChecksNewestFirst: StoredAiServiceCheck[],
+  fallbackInstantIso: string,
+): { downSinceIso: string; recoveredAtIso: string } {
+  const reportedCheckIndex = indexOfMostRecentlyReportedCheck(earlierChecksNewestFirst);
+  if (reportedCheckIndex === -1) return { downSinceIso: fallbackInstantIso, recoveredAtIso: fallbackInstantIso };
+
+  let oldestDownIndex = reportedCheckIndex;
+  while (earlierChecksNewestFirst[oldestDownIndex + 1]?.status === "down") oldestDownIndex += 1;
+
+  let firstWorkingAfterIndex = -1;
+  for (let checkIndex = reportedCheckIndex - 1; checkIndex >= 0; checkIndex -= 1) {
+    if (earlierChecksNewestFirst[checkIndex].status === "working") {
+      firstWorkingAfterIndex = checkIndex;
+      break;
+    }
+  }
+
+  return {
+    downSinceIso: earlierChecksNewestFirst[oldestDownIndex].checkedAt,
+    recoveredAtIso:
+      firstWorkingAfterIndex === -1 ? fallbackInstantIso : earlierChecksNewestFirst[firstWorkingAfterIndex].checkedAt,
+  };
+}
+
+export function anAlertEmailWentOutSince(
+  recentChecksAcrossAllServices: Pick<StoredAiServiceCheck, "checkedAt" | "alertSent">[],
+  sinceInstantIso: string,
+): boolean {
+  const sinceMilliseconds = Date.parse(sinceInstantIso);
+  return recentChecksAcrossAllServices.some(
+    (check) => check.alertSent !== null && Date.parse(check.checkedAt) >= sinceMilliseconds,
+  );
+}
+
+export function pacificDayKey(instant: Date): string {
+  return dayKeyInTimeZone(instant, adminTimeZone);
+}
+
+export function startOfPacificDay(instant: Date): Date {
+  return startOfDayInstant(pacificDayKey(instant), adminTimeZone);
 }
 
 export function downSinceForIncident(earlierChecksNewestFirst: StoredAiServiceCheck[], fallbackInstantIso: string): string {
@@ -132,27 +179,68 @@ export function describeDowntime(downSinceIso: string, recoveredAtIso: string): 
   return `${hours} hour${hours === 1 ? "" : "s"} ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
-export type AiServiceAlertEmailInput = {
-  alertKind: AiServiceAlertKind;
+export type ServiceOutageForEmail = {
   service: AiServiceName;
   failureKind: AiServiceFailureKind | null;
   failureDetail: string | null;
   downSinceIso: string;
-  nowIso: string;
+};
+
+export type ServiceRecoveryForEmail = {
+  service: AiServiceName;
+  downSinceIso: string;
+  recoveredAtIso: string;
+};
+
+export type AiHealthDailyEmailInput = {
+  outages: ServiceOutageForEmail[];
+  recoveries: ServiceRecoveryForEmail[];
   healthPageUrl: string;
 };
 
 export type AiServiceAlertEmail = { subject: string; text: string; html: string };
 
-export function buildAiServiceAlertEmail(alertInput: AiServiceAlertEmailInput): AiServiceAlertEmail {
-  const serviceName = aiServiceDisplayNames[alertInput.service];
-  const paragraphs = alertEmailParagraphs(alertInput, serviceName);
-  const subject =
-    alertInput.alertKind === "down"
-      ? `Dharma is down: ${serviceName} says ${aiServiceFailureSummaries[alertInput.failureKind ?? "unexpected_response"]}`
-      : `Dharma is back: ${serviceName} is working again`;
-  const text = [...paragraphs, `Health page: ${alertInput.healthPageUrl}`].join("\n\n");
-  const accentColor = alertInput.alertKind === "down" ? "#dc2626" : "#16a34a";
+export function dailyEmailSubject(emailInput: Pick<AiHealthDailyEmailInput, "outages" | "recoveries">): string {
+  if (emailInput.outages.length === 1) {
+    const outage = emailInput.outages[0];
+    return `Dharma is down: ${aiServiceDisplayNames[outage.service]} says ${aiServiceFailureSummaries[outage.failureKind ?? "unexpected_response"]}`;
+  }
+  if (emailInput.outages.length > 1) {
+    return `Dharma is down: ${emailInput.outages.length} services are failing`;
+  }
+  if (emailInput.recoveries.length === 1) {
+    return `Dharma is back: ${aiServiceDisplayNames[emailInput.recoveries[0].service]} is working again`;
+  }
+  return `Dharma is back: ${emailInput.recoveries.length} services are working again`;
+}
+
+function outageParagraphs(outage: ServiceOutageForEmail): string[] {
+  const serviceName = aiServiceDisplayNames[outage.service];
+  const failureKind = outage.failureKind ?? "unexpected_response";
+  const paragraphs = [
+    `${serviceName}: since ${formatPacificTime(outage.downSinceIso)} PT, ${whatBreaksForUsers[outage.service]}.`,
+    whatToDo[failureKind](outage.service),
+  ];
+  if (outage.failureDetail) paragraphs.push(`What ${serviceName} said: ${outage.failureDetail}`);
+  return paragraphs;
+}
+
+function recoveryParagraph(recovery: ServiceRecoveryForEmail): string {
+  return `${aiServiceDisplayNames[recovery.service]} is working again since ${formatPacificTime(recovery.recoveredAtIso)} PT, after being down for ${describeDowntime(recovery.downSinceIso, recovery.recoveredAtIso)}.`;
+}
+
+export const dailyEmailLimitNotice =
+  "You get at most one of these emails a day. If it is still broken tomorrow you will hear again, and the Health page always shows the live status.";
+
+export function buildAiHealthDailyEmail(emailInput: AiHealthDailyEmailInput): AiServiceAlertEmail {
+  const subject = dailyEmailSubject(emailInput);
+  const paragraphs = [
+    ...emailInput.outages.flatMap(outageParagraphs),
+    ...emailInput.recoveries.map(recoveryParagraph),
+    dailyEmailLimitNotice,
+  ];
+  const text = [...paragraphs, `Health page: ${emailInput.healthPageUrl}`].join("\n\n");
+  const accentColor = emailInput.outages.length > 0 ? "#dc2626" : "#16a34a";
   const html =
     `<div style="font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827">` +
     `<div style="border-left:4px solid ${accentColor};padding-left:14px">` +
@@ -161,28 +249,9 @@ export function buildAiServiceAlertEmail(alertInput: AiServiceAlertEmailInput): 
       .map((paragraph) => `<p style="font-size:14px;line-height:1.5;margin:0 0 12px">${escapeHtml(paragraph)}</p>`)
       .join("") +
     `</div>` +
-    `<p style="margin:20px 0 0"><a href="${escapeHtml(alertInput.healthPageUrl)}" style="background:#111827;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600">Open the Health page</a></p>` +
+    `<p style="margin:20px 0 0"><a href="${escapeHtml(emailInput.healthPageUrl)}" style="background:#111827;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600">Open the Health page</a></p>` +
     `</div>`;
   return { subject, text, html };
-}
-
-function alertEmailParagraphs(alertInput: AiServiceAlertEmailInput, serviceName: string): string[] {
-  if (alertInput.alertKind === "recovered") {
-    return [
-      `${serviceName} started working again at ${formatPacificTime(alertInput.nowIso)} PT.`,
-      `It was down for ${describeDowntime(alertInput.downSinceIso, alertInput.nowIso)}, since ${formatPacificTime(alertInput.downSinceIso)} PT.`,
-    ];
-  }
-  const failureKind = alertInput.failureKind ?? "unexpected_response";
-  const paragraphs = [
-    `Since ${formatPacificTime(alertInput.downSinceIso)} PT, ${whatBreaksForUsers[alertInput.service]}.`,
-    whatToDo[failureKind](alertInput.service),
-  ];
-  if (alertInput.failureDetail) {
-    paragraphs.push(`What ${serviceName} said: ${alertInput.failureDetail}`);
-  }
-  paragraphs.push("You will get one more email when it recovers.");
-  return paragraphs;
 }
 
 export const defaultAiHealthAlertRecipient = "finley@qsbsrollover.com";
