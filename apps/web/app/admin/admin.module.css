@@ -741,3 +741,121 @@
 .compactTable {
   min-width: 380px;
 }
+
+.navigationBadge {
+  float: right;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--admin-bad);
+  color: #111;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.healthDownStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 11px 14px;
+  border: 1px solid #7f2d2d;
+  background: #1f0b0b;
+  border-radius: 10px;
+  color: #fecaca;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.healthDownStrip:hover {
+  border-color: var(--admin-bad);
+}
+
+.healthDownStripLink {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--admin-bad);
+  font-weight: 600;
+}
+
+.healthServiceHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.healthServiceName {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.healthServiceStatus {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.healthUptime {
+  margin-left: auto;
+  color: #c9c9cc;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.healthDownDetail {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #1f0b0b;
+  color: #fecaca;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.healthTimeline {
+  display: flex;
+  gap: 2px;
+}
+
+.healthTimelineSlot {
+  flex: 1;
+  height: 22px;
+  border-radius: 2px;
+  background: #1b1b1e;
+}
+
+.healthTimelineSlotWorking {
+  background: var(--admin-good);
+  opacity: 0.7;
+}
+
+.healthTimelineSlotDown {
+  background: var(--admin-bad);
+}
+
+.healthTimelineLabels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--admin-faint);
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.healthSpend {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #1b1b1e;
+}
+
+@media (max-width: 640px) {
+  .healthUptime {
+    margin-left: 0;
+    width: 100%;
+  }
+}

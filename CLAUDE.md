@@ -105,3 +105,15 @@ to a single "final" design before a choice has been made.
 - One PR per logical change, no mixing chores into feature branches.
 - Delete the branch after merge.
 <!-- END STANDARD -->
+
+## AI service health checks
+
+Every 10 minutes Vercel Cron calls `GET /api/cron/ai-health` (`apps/web/vercel.json`, same `Authorization: Bearer $CRON_SECRET` gate as the other cron routes). It sends one real `max_tokens: 1` request to Claude (`claude-haiku-5-5`) with the production `ANTHROPIC_API_KEY`, through `lib/anthropicEndpoint.ts` so it follows the AI Gateway when `AI_GATEWAY_API_KEY` is set. Anthropic has no API for remaining prepaid credit, so this live check is the only signal that the org ran out.
+
+- `apps/web/lib/aiHealth/aiHealthChecks.ts`: the probe and failure classification (out_of_credits, key_rejected, key_not_allowed, rate_limited, provider_outage, unreachable, unexpected_response, not_configured).
+- `apps/web/lib/aiHealth/aiHealthAlerts.ts`: pure alert decisions and the email. Credit and key failures alert on the first failed check, transient ones need two in a row; one down email and one recovered email per incident.
+- `apps/web/lib/aiHealth/aiHealthSummary.ts`: pure uptime, 7 day timeline and incident math for the Health page.
+- `apps/web/lib/aiHealth/aiHealthJob.ts`: Prisma reads and writes, and alert delivery. Email goes through Resend's REST API when `RESEND_API_KEY` and `AI_HEALTH_ALERT_FROM` are set, to `AI_HEALTH_ALERT_TO` (comma separated, default `finley@qsbsrollover.com`), and is mirrored to `OPS_ALERT_WEBHOOK_URL` through `lib/opsAlert.ts`.
+- Table `ai_service_checks` (Prisma model `AiServiceCheck`), one row per service per run. Additive; created with `db push`.
+- `/admin/health` shows status, last check, reply time, 7 day timeline, uptime and incidents. The console layout shows a red strip on every admin page and a badge on the Health nav item while a service is down, and renders normally if the database cannot be read.
+- Tests: `apps/web/lib/aiHealth/*.test.ts` (`npm test`).

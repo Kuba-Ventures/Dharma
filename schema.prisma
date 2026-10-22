@@ -332,3 +332,19 @@ model Feedback {
 
   @@index([userId, createdAt])
 }
+
+// ── AI service health checks (cron /api/cron/ai-health, admin /admin/health) ──
+
+model AiServiceCheck {
+  id             String   @id @default(cuid())
+  service        String   // "claude"
+  checkedAt      DateTime @default(now()) @map("checked_at")
+  status         String   // "working" | "down" | "unknown"
+  failureKind    String?  @map("failure_kind")
+  failureDetail  String?  @map("failure_detail")
+  latencyMs      Int?     @map("latency_ms")
+  alertSent      String?  @map("alert_sent") // "down" | "recovered"
+
+  @@index([service, checkedAt(sort: Desc)])
+  @@map("ai_service_checks")
+}
